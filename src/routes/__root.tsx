@@ -94,6 +94,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Agenda — Organize tarefas da sua equipe" },
+      { name: "description", content: "Team Schedule Hub is a web application for managing team schedules and tasks." },
+      { property: "og:description", content: "Team Schedule Hub is a web application for managing team schedules and tasks." },
+      { name: "twitter:description", content: "Team Schedule Hub is a web application for managing team schedules and tasks." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/4fc6a862-2095-44b7-b601-bf1e876ced8a/id-preview-be113e17--c9492a9e-fb14-4549-b516-bac5250b6166.lovable.app-1783002691423.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/4fc6a862-2095-44b7-b601-bf1e876ced8a/id-preview-be113e17--c9492a9e-fb14-4549-b516-bac5250b6166.lovable.app-1783002691423.png" },
     ],
     links: [
       {
