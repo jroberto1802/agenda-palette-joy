@@ -1,4 +1,4 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useRouterState, type LinkProps } from "@tanstack/react-router";
 import {
   BarChart3,
   Building2,
@@ -13,7 +13,7 @@ import {
   Sun,
   Users,
 } from "lucide-react";
-import { useMemo, type ReactNode } from "react";
+import { useMemo, type ComponentType, type ReactNode } from "react";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import {
   Sidebar,
@@ -38,7 +38,13 @@ import { useProfile } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
 import { isAdmin } from "@/utils/permissions";
 
-const BASE_NAV = [
+type NavItem = {
+  to: string;
+  label: string;
+  icon: ComponentType<{ className?: string }>;
+};
+
+const BASE_NAV: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/tarefas", label: "Tarefas", icon: ClipboardList },
   { to: "/calendario", label: "Calendário", icon: CalendarDays },
@@ -47,7 +53,7 @@ const BASE_NAV = [
   { to: "/setores", label: "Setores", icon: Building2 },
   { to: "/pessoas", label: "Pessoas", icon: Users },
   { to: "/configuracoes", label: "Configurações", icon: Settings },
-] as const;
+];
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { user, signOut } = useAuth();
@@ -57,8 +63,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const displayName = profile?.nome_completo ?? user?.email ?? "Usuário";
 
-  const navItems = useMemo(() => {
-    const items = [...BASE_NAV];
+  const navItems = useMemo((): NavItem[] => {
+    const items: NavItem[] = [...BASE_NAV];
     if (isAdmin(profile)) {
       items.push({ to: "/admin", label: "Admin", icon: Shield });
     }
@@ -96,7 +102,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 {navItems.map(({ to, label, icon: Icon }) => (
                   <SidebarMenuItem key={to}>
                     <SidebarMenuButton asChild isActive={isActive(to)} tooltip={label}>
-                      <Link to={to}>
+                      <Link to={to as LinkProps["to"]}>
                         <Icon />
                         <span>{label}</span>
                       </Link>

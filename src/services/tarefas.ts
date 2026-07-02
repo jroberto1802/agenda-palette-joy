@@ -17,6 +17,7 @@ import type {
   TarefaStatus,
   TarefaWithRelations,
 } from "@/types";
+import type { TablesUpdate } from "@/types/database";
 
 const TAREFA_SELECT = `
   *,
@@ -180,7 +181,7 @@ export async function updateTarefa(
     .eq("id", id)
     .single();
 
-  const updateData: Record<string, unknown> = {
+  const updateData: TablesUpdate<"tarefas"> = {
     titulo: payload.titulo,
     descricao: payload.descricao || null,
     setor_id: payload.setor_id,
@@ -246,7 +247,7 @@ export async function updateTarefaStatus(
     .eq("id", id)
     .single();
 
-  const updateData: Record<string, unknown> = { status };
+  const updateData: TablesUpdate<"tarefas"> = { status };
 
   if (status === "concluida") {
     updateData.data_conclusao = new Date().toISOString();

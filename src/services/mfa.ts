@@ -61,14 +61,14 @@ export async function challengeAndVerifyMfa(factorId: string, code: string) {
 }
 
 export async function getVerifiedTotpFactor() {
-  const { data } = await listMfaFactors();
-  return data.totp.find((f) => f.status === "verified") ?? null;
+  const factors = await listMfaFactors();
+  return factors.totp.find((f) => f.status === "verified") ?? null;
 }
 
 export async function needsMfaChallenge() {
   const factor = await getVerifiedTotpFactor();
   if (!factor) return false;
 
-  const { data: aal } = await getMfaAssuranceLevel();
+  const aal = await getMfaAssuranceLevel();
   return aal?.nextLevel === "aal2" && aal.currentLevel !== "aal2";
 }

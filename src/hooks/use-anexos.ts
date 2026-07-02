@@ -27,7 +27,7 @@ export function useDeleteAnexo() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (anexo: TarefaAnexo) => deleteAnexo(anexo),
-    onSuccess: (anexo) => {
+    onSuccess: (_data, anexo) => {
       queryClient.invalidateQueries({ queryKey: anexoKeys.list(anexo.tarefa_id) });
       queryClient.invalidateQueries({ queryKey: tarefaKeys.detail(anexo.tarefa_id) });
     },

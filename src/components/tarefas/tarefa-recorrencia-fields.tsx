@@ -18,19 +18,19 @@ import { cn } from "@/lib/utils";
 import type { RecorrenciaTipo } from "@/types";
 import { DIAS_SEMANA, RECORRENCIA_LABELS } from "@/utils/recorrencia";
 
-type RecorrenciaFormValues = {
+export type RecorrenciaFormValues = {
   recorrencia_tipo: RecorrenciaTipo;
   recorrencia_dias_semana: number[];
   recorrencia_dia_mes: number;
   recorrencia_data_fim: Date | null;
 };
 
-export function TarefaRecorrenciaFields<T extends RecorrenciaFormValues>({
+export function TarefaRecorrenciaFields({
   form,
 }: {
-  form: UseFormReturn<T>;
+  form: UseFormReturn<RecorrenciaFormValues>;
 }) {
-  const tipo = form.watch("recorrencia_tipo" as never) as RecorrenciaTipo;
+  const tipo = form.watch("recorrencia_tipo");
 
   return (
     <div className="space-y-4 rounded-lg border p-4">
@@ -38,7 +38,7 @@ export function TarefaRecorrenciaFields<T extends RecorrenciaFormValues>({
 
       <FormField
         control={form.control}
-        name={"recorrencia_tipo" as never}
+        name="recorrencia_tipo"
         render={({ field }) => (
           <FormItem>
             <FormLabel>Frequência</FormLabel>
@@ -64,13 +64,13 @@ export function TarefaRecorrenciaFields<T extends RecorrenciaFormValues>({
       {tipo === "semanal" && (
         <FormField
           control={form.control}
-          name={"recorrencia_dias_semana" as never}
+          name="recorrencia_dias_semana"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Dias da semana</FormLabel>
               <div className="flex flex-wrap gap-2">
                 {DIAS_SEMANA.map((dia) => {
-                  const selected = (field.value as number[]).includes(dia.value);
+                  const selected = field.value.includes(dia.value);
                   return (
                     <label
                       key={dia.value}
@@ -82,11 +82,10 @@ export function TarefaRecorrenciaFields<T extends RecorrenciaFormValues>({
                       <Checkbox
                         checked={selected}
                         onCheckedChange={(checked) => {
-                          const current = field.value as number[];
                           field.onChange(
                             checked
-                              ? [...current, dia.value]
-                              : current.filter((d) => d !== dia.value),
+                              ? [...field.value, dia.value]
+                              : field.value.filter((d) => d !== dia.value),
                           );
                         }}
                       />
@@ -104,7 +103,7 @@ export function TarefaRecorrenciaFields<T extends RecorrenciaFormValues>({
       {tipo === "mensal" && (
         <FormField
           control={form.control}
-          name={"recorrencia_dia_mes" as never}
+          name="recorrencia_dia_mes"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Dia do mês</FormLabel>
@@ -134,7 +133,7 @@ export function TarefaRecorrenciaFields<T extends RecorrenciaFormValues>({
       {tipo !== "nenhuma" && (
         <FormField
           control={form.control}
-          name={"recorrencia_data_fim" as never}
+          name="recorrencia_data_fim"
           render={({ field }) => (
             <FormItem className="flex flex-col">
               <FormLabel>Repetir até (opcional)</FormLabel>
@@ -150,7 +149,7 @@ export function TarefaRecorrenciaFields<T extends RecorrenciaFormValues>({
                       )}
                     >
                       {field.value
-                        ? format(field.value as Date, "dd/MM/yyyy", { locale: ptBR })
+                        ? format(field.value, "dd/MM/yyyy", { locale: ptBR })
                         : "Sem data limite"}
                       <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                     </Button>
@@ -159,7 +158,7 @@ export function TarefaRecorrenciaFields<T extends RecorrenciaFormValues>({
                 <PopoverContent className="w-auto p-0" align="start">
                   <Calendar
                     mode="single"
-                    selected={(field.value as Date | null) ?? undefined}
+                    selected={field.value ?? undefined}
                     onSelect={field.onChange}
                     locale={ptBR}
                     initialFocus

@@ -46,7 +46,8 @@ import type {
 } from "@/types";
 import { TAREFA_PRIORIDADE_LABELS, TAREFA_STATUS_LABELS } from "@/utils/tarefas";
 import { parseRecorrencia } from "@/utils/recorrencia";
-import { TarefaRecorrenciaFields } from "@/components/tarefas/tarefa-recorrencia-fields";
+import { TarefaRecorrenciaFields, type RecorrenciaFormValues } from "@/components/tarefas/tarefa-recorrencia-fields";
+import type { UseFormReturn } from "react-hook-form";
 
 const tarefaSchema = z.object({
   titulo: z.string().min(2, "Título deve ter pelo menos 2 caracteres"),
@@ -378,7 +379,9 @@ export function TarefaFormDialog({
               )}
             />
 
-            <TarefaRecorrenciaFields form={form} />
+            <TarefaRecorrenciaFields
+              form={form as unknown as UseFormReturn<RecorrenciaFormValues>}
+            />
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

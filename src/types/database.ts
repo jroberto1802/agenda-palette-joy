@@ -25,7 +25,22 @@ export type Database = {
           id?: string;
           usuario_id?: string | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "aviso_comentarios_aviso_id_fkey",
+            columns: ["aviso_id"],
+            isOneToOne: false,
+            referencedRelation: "avisos",
+            referencedColumns: ["id"],
+          },
+          {
+            foreignKeyName: "aviso_comentarios_usuario_id_fkey",
+            columns: ["usuario_id"],
+            isOneToOne: false,
+            referencedRelation: "profiles",
+            referencedColumns: ["id"],
+          },
+        ];
       };
       aviso_lido_por: {
         Row: {
@@ -43,7 +58,22 @@ export type Database = {
           lido_em?: string;
           usuario_id?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "aviso_lido_por_aviso_id_fkey",
+            columns: ["aviso_id"],
+            isOneToOne: false,
+            referencedRelation: "avisos",
+            referencedColumns: ["id"],
+          },
+          {
+            foreignKeyName: "aviso_lido_por_usuario_id_fkey",
+            columns: ["usuario_id"],
+            isOneToOne: false,
+            referencedRelation: "profiles",
+            referencedColumns: ["id"],
+          },
+        ];
       };
       aviso_pessoas: {
         Row: {
@@ -58,7 +88,22 @@ export type Database = {
           aviso_id?: string;
           usuario_id?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "aviso_pessoas_aviso_id_fkey",
+            columns: ["aviso_id"],
+            isOneToOne: false,
+            referencedRelation: "avisos",
+            referencedColumns: ["id"],
+          },
+          {
+            foreignKeyName: "aviso_pessoas_usuario_id_fkey",
+            columns: ["usuario_id"],
+            isOneToOne: false,
+            referencedRelation: "profiles",
+            referencedColumns: ["id"],
+          },
+        ];
       };
       aviso_setores: {
         Row: {
@@ -73,7 +118,22 @@ export type Database = {
           aviso_id?: string;
           setor_id?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "aviso_setores_aviso_id_fkey",
+            columns: ["aviso_id"],
+            isOneToOne: false,
+            referencedRelation: "avisos",
+            referencedColumns: ["id"],
+          },
+          {
+            foreignKeyName: "aviso_setores_setor_id_fkey",
+            columns: ["setor_id"],
+            isOneToOne: false,
+            referencedRelation: "setores",
+            referencedColumns: ["id"],
+          },
+        ];
       };
       avisos: {
         Row: {
@@ -112,7 +172,15 @@ export type Database = {
           titulo?: string;
           updated_at?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "avisos_criado_por_fkey",
+            columns: ["criado_por"],
+            isOneToOne: false,
+            referencedRelation: "profiles",
+            referencedColumns: ["id"],
+          },
+        ];
       };
       notificacoes: {
         Row: {
@@ -142,7 +210,15 @@ export type Database = {
           tipo?: string;
           usuario_id?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "notificacoes_usuario_id_fkey",
+            columns: ["usuario_id"],
+            isOneToOne: false,
+            referencedRelation: "profiles",
+            referencedColumns: ["id"],
+          },
+        ];
       };
       profiles: {
         Row: {
@@ -178,7 +254,15 @@ export type Database = {
           setor_id?: string | null;
           updated_at?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "profiles_setor_id_fkey",
+            columns: ["setor_id"],
+            isOneToOne: false,
+            referencedRelation: "setores",
+            referencedColumns: ["id"],
+          },
+        ];
       };
       setores: {
         Row: {
@@ -208,7 +292,15 @@ export type Database = {
           nome?: string;
           updated_at?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "setores_gerente_id_fkey",
+            columns: ["gerente_id"],
+            isOneToOne: false,
+            referencedRelation: "profiles",
+            referencedColumns: ["id"],
+          },
+        ];
       };
       subtarefas: {
         Row: {
@@ -232,7 +324,15 @@ export type Database = {
           tarefa_id?: string;
           titulo?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "subtarefas_tarefa_id_fkey",
+            columns: ["tarefa_id"],
+            isOneToOne: false,
+            referencedRelation: "tarefas",
+            referencedColumns: ["id"],
+          },
+        ];
       };
       tarefa_anexos: {
         Row: {
@@ -262,7 +362,15 @@ export type Database = {
           tarefa_id?: string;
           tipo?: string | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "tarefa_anexos_tarefa_id_fkey",
+            columns: ["tarefa_id"],
+            isOneToOne: false,
+            referencedRelation: "tarefas",
+            referencedColumns: ["id"],
+          },
+        ];
       };
       tarefa_comentarios: {
         Row: {
@@ -286,7 +394,22 @@ export type Database = {
           tarefa_id?: string;
           usuario_id?: string | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "tarefa_comentarios_tarefa_id_fkey",
+            columns: ["tarefa_id"],
+            isOneToOne: false,
+            referencedRelation: "tarefas",
+            referencedColumns: ["id"],
+          },
+          {
+            foreignKeyName: "tarefa_comentarios_usuario_id_fkey",
+            columns: ["usuario_id"],
+            isOneToOne: false,
+            referencedRelation: "profiles",
+            referencedColumns: ["id"],
+          },
+        ];
       };
       tarefa_historico: {
         Row: {
@@ -316,7 +439,22 @@ export type Database = {
           valor_anterior?: string | null;
           valor_novo?: string | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "tarefa_historico_tarefa_id_fkey",
+            columns: ["tarefa_id"],
+            isOneToOne: false,
+            referencedRelation: "tarefas",
+            referencedColumns: ["id"],
+          },
+          {
+            foreignKeyName: "tarefa_historico_usuario_id_fkey",
+            columns: ["usuario_id"],
+            isOneToOne: false,
+            referencedRelation: "profiles",
+            referencedColumns: ["id"],
+          },
+        ];
       };
       tarefa_observadores: {
         Row: {
@@ -331,7 +469,22 @@ export type Database = {
           tarefa_id?: string;
           usuario_id?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "tarefa_observadores_tarefa_id_fkey",
+            columns: ["tarefa_id"],
+            isOneToOne: false,
+            referencedRelation: "tarefas",
+            referencedColumns: ["id"],
+          },
+          {
+            foreignKeyName: "tarefa_observadores_usuario_id_fkey",
+            columns: ["usuario_id"],
+            isOneToOne: false,
+            referencedRelation: "profiles",
+            referencedColumns: ["id"],
+          },
+        ];
       };
       tarefas: {
         Row: {
@@ -388,11 +541,43 @@ export type Database = {
           titulo?: string;
           updated_at?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "tarefas_setor_id_fkey",
+            columns: ["setor_id"],
+            isOneToOne: false,
+            referencedRelation: "setores",
+            referencedColumns: ["id"],
+          },
+          {
+            foreignKeyName: "tarefas_criado_por_fkey",
+            columns: ["criado_por"],
+            isOneToOne: false,
+            referencedRelation: "profiles",
+            referencedColumns: ["id"],
+          },
+          {
+            foreignKeyName: "tarefas_atribuido_a_fkey",
+            columns: ["atribuido_a"],
+            isOneToOne: false,
+            referencedRelation: "profiles",
+            referencedColumns: ["id"],
+          },
+        ];
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      notify_user: {
+        Args: {
+          p_usuario_id: string;
+          p_tipo: string;
+          p_referencia_tipo?: string | null;
+          p_referencia_id?: string | null;
+        };
+        Returns: void;
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };
