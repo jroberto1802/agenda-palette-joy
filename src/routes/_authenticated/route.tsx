@@ -1,9 +1,9 @@
 import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { AppShell } from "@/components/layouts/app-shell";
 import { useAuth } from "@/hooks/use-auth";
-
+import { needsMfaChallenge } from "@/services/mfa";
 export const Route = createFileRoute("/_authenticated")({
-  // Sessão Supabase vive em localStorage → gate roda no cliente.
   ssr: false,
   component: AuthenticatedLayout,
 });
@@ -11,6 +11,8 @@ export const Route = createFileRoute("/_authenticated")({
 function AuthenticatedLayout() {
   const { session, loading } = useAuth();
   const navigate = useNavigate();
+  const [mfaChecked, setMfaChecked] = useState(false);
+  const [mfaRequired, setMfaRequired] = useState(false);
 
   useEffect(() => {
     if (!loading && !session) {
@@ -18,13 +20,30 @@ function AuthenticatedLayout() {
     }
   }, [session, loading, navigate]);
 
-  if (loading || !session) {
-    return (
+  useEffect(() => {
+    if (!session) {
+      setMfaChecked(false);
+      return;
+    }
+    needsMfaChallenge()
+      .then((required) => {
+        setMfaRequired(required);
+        setMfaChecked(true);
+        if (required) navigate({ to: "/auth", replace: true });
+      })
+      .catch(() => setMfaChecked(true));
+  }, [session, navigate]);
+
+  if (loading || !session || !mfaChecked || mfaRequired) {    return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <p className="text-sm text-muted-foreground">Carregando...</p>
       </div>
     );
   }
 
-  return <Outlet />;
+  return (
+    <AppShell>
+      <Outlet />
+    </AppShell>
+  );
 }

@@ -1,13 +1,14 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
+import { useChallengeMfa } from "@/hooks/use-mfa";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-
+import { getVerifiedTotpFactor, needsMfaChallenge } from "@/services/mfa";
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
@@ -23,11 +24,13 @@ function AuthPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!loading && session) {
-      navigate({ to: "/dashboard", replace: true });
-    }
+    if (loading || !session) return;
+    needsMfaChallenge().then((required) => {
+      if (!required) {
+        navigate({ to: "/dashboard", replace: true });
+      }
+    });
   }, [session, loading, navigate]);
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <Card className="w-full max-w-md">
@@ -62,7 +65,11 @@ function SignInForm({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [mfaStep, setMfaStep] = useState(false);
+  const [factorId, setFactorId] = useState<string | null>(null);
+  const [mfaCode, setMfaCode] = useState("");
   const navigate = useNavigate();
+  const challengeMfa = useChallengeMfa();
 
   const handle = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,13 +78,64 @@ function SignInForm({
     setBusy(false);
     if (error) {
       toast.error("Falha ao entrar", { description: error });
-    } else {
+      return;
+    }
+
+    const required = await needsMfaChallenge();
+    if (required) {
+      const factor = await getVerifiedTotpFactor();
+      if (!factor) {
+        toast.error("2FA configurado mas fator não encontrado");
+        return;
+      }
+      setFactorId(factor.id);
+      setMfaStep(true);
+      return;
+    }
+
+    navigate({ to: "/dashboard" });
+  };
+
+  const handleMfa = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!factorId || mfaCode.length < 6) return;
+    try {
+      await challengeMfa.mutateAsync({ factorId, code: mfaCode });
       navigate({ to: "/dashboard" });
+    } catch {
+      toast.error("Código inválido", { description: "Verifique o código do autenticador." });
     }
   };
 
-  return (
-    <form onSubmit={handle} className="space-y-4 pt-4">
+  if (mfaStep) {
+    return (
+      <form onSubmit={handleMfa} className="space-y-4 pt-4">
+        <p className="text-sm text-muted-foreground">
+          Digite o código de 6 dígitos do seu aplicativo autenticador.
+        </p>
+        <div className="space-y-2">
+          <Label htmlFor="mfa-code">Código 2FA</Label>
+          <Input
+            id="mfa-code"
+            inputMode="numeric"
+            maxLength={6}
+            required
+            value={mfaCode}
+            onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ""))}
+            autoComplete="one-time-code"
+          />
+        </div>
+        <Button type="submit" className="w-full" disabled={challengeMfa.isPending || mfaCode.length < 6}>
+          {challengeMfa.isPending ? "Verificando..." : "Confirmar"}
+        </Button>
+        <Button type="button" variant="ghost" className="w-full" onClick={() => setMfaStep(false)}>
+          Voltar
+        </Button>
+      </form>
+    );
+  }
+
+  return (    <form onSubmit={handle} className="space-y-4 pt-4">
       <div className="space-y-2">
         <Label htmlFor="signin-email">Email</Label>
         <Input

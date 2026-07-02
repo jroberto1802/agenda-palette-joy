@@ -1,0 +1,140 @@
+import type { Tables } from "./database";
+
+export type Papel = Tables<"profiles">["papel"];
+export type TarefaStatus = Tables<"tarefas">["status"];
+export type TarefaPrioridade = Tables<"tarefas">["prioridade"];
+
+export type Profile = Tables<"profiles">;
+export type Setor = Tables<"setores">;
+export type Tarefa = Tables<"tarefas">;
+
+export type ProfileWithSetor = Profile & {
+  setor: Pick<Setor, "id" | "nome" | "cor"> | null;
+};
+
+export type SetorWithGerente = Setor & {
+  gerente: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
+};
+
+export type SetorFormData = {
+  nome: string;
+  cor: string;
+  descricao: string;
+  gerente_id: string | null;
+};
+
+export type ProfileFormData = {
+  nome_completo: string;
+  cargo: string;
+  setor_id: string | null;
+  papel: Papel;
+  ativo: boolean;
+};
+
+export type DashboardKpis = {
+  totalTarefas: number;
+  tarefasAFazer: number;
+  tarefasEmAndamento: number;
+  tarefasConcluidas: number;
+  tarefasBloqueadas: number;
+  tarefasVencendoHoje: number;
+  totalSetores: number;
+  totalPessoas: number;
+};
+
+export type TarefaWithRelations = Tarefa & {
+  setor: Pick<Setor, "id" | "nome" | "cor"> | null;
+  criador: Pick<Profile, "id" | "nome_completo"> | null;
+  responsavel: Pick<Profile, "id" | "nome_completo"> | null;
+};
+
+export type RecorrenciaTipo = "nenhuma" | "diaria" | "semanal" | "mensal";
+
+export type RecorrenciaConfig = {
+  tipo: RecorrenciaTipo;
+  dias_semana?: number[];
+  dia_mes?: number;
+  data_fim?: string | null;
+};
+
+export type TarefaFormData = {
+  titulo: string;
+  descricao: string;
+  setor_id: string | null;
+  atribuido_a: string | null;
+  prioridade: TarefaPrioridade;
+  status: TarefaStatus;
+  data_vencimento: string | null;
+  tags: string[];
+  recorrencia: RecorrenciaConfig | null;
+};
+
+export type TarefaAnexo = Tables<"tarefa_anexos">;
+
+export type TarefaFilters = {
+  search?: string;
+  status?: TarefaStatus | "all";
+  prioridade?: TarefaPrioridade | "all";
+  setor_id?: string | "all";
+  atribuido_a?: string | "all";
+  tag?: string;
+};
+
+export type Subtarefa = Tables<"subtarefas">;
+
+export type TarefaComentario = Tables<"tarefa_comentarios"> & {
+  usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
+};
+
+export type TarefaDetail = TarefaWithRelations & {
+  subtarefas: Subtarefa[];
+  comentarios: TarefaComentario[];
+  anexos: TarefaAnexo[];
+};
+
+export type Aviso = Tables<"avisos">;
+export type AvisoAlcance = Aviso["alcance"];
+
+export type AvisoWithRelations = Aviso & {
+  criador: Pick<Profile, "id" | "nome_completo"> | null;
+  setores: { setor: Pick<Setor, "id" | "nome"> | null }[];
+  pessoas: { usuario: Pick<Profile, "id" | "nome_completo"> | null }[];
+  lido_por: { usuario_id: string }[];
+};
+
+export type AvisoComentario = Tables<"aviso_comentarios"> & {
+  usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
+};
+
+export type AvisoDetail = AvisoWithRelations & {
+  comentarios: AvisoComentario[];
+};
+
+export type AvisoFormData = {
+  titulo: string;
+  conteudo: string;
+  alcance: AvisoAlcance;
+  fixado: boolean;
+  comentarios_permitidos: boolean;
+  setor_ids: string[];
+  usuario_ids: string[];
+};
+
+export type Notificacao = Tables<"notificacoes">;
+
+export type RelatoriosData = {
+  totalTarefas: number;
+  porStatus: { status: TarefaStatus; total: number }[];
+  porPrioridade: { prioridade: TarefaPrioridade; total: number }[];
+  porSetor: { setor_id: string; nome: string; cor: string | null; total: number }[];
+  porPessoa: { usuario_id: string; nome: string; total: number }[];
+  conclusoesPorDia: { data: string; total: number }[];
+};
+
+export type AdminCreateUserData = {
+  email: string;
+  password: string;
+  nome_completo: string;
+  papel: Papel;
+  setor_id: string | null;
+};
