@@ -1,8 +1,9 @@
 import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/layouts/app-shell";
 import { useAuth } from "@/hooks/use-auth";
 import { needsMfaChallenge } from "@/services/mfa";
+
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
   component: AuthenticatedLayout,
@@ -11,30 +12,49 @@ export const Route = createFileRoute("/_authenticated")({
 function AuthenticatedLayout() {
   const { session, loading } = useAuth();
   const navigate = useNavigate();
-  const [mfaChecked, setMfaChecked] = useState(false);
-  const [mfaRequired, setMfaRequired] = useState(false);
+  const [ready, setReady] = useState(false);
+  const checkedUserId = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!loading && !session) {
-      navigate({ to: "/auth", replace: true });
-    }
-  }, [session, loading, navigate]);
+    if (loading) return;
 
-  useEffect(() => {
     if (!session) {
-      setMfaChecked(false);
+      checkedUserId.current = null;
+      setReady(false);
+      navigate({ to: "/auth", replace: true });
       return;
     }
+
+    const userId = session.user.id;
+    if (checkedUserId.current === userId) return;
+
+    let cancelled = false;
+    setReady(false);
+
     needsMfaChallenge()
       .then((required) => {
-        setMfaRequired(required);
-        setMfaChecked(true);
-        if (required) navigate({ to: "/auth", replace: true });
+        if (cancelled) return;
+        checkedUserId.current = userId;
+        if (required) {
+          navigate({ to: "/auth", replace: true });
+        } else {
+          setReady(true);
+        }
       })
-      .catch(() => setMfaChecked(true));
-  }, [session, navigate]);
+      .catch(() => {
+        if (!cancelled) {
+          checkedUserId.current = userId;
+          setReady(true);
+        }
+      });
 
-  if (loading || !session || !mfaChecked || mfaRequired) {    return (
+    return () => {
+      cancelled = true;
+    };
+  }, [session, loading, navigate]);
+
+  if (loading || !session || !ready) {
+    return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <p className="text-sm text-muted-foreground">Carregando...</p>
       </div>

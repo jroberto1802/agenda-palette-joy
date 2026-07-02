@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ThemeSettingsCard } from "@/components/settings/theme-settings-card";
 import { useProfile } from "@/hooks/use-profile";
 import {
   useEnrollTotp,
@@ -94,7 +95,7 @@ function ConfiguracoesPage() {
     <div className="space-y-6 max-w-2xl">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Configurações</h1>
-        <p className="text-muted-foreground">Gerencie a segurança da sua conta.</p>
+        <p className="text-muted-foreground">Gerencie aparência e segurança da sua conta.</p>
       </div>
 
       <Card>
@@ -112,6 +113,8 @@ function ConfiguracoesPage() {
           </p>
         </CardContent>
       </Card>
+
+      <ThemeSettingsCard />
 
       <Card>
         <CardHeader>

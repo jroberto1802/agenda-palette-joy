@@ -66,6 +66,9 @@ export async function getVerifiedTotpFactor() {
 }
 
 export async function needsMfaChallenge() {
+  const factor = await getVerifiedTotpFactor();
+  if (!factor) return false;
+
   const { data: aal } = await getMfaAssuranceLevel();
   return aal?.nextLevel === "aal2" && aal.currentLevel !== "aal2";
 }
