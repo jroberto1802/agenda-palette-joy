@@ -137,6 +137,10 @@ function parseTags(input: string): string[] {
     .filter(Boolean);
 }
 
+function defaultVisibilidade(setorId?: string | null): TarefaVisibilidade {
+  return setorId ? "todos_setor" : "todos_empresa";
+}
+
 function toFormValues(
   tarefa?: TarefaWithRelations | null,
   defaultSetorId?: string | null,
@@ -152,7 +156,7 @@ function toFormValues(
     data_inicio: tarefa?.data_inicio ? new Date(tarefa.data_inicio) : null,
     data_vencimento: tarefa?.data_vencimento ? new Date(tarefa.data_vencimento) : null,
     tagsInput: tarefa?.tags?.join(", ") ?? "",
-    visibilidade: tarefa?.visibilidade ?? "todos_setor",
+    visibilidade: tarefa?.visibilidade ?? defaultVisibilidade(defaultSetorId),
     observador_ids: tarefa?.observadores?.map((o) => o.usuario_id) ?? [],
     lembretes: parseLembretes(tarefa?.lembretes),
     recorrencia_tipo: rec?.tipo ?? "nenhuma",

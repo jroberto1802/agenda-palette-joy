@@ -55,11 +55,19 @@ function normalizeSetorForCreate(payload: TarefaFormData, profile: Profile | nul
   if (!profile) return payload;
 
   const isPrivileged = profile.papel === "admin" || profile.papel === "gerente";
-  if (isPrivileged) return payload;
+  const setorId = isPrivileged
+    ? payload.setor_id
+    : (profile.setor_id ?? payload.setor_id ?? null);
+
+  let visibilidade = payload.visibilidade;
+  if (!isPrivileged && !setorId && visibilidade === "todos_setor") {
+    visibilidade = "todos_empresa";
+  }
 
   return {
     ...payload,
-    setor_id: profile.setor_id ?? payload.setor_id ?? null,
+    setor_id: setorId,
+    visibilidade,
   };
 }
 
@@ -213,7 +221,7 @@ export async function createTarefa(payload: TarefaFormData): Promise<TarefaWithR
     throw new Error("Selecione ao menos uma pessoa para visibilidade específica.");
   }
 
-  const { data, error } = await supabase
+  const { data: inserted, error } = await supabase
     .from("tarefas")
     .insert({
       titulo: normalized.titulo,
@@ -230,15 +238,23 @@ export async function createTarefa(payload: TarefaFormData): Promise<TarefaWithR
       lembretes: serializeLembretes(normalized.lembretes),
       criado_por: user.id,
     })
-    .select(TAREFA_SELECT)
+    .select("id")
     .single();
 
   if (error) throw error;
-  const tarefa = data as TarefaWithRelations;
 
   if (normalized.visibilidade === "pessoas_especificas") {
-    await syncObservadores(tarefa.id, normalized.observador_ids);
+    await syncObservadores(inserted.id, normalized.observador_ids);
   }
+
+  const { data, error: fetchError } = await supabase
+    .from("tarefas")
+    .select(TAREFA_SELECT)
+    .eq("id", inserted.id)
+    .single();
+
+  if (fetchError) throw fetchError;
+  const tarefa = data as TarefaWithRelations;
 
   if (tarefa.atribuido_a) {
     await notifyUser({
