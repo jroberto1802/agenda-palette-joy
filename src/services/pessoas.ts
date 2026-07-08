@@ -4,11 +4,11 @@ import type { ProfileFormData, ProfileWithSetor } from "@/types";
 
 const PESSOA_SELECT = `
   *,
-  setor:setores(id, nome, cor),
+  setor:setores!profiles_setor_id_fkey(id, nome, cor),
   gestor:profiles!profiles_gestor_id_fkey(id, nome_completo, papel)
 `;
 
-const PESSOA_SELECT_BASIC = `*, setor:setores(id, nome, cor)`;
+const PESSOA_SELECT_BASIC = `*, setor:setores!profiles_setor_id_fkey(id, nome, cor)`;
 
 export async function getMyProfile(): Promise<ProfileWithSetor> {
   const {

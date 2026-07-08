@@ -3,7 +3,7 @@ import type { SetorFormData, SetorWithGerente } from "@/types";
 
 const SETOR_SELECT = `
   *,
-  gerente:profiles!gerente_id(id, nome_completo, avatar_url)
+  gerente:profiles!setores_gerente_id_fkey(id, nome_completo, avatar_url)
 `;
 
 export async function listSetores(): Promise<SetorWithGerente[]> {
