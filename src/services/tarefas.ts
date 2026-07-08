@@ -32,6 +32,13 @@ const TAREFA_SELECT = `
   )
 `;
 
+const TAREFA_SELECT_LITE = `
+  *,
+  setor:setores(id, nome, cor),
+  criador:profiles!criado_por(id, nome_completo, avatar_url),
+  responsavel:profiles!atribuido_a(id, nome_completo, avatar_url)
+`;
+
 function serializeLembretes(lembretes: TarefaLembreteOpcao[]): TarefaLembreteOpcao[] {
   return lembretes;
 }
@@ -253,7 +260,31 @@ export async function createTarefa(payload: TarefaFormData): Promise<TarefaWithR
     .eq("id", inserted.id)
     .single();
 
-  if (fetchError) throw fetchError;
+  if (fetchError) {
+    const { data: fallback, error: fallbackError } = await supabase
+      .from("tarefas")
+      .select(TAREFA_SELECT_LITE)
+      .eq("id", inserted.id)
+      .single();
+
+    if (fallbackError) throw fetchError;
+    const tarefa = {
+      ...(fallback as TarefaWithRelations),
+      observadores: [],
+    };
+
+    if (tarefa.atribuido_a) {
+      await notifyUser({
+        usuario_id: tarefa.atribuido_a,
+        tipo: "tarefa_atribuida",
+        referencia_tipo: "tarefa",
+        referencia_id: tarefa.id,
+      }).catch(() => undefined);
+    }
+
+    return tarefa;
+  }
+
   const tarefa = data as TarefaWithRelations;
 
   if (tarefa.atribuido_a) {
