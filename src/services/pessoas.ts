@@ -5,8 +5,10 @@ import type { ProfileFormData, ProfileWithSetor } from "@/types";
 const PESSOA_SELECT = `
   *,
   setor:setores(id, nome, cor),
-  gestor:profiles!gestor_id(id, nome_completo, papel)
+  gestor:profiles!profiles_gestor_id_fkey(id, nome_completo, papel)
 `;
+
+const PESSOA_SELECT_BASIC = `*, setor:setores(id, nome, cor)`;
 
 export async function getMyProfile(): Promise<ProfileWithSetor> {
   const {
@@ -14,14 +16,19 @@ export async function getMyProfile(): Promise<ProfileWithSetor> {
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Usuário não autenticado");
 
+  // Sem embed de gestor: self-join + RLS pode falhar e esconder a aba Cadastros.
   const { data, error } = await supabase
     .from("profiles")
-    .select(PESSOA_SELECT)
+    .select(PESSOA_SELECT_BASIC)
     .eq("id", user.id)
     .single();
 
   if (error) throw error;
-  return data as ProfileWithSetor;
+
+  return {
+    ...(data as ProfileWithSetor),
+    gestor: null,
+  };
 }
 
 export async function listPessoas(search?: string): Promise<ProfileWithSetor[]> {
@@ -35,10 +42,26 @@ export async function listPessoas(search?: string): Promise<ProfileWithSetor[]> 
   }
 
   const { data, error } = await query;
-  if (error) throw error;
-  return (data ?? []) as ProfileWithSetor[];
+  if (error) {
+    let fallback = supabase
+      .from("profiles")
+      .select(PESSOA_SELECT_BASIC)
+      .order("nome_completo");
+    if (search?.trim()) {
+      const term = search.trim();
+      fallback = fallback.or(
+        `nome_completo.ilike.%${term}%,cargo.ilike.%${term}%,email.ilike.%${term}%`,
+      );
+    }
+    const second = await fallback;
+    if (second.error) throw second.error;
+    return (second.data ?? []).map((row) => ({
+      ...(row as ProfileWithSetor),
+      gestor: null,
+    }));
+  }
+  return (data ?? []) as unknown as ProfileWithSetor[];
 }
-
 export async function countActiveAdmins(excludeId?: string): Promise<number> {
   let query = supabase
     .from("profiles")
@@ -111,11 +134,11 @@ export async function updatePessoa(id: string, payload: ProfileFormData): Promis
       gestor_id: payload.gestor_id,
     })
     .eq("id", id)
-    .select(PESSOA_SELECT)
+    .select(PESSOA_SELECT_BASIC)
     .single();
 
   if (error) throw error;
-  return data as ProfileWithSetor;
+  return { ...(data as ProfileWithSetor), gestor: null };
 }
 
 export async function deletePessoa(id: string): Promise<void> {
@@ -155,9 +178,9 @@ export async function updateMyProfile(payload: {
       cargo: payload.cargo || null,
     })
     .eq("id", user.id)
-    .select(PESSOA_SELECT)
+    .select(PESSOA_SELECT_BASIC)
     .single();
 
   if (error) throw error;
-  return data as ProfileWithSetor;
+  return { ...(data as ProfileWithSetor), gestor: null };
 }

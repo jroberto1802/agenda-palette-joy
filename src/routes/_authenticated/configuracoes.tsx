@@ -35,7 +35,7 @@ export const Route = createFileRoute("/_authenticated/configuracoes")({
 });
 
 function ConfiguracoesPage() {
-  const { data: profile } = useProfile();
+  const { data: profile, isLoading: loadingProfile, error: profileError } = useProfile();
   const { data: factors, isLoading } = useMfaFactors();
   const enrollTotp = useEnrollTotp();
   const verifyEnrollment = useVerifyTotpEnrollment();
@@ -140,14 +140,24 @@ function ConfiguracoesPage() {
               <CardDescription>Informações da sua conta</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
-              <p>
-                <span className="text-muted-foreground">Nome:</span>{" "}
-                {profile?.nome_completo ?? "—"}
-              </p>
-              <p>
-                <span className="text-muted-foreground">Papel:</span>{" "}
-                {profile?.papel ? PAPEL_LABELS[profile.papel] : "—"}
-              </p>
+              {loadingProfile ? (
+                <Skeleton className="h-10 w-full" />
+              ) : profileError ? (
+                <p className="text-destructive">
+                  Não foi possível carregar o perfil. Atualize a página.
+                </p>
+              ) : (
+                <>
+                  <p>
+                    <span className="text-muted-foreground">Nome:</span>{" "}
+                    {profile?.nome_completo ?? "—"}
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">Papel:</span>{" "}
+                    {profile?.papel ? PAPEL_LABELS[profile.papel] : "—"}
+                  </p>
+                </>
+              )}
             </CardContent>
           </Card>
 
