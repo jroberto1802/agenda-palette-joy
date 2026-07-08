@@ -1,4 +1,5 @@
-import { CalendarIcon, User } from "lucide-react";
+import { CalendarIcon } from "lucide-react";
+import { ProfileAvatar } from "@/components/common/profile-avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -130,7 +131,11 @@ export function TarefaCard({
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground">
           {tarefa.responsavel && (
             <span className="flex items-center gap-1.5">
-              <User className="h-3.5 w-3.5" />
+              <ProfileAvatar
+                name={tarefa.responsavel.nome_completo}
+                avatarUrl={tarefa.responsavel.avatar_url}
+                className="h-5 w-5"
+              />
               {tarefa.responsavel.nome_completo}
             </span>
           )}

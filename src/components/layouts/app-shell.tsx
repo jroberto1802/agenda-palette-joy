@@ -10,8 +10,10 @@ import {
   Settings,
   Shield,
   Sun,
+  Users,
 } from "lucide-react";
 import { useMemo, type ComponentType, type ReactNode } from "react";
+import { ProfileAvatar } from "@/components/common/profile-avatar";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import {
   Sidebar,
@@ -48,6 +50,8 @@ const BASE_NAV: NavItem[] = [
   { to: "/calendario", label: "Calendário", icon: CalendarDays },
   { to: "/avisos", label: "Avisos", icon: Megaphone },
   { to: "/relatorios", label: "Relatórios", icon: BarChart3 },
+  { to: "/pessoas", label: "Pessoas", icon: Users },
+  { to: "/equipe", label: "Equipe", icon: Users },
   { to: "/configuracoes", label: "Configurações", icon: Settings },
 ];
 
@@ -114,9 +118,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           <SidebarMenu>
             <SidebarMenuItem>
               <div className="flex items-center gap-2 px-2 py-1.5 group-data-[collapsible=icon]:justify-center">
-                <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-sidebar-accent text-xs font-medium">
-                  {displayName.charAt(0).toUpperCase()}
-                </div>
+                <ProfileAvatar
+                  name={displayName}
+                  avatarUrl={profile?.avatar_url}
+                  className="h-8 w-8 shrink-0"
+                />
                 <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
                   <span className="truncate font-medium">{displayName}</span>
                   <span className="truncate text-xs text-muted-foreground">{user?.email}</span>

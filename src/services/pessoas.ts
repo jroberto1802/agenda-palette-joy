@@ -1,14 +1,31 @@
 import { supabase } from "@/integrations/supabase/client";
 import { criarUsuarioAdmin, excluirUsuarioAdmin } from "@/services/admin";
+import { removeProfileAvatar, uploadProfileAvatar } from "@/services/profile-avatars";
 import type { ProfileFormData, ProfileWithSetor } from "@/types";
 
-const PESSOA_SELECT = `
-  *,
-  setor:setores!profiles_setor_id_fkey(id, nome, cor),
-  gestor:profiles!profiles_gestor_id_fkey(id, nome_completo, papel)
-`;
-
 const PESSOA_SELECT_BASIC = `*, setor:setores!profiles_setor_id_fkey(id, nome, cor)`;
+
+type ProfileRow = Omit<ProfileWithSetor, "gestor">;
+
+async function attachGestores(pessoas: ProfileRow[]): Promise<ProfileWithSetor[]> {
+  const gestorIds = [...new Set(pessoas.map((p) => p.gestor_id).filter((id): id is string => !!id))];
+
+  if (!gestorIds.length) {
+    return pessoas.map((pessoa) => ({ ...pessoa, gestor: null }));
+  }
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, nome_completo, papel")
+    .in("id", gestorIds);
+  if (error) throw error;
+
+  const gestores = new Map((data ?? []).map((gestor) => [gestor.id, gestor]));
+  return pessoas.map((pessoa) => ({
+    ...pessoa,
+    gestor: pessoa.gestor_id ? (gestores.get(pessoa.gestor_id) ?? null) : null,
+  }));
+}
 
 export async function getMyProfile(): Promise<ProfileWithSetor> {
   const {
@@ -25,14 +42,12 @@ export async function getMyProfile(): Promise<ProfileWithSetor> {
 
   if (error) throw error;
 
-  return {
-    ...(data as ProfileWithSetor),
-    gestor: null,
-  };
+  const [profile] = await attachGestores([(data as unknown) as ProfileRow]);
+  return profile;
 }
 
 export async function listPessoas(search?: string): Promise<ProfileWithSetor[]> {
-  let query = supabase.from("profiles").select(PESSOA_SELECT).order("nome_completo");
+  let query = supabase.from("profiles").select(PESSOA_SELECT_BASIC).order("nome_completo");
 
   if (search?.trim()) {
     const term = search.trim();
@@ -42,25 +57,8 @@ export async function listPessoas(search?: string): Promise<ProfileWithSetor[]> 
   }
 
   const { data, error } = await query;
-  if (error) {
-    let fallback = supabase
-      .from("profiles")
-      .select(PESSOA_SELECT_BASIC)
-      .order("nome_completo");
-    if (search?.trim()) {
-      const term = search.trim();
-      fallback = fallback.or(
-        `nome_completo.ilike.%${term}%,cargo.ilike.%${term}%,email.ilike.%${term}%`,
-      );
-    }
-    const second = await fallback;
-    if (second.error) throw second.error;
-    return (second.data ?? []).map((row) => ({
-      ...(row as ProfileWithSetor),
-      gestor: null,
-    }));
-  }
-  return (data ?? []) as unknown as ProfileWithSetor[];
+  if (error) throw error;
+  return attachGestores(((data ?? []) as unknown) as ProfileRow[]);
 }
 export async function countActiveAdmins(excludeId?: string): Promise<number> {
   let query = supabase
@@ -89,7 +87,7 @@ export async function createPessoa(payload: ProfileFormData): Promise<{ user_id:
     throw new Error("Papel é obrigatório.");
   }
 
-  return criarUsuarioAdmin({
+  const created = await criarUsuarioAdmin({
     email: payload.email.trim(),
     password: payload.password,
     nome_completo: payload.nome_completo.trim(),
@@ -97,18 +95,29 @@ export async function createPessoa(payload: ProfileFormData): Promise<{ user_id:
     setor_id: payload.setor_id,
     gestor_id: payload.gestor_id,
   });
+
+  if (payload.avatar_file) {
+    const avatarUrl = await uploadProfileAvatar(created.user_id, payload.avatar_file);
+    const { error } = await supabase
+      .from("profiles")
+      .update({ avatar_url: avatarUrl })
+      .eq("id", created.user_id);
+    if (error) throw error;
+  }
+
+  return created;
 }
 
 export async function updatePessoa(id: string, payload: ProfileFormData): Promise<ProfileWithSetor> {
+  const current = await supabase
+    .from("profiles")
+    .select("papel, ativo, avatar_url")
+    .eq("id", id)
+    .single();
+
+  if (current.error) throw current.error;
+
   if (payload.papel !== "admin" || payload.ativo === false) {
-    const current = await supabase
-      .from("profiles")
-      .select("papel, ativo")
-      .eq("id", id)
-      .single();
-
-    if (current.error) throw current.error;
-
     const wasActiveAdmin = current.data.papel === "admin" && current.data.ativo;
     const willLoseAdmin =
       wasActiveAdmin && (payload.papel !== "admin" || payload.ativo === false);
@@ -123,6 +132,11 @@ export async function updatePessoa(id: string, payload: ProfileFormData): Promis
     }
   }
 
+  let avatarUrl = current.data.avatar_url;
+  if (payload.avatar_file) {
+    avatarUrl = await uploadProfileAvatar(id, payload.avatar_file, current.data.avatar_url);
+  }
+
   const { data, error } = await supabase
     .from("profiles")
     .update({
@@ -132,19 +146,21 @@ export async function updatePessoa(id: string, payload: ProfileFormData): Promis
       papel: payload.papel,
       ativo: payload.ativo,
       gestor_id: payload.gestor_id,
+      avatar_url: avatarUrl,
     })
     .eq("id", id)
     .select(PESSOA_SELECT_BASIC)
     .single();
 
   if (error) throw error;
-  return { ...(data as ProfileWithSetor), gestor: null };
+  const [profile] = await attachGestores([((data as unknown) as ProfileRow)]);
+  return profile;
 }
 
 export async function deletePessoa(id: string): Promise<void> {
   const { data: pessoa, error: fetchError } = await supabase
     .from("profiles")
-    .select("papel, ativo")
+    .select("papel, ativo, avatar_url")
     .eq("id", id)
     .single();
 
@@ -157,6 +173,7 @@ export async function deletePessoa(id: string): Promise<void> {
     }
   }
 
+  await removeProfileAvatar(pessoa.avatar_url).catch(() => undefined);
   await excluirUsuarioAdmin(id);
 }
 
@@ -182,5 +199,6 @@ export async function updateMyProfile(payload: {
     .single();
 
   if (error) throw error;
-  return { ...(data as ProfileWithSetor), gestor: null };
+  const [profile] = await attachGestores([((data as unknown) as ProfileRow)]);
+  return profile;
 }

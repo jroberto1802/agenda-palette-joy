@@ -1,8 +1,8 @@
 import { MessageSquare, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { ProfileAvatar } from "@/components/common/profile-avatar";
 import { toast } from "sonner";
 import { TarefaAnexosSection } from "@/components/tarefas/tarefa-anexos-section";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -37,15 +37,6 @@ import {
   canEditTarefa,
 } from "@/utils/tarefas";
 import { formatRecorrencia, parseRecorrencia } from "@/utils/recorrencia";
-
-function initials(name: string) {
-  return name
-    .split(" ")
-    .slice(0, 2)
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase();
-}
 
 export function TarefaDetailSheet({
   tarefaId,
@@ -129,10 +120,28 @@ export function TarefaDetailSheet({
                 {tarefa.descricao || "Sem descrição"}
               </SheetDescription>
               <div className="text-xs text-muted-foreground space-y-1 pt-2">
-                {tarefa.responsavel && <p>Responsável: {tarefa.responsavel.nome_completo}</p>}
+                {tarefa.responsavel && (
+                  <div className="flex items-center gap-2">
+                    <ProfileAvatar
+                      name={tarefa.responsavel.nome_completo}
+                      avatarUrl={tarefa.responsavel.avatar_url}
+                      className="h-6 w-6"
+                    />
+                    <p>Responsável: {tarefa.responsavel.nome_completo}</p>
+                  </div>
+                )}
                 {tarefa.data_vencimento && <p>Vencimento: {formatDateTime(tarefa.data_vencimento)}</p>}
                 {recorrencia && <p>Recorrência: {formatRecorrencia(recorrencia)}</p>}
-                {tarefa.criador && <p>Criado por: {tarefa.criador.nome_completo}</p>}
+                {tarefa.criador && (
+                  <div className="flex items-center gap-2">
+                    <ProfileAvatar
+                      name={tarefa.criador.nome_completo}
+                      avatarUrl={tarefa.criador.avatar_url}
+                      className="h-6 w-6"
+                    />
+                    <p>Criado por: {tarefa.criador.nome_completo}</p>
+                  </div>
+                )}
               </div>
               {onEdit && (
                 <Button variant="outline" size="sm" className="mt-2 w-fit" onClick={onEdit}>
@@ -226,12 +235,11 @@ export function TarefaDetailSheet({
                   <div className="space-y-4">
                     {comentarios.map((c) => (
                       <div key={c.id} className="flex gap-3 group">
-                        <Avatar className="h-8 w-8 shrink-0">
-                          <AvatarImage src={c.usuario?.avatar_url ?? undefined} />
-                          <AvatarFallback className="text-xs">
-                            {initials(c.usuario?.nome_completo ?? "?")}
-                          </AvatarFallback>
-                        </Avatar>
+                        <ProfileAvatar
+                          name={c.usuario?.nome_completo ?? "?"}
+                          avatarUrl={c.usuario?.avatar_url}
+                          className="h-8 w-8 shrink-0"
+                        />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <p className="text-sm font-medium">{c.usuario?.nome_completo}</p>

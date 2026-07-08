@@ -1,5 +1,6 @@
 import { Pencil, Plus, Search, Trash2, UserX } from "lucide-react";
 import { useMemo, useState } from "react";
+import { ProfileAvatar } from "@/components/common/profile-avatar";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -68,6 +69,10 @@ export function CadastroPessoasPanel({ canManage }: { canManage: boolean }) {
 
   const activeAdminCount = useMemo(
     () => (todasPessoas ?? []).filter((p) => p.papel === "admin" && p.ativo).length,
+    [todasPessoas],
+  );
+  const pessoasById = useMemo(
+    () => new Map((todasPessoas ?? []).map((pessoa) => [pessoa.id, pessoa])),
     [todasPessoas],
   );
 
@@ -203,11 +208,18 @@ export function CadastroPessoasPanel({ canManage }: { canManage: boolean }) {
               {pessoas.map((pessoa) => (
                 <TableRow key={pessoa.id} className={!pessoa.ativo ? "opacity-60" : undefined}>
                   <TableCell>
-                    <div className="min-w-0">
-                      <p className="font-medium truncate">{pessoa.nome_completo}</p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {pessoa.email || "—"}
-                      </p>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <ProfileAvatar
+                        name={pessoa.nome_completo}
+                        avatarUrl={pessoa.avatar_url}
+                        className="h-9 w-9"
+                      />
+                      <div className="min-w-0">
+                        <p className="font-medium truncate">{pessoa.nome_completo}</p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {pessoa.email || "—"}
+                        </p>
+                      </div>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -227,7 +239,8 @@ export function CadastroPessoasPanel({ canManage }: { canManage: boolean }) {
                     <Badge variant="secondary">{PAPEL_LABELS[pessoa.papel]}</Badge>
                   </TableCell>
                   <TableCell>
-                    {pessoa.gestor?.nome_completo ?? (
+                    {(pessoa.gestor?.nome_completo ??
+                      (pessoa.gestor_id ? pessoasById.get(pessoa.gestor_id)?.nome_completo : null)) ?? (
                       <span className="text-muted-foreground">—</span>
                     )}
                   </TableCell>

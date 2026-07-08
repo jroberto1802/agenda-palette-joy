@@ -1,7 +1,8 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { ProfileAvatar } from "@/components/common/profile-avatar";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -63,6 +64,8 @@ export function PessoaFormDialog({
   loading?: boolean;
 }) {
   const isCreate = !pessoa;
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
 
   const form = useForm<PessoaSchema>({
     resolver: zodResolver(
@@ -87,7 +90,9 @@ export function PessoaFormDialog({
 
   useEffect(() => {
     if (!open) return;
+    setAvatarFile(null);
     if (pessoa) {
+      setAvatarPreview(pessoa.avatar_url ?? null);
       form.reset({
         nome_completo: pessoa.nome_completo,
         email: pessoa.email ?? "",
@@ -98,6 +103,7 @@ export function PessoaFormDialog({
         ativo: pessoa.ativo,
       });
     } else {
+      setAvatarPreview(null);
       form.reset({
         nome_completo: "",
         email: "",
@@ -119,10 +125,15 @@ export function PessoaFormDialog({
       papel: values.papel,
       gestor_id: values.gestor_id,
       ativo: values.ativo,
+      avatar_file: avatarFile,
     });
   });
 
   const gestoresFiltrados = gestores.filter((g) => !pessoa || g.id !== pessoa.id);
+  const previewName = useMemo(
+    () => form.watch("nome_completo") || pessoa?.nome_completo || "Pessoa",
+    [form, pessoa?.nome_completo],
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -138,6 +149,35 @@ export function PessoaFormDialog({
 
         <Form {...form}>
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+              <ProfileAvatar
+                name={previewName}
+                avatarUrl={avatarPreview}
+                className="h-20 w-20"
+                fallbackClassName="text-lg"
+              />
+              <div className="flex-1 space-y-2">
+                <FormLabel htmlFor="avatar_file">Foto de perfil</FormLabel>
+                <Input
+                  id="avatar_file"
+                  type="file"
+                  accept="image/*"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] ?? null;
+                    setAvatarFile(file);
+                    if (file) {
+                      setAvatarPreview(URL.createObjectURL(file));
+                    } else {
+                      setAvatarPreview(pessoa?.avatar_url ?? null);
+                    }
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Use uma imagem quadrada para melhor resultado no avatar.
+                </p>
+              </div>
+            </div>
+
             <FormField
               control={form.control}
               name="nome_completo"

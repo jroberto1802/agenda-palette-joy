@@ -22,8 +22,8 @@ import type { TablesUpdate } from "@/types/database";
 const TAREFA_SELECT = `
   *,
   setor:setores(id, nome, cor),
-  criador:profiles!criado_por(id, nome_completo),
-  responsavel:profiles!atribuido_a(id, nome_completo)
+  criador:profiles!criado_por(id, nome_completo, avatar_url),
+  responsavel:profiles!atribuido_a(id, nome_completo, avatar_url)
 `;
 
 export async function listTarefas(filters: TarefaFilters = {}): Promise<TarefaWithRelations[]> {

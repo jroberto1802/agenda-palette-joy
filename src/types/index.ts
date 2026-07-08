@@ -33,6 +33,7 @@ export type ProfileFormData = {
   papel: Papel;
   gestor_id: string | null;
   ativo: boolean;
+  avatar_file?: File | null;
 };
 
 export type DashboardKpis = {
@@ -48,8 +49,8 @@ export type DashboardKpis = {
 
 export type TarefaWithRelations = Tarefa & {
   setor: Pick<Setor, "id" | "nome" | "cor"> | null;
-  criador: Pick<Profile, "id" | "nome_completo"> | null;
-  responsavel: Pick<Profile, "id" | "nome_completo"> | null;
+  criador: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
+  responsavel: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
 };
 
 export type RecorrenciaTipo = "nenhuma" | "diaria" | "semanal" | "mensal";
