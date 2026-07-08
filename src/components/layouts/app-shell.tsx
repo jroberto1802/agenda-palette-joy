@@ -50,7 +50,6 @@ const BASE_NAV: NavItem[] = [
   { to: "/calendario", label: "Calendário", icon: CalendarDays },
   { to: "/avisos", label: "Avisos", icon: Megaphone },
   { to: "/relatorios", label: "Relatórios", icon: BarChart3 },
-  { to: "/pessoas", label: "Pessoas", icon: Users },
   { to: "/equipe", label: "Equipe", icon: Users },
   { to: "/configuracoes", label: "Configurações", icon: Settings },
 ];

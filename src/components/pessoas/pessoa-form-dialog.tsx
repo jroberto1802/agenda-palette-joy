@@ -21,6 +21,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -157,7 +158,7 @@ export function PessoaFormDialog({
                 fallbackClassName="text-lg"
               />
               <div className="flex-1 space-y-2">
-                <FormLabel htmlFor="avatar_file">Foto de perfil</FormLabel>
+                <Label htmlFor="avatar_file">Foto de perfil</Label>
                 <Input
                   id="avatar_file"
                   type="file"
