@@ -1,7 +1,6 @@
 import { Link, useRouterState, type LinkProps } from "@tanstack/react-router";
 import {
   BarChart3,
-  Building2,
   CalendarDays,
   ClipboardList,
   LayoutDashboard,
@@ -11,7 +10,6 @@ import {
   Settings,
   Shield,
   Sun,
-  Users,
 } from "lucide-react";
 import { useMemo, type ComponentType, type ReactNode } from "react";
 import { NotificationBell } from "@/components/notifications/notification-bell";
@@ -50,8 +48,6 @@ const BASE_NAV: NavItem[] = [
   { to: "/calendario", label: "Calendário", icon: CalendarDays },
   { to: "/avisos", label: "Avisos", icon: Megaphone },
   { to: "/relatorios", label: "Relatórios", icon: BarChart3 },
-  { to: "/setores", label: "Setores", icon: Building2 },
-  { to: "/pessoas", label: "Pessoas", icon: Users },
   { to: "/configuracoes", label: "Configurações", icon: Settings },
 ];
 

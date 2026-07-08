@@ -226,6 +226,8 @@ export type Database = {
           avatar_url: string | null;
           cargo: string | null;
           created_at: string;
+          email: string | null;
+          gestor_id: string | null;
           id: string;
           nome_completo: string;
           papel: "admin" | "gerente" | "usuario" | "visualizador";
@@ -237,6 +239,8 @@ export type Database = {
           avatar_url?: string | null;
           cargo?: string | null;
           created_at?: string;
+          email?: string | null;
+          gestor_id?: string | null;
           id: string;
           nome_completo: string;
           papel?: "admin" | "gerente" | "usuario" | "visualizador";
@@ -248,6 +252,8 @@ export type Database = {
           avatar_url?: string | null;
           cargo?: string | null;
           created_at?: string;
+          email?: string | null;
+          gestor_id?: string | null;
           id?: string;
           nome_completo?: string;
           papel?: "admin" | "gerente" | "usuario" | "visualizador";
@@ -255,6 +261,13 @@ export type Database = {
           updated_at?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: "profiles_gestor_id_fkey",
+            columns: ["gestor_id"],
+            isOneToOne: false,
+            referencedRelation: "profiles",
+            referencedColumns: ["id"],
+          },
           {
             foreignKeyName: "profiles_setor_id_fkey",
             columns: ["setor_id"],

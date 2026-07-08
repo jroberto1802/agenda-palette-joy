@@ -20,7 +20,7 @@ export async function createSetor(payload: SetorFormData): Promise<SetorWithGere
       nome: payload.nome,
       cor: payload.cor || null,
       descricao: payload.descricao || null,
-      gerente_id: payload.gerente_id,
+      gerente_id: payload.gerente_id ?? null,
     })
     .select(SETOR_SELECT)
     .single();
@@ -36,7 +36,7 @@ export async function updateSetor(id: string, payload: SetorFormData): Promise<S
       nome: payload.nome,
       cor: payload.cor || null,
       descricao: payload.descricao || null,
-      gerente_id: payload.gerente_id,
+      gerente_id: payload.gerente_id ?? null,
     })
     .eq("id", id)
     .select(SETOR_SELECT)
@@ -46,18 +46,24 @@ export async function updateSetor(id: string, payload: SetorFormData): Promise<S
   return data as SetorWithGerente;
 }
 
-export async function deleteSetor(id: string): Promise<void> {
-  const { error } = await supabase.from("setores").delete().eq("id", id);
-  if (error) throw error;
-}
-
 export async function countPessoasPorSetor(setorId: string): Promise<number> {
   const { count, error } = await supabase
     .from("profiles")
     .select("id", { count: "exact", head: true })
-    .eq("setor_id", setorId)
-    .eq("ativo", true);
+    .eq("setor_id", setorId);
 
   if (error) throw error;
   return count ?? 0;
+}
+
+export async function deleteSetor(id: string): Promise<void> {
+  const linked = await countPessoasPorSetor(id);
+  if (linked > 0) {
+    throw new Error(
+      "Não é possível excluir o setor enquanto houver pessoas vinculadas. Realoque as pessoas antes de excluir.",
+    );
+  }
+
+  const { error } = await supabase.from("setores").delete().eq("id", id);
+  if (error) throw error;
 }

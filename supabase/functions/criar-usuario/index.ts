@@ -12,6 +12,7 @@ type CreateUserBody = {
   nome_completo: string;
   papel?: string;
   setor_id?: string | null;
+  gestor_id?: string | null;
 };
 
 Deno.serve(async (req) => {
@@ -60,10 +61,27 @@ Deno.serve(async (req) => {
     }
 
     const body = (await req.json()) as CreateUserBody;
-    const { email, password, nome_completo, papel = "usuario", setor_id = null } = body;
+    const {
+      email,
+      password,
+      nome_completo,
+      papel = "usuario",
+      setor_id = null,
+      gestor_id = null,
+    } = body;
 
     if (!email || !password || !nome_completo) {
-      return new Response(JSON.stringify({ error: "Campos obrigatórios: email, password, nome_completo" }), {
+      return new Response(
+        JSON.stringify({ error: "Campos obrigatórios: email, password, nome_completo" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    if (!papel) {
+      return new Response(JSON.stringify({ error: "Papel é obrigatório." }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -74,14 +92,42 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
+    const { data: existingProfile } = await supabaseAdmin
+      .from("profiles")
+      .select("id")
+      .ilike("email", email.trim())
+      .maybeSingle();
+
+    if (existingProfile) {
+      return new Response(
+        JSON.stringify({ error: "Já existe uma pessoa cadastrada com este e-mail." }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
+
     const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-      email,
+      email: email.trim(),
       password,
       email_confirm: true,
       user_metadata: { nome_completo, papel },
     });
 
-    if (createError) throw createError;
+    if (createError) {
+      const msg = createError.message?.toLowerCase() ?? "";
+      if (msg.includes("already") || msg.includes("registered") || msg.includes("exists")) {
+        return new Response(
+          JSON.stringify({ error: "Já existe uma pessoa cadastrada com este e-mail." }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+      throw createError;
+    }
 
     const validPapeis = ["admin", "gerente", "usuario", "visualizador"];
     const assignedPapel = validPapeis.includes(papel) ? papel : "usuario";
@@ -90,8 +136,11 @@ Deno.serve(async (req) => {
       .from("profiles")
       .update({
         nome_completo,
+        email: email.trim().toLowerCase(),
         papel: assignedPapel,
         setor_id: setor_id || null,
+        gestor_id: gestor_id || null,
+        ativo: true,
       })
       .eq("id", newUser.user.id);
 

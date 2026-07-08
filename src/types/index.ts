@@ -10,6 +10,7 @@ export type Tarefa = Tables<"tarefas">;
 
 export type ProfileWithSetor = Profile & {
   setor: Pick<Setor, "id" | "nome" | "cor"> | null;
+  gestor: Pick<Profile, "id" | "nome_completo" | "papel"> | null;
 };
 
 export type SetorWithGerente = Setor & {
@@ -19,15 +20,18 @@ export type SetorWithGerente = Setor & {
 export type SetorFormData = {
   nome: string;
   cor: string;
-  descricao: string;
-  gerente_id: string | null;
+  descricao?: string;
+  gerente_id?: string | null;
 };
 
 export type ProfileFormData = {
   nome_completo: string;
-  cargo: string;
+  email?: string;
+  password?: string;
+  cargo?: string;
   setor_id: string | null;
   papel: Papel;
+  gestor_id: string | null;
   ativo: boolean;
 };
 
@@ -137,4 +141,5 @@ export type AdminCreateUserData = {
   nome_completo: string;
   papel: Papel;
   setor_id: string | null;
+  gestor_id?: string | null;
 };
