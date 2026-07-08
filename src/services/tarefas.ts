@@ -216,6 +216,7 @@ export async function createTarefa(payload: TarefaFormData): Promise<TarefaWithR
 
   const profile = await getCurrentProfile();
   const normalized = normalizeSetorForCreate(payload, profile);
+  const tarefaId = crypto.randomUUID();
 
   if (normalized.visibilidade === "todos_setor" && !normalized.setor_id) {
     throw new Error('Setor é obrigatório para visibilidade "Todos do setor".');
@@ -228,9 +229,10 @@ export async function createTarefa(payload: TarefaFormData): Promise<TarefaWithR
     throw new Error("Selecione ao menos uma pessoa para visibilidade específica.");
   }
 
-  const { data: inserted, error } = await supabase
+  const { error } = await supabase
     .from("tarefas")
     .insert({
+      id: tarefaId,
       titulo: normalized.titulo,
       descricao: normalized.descricao || null,
       setor_id: normalized.setor_id,
@@ -244,27 +246,25 @@ export async function createTarefa(payload: TarefaFormData): Promise<TarefaWithR
       visibilidade: normalized.visibilidade,
       lembretes: serializeLembretes(normalized.lembretes),
       criado_por: user.id,
-    })
-    .select("id")
-    .single();
+    });
 
   if (error) throw error;
 
   if (normalized.visibilidade === "pessoas_especificas") {
-    await syncObservadores(inserted.id, normalized.observador_ids);
+    await syncObservadores(tarefaId, normalized.observador_ids);
   }
 
   const { data, error: fetchError } = await supabase
     .from("tarefas")
     .select(TAREFA_SELECT)
-    .eq("id", inserted.id)
+    .eq("id", tarefaId)
     .single();
 
   if (fetchError) {
     const { data: fallback, error: fallbackError } = await supabase
       .from("tarefas")
       .select(TAREFA_SELECT_LITE)
-      .eq("id", inserted.id)
+      .eq("id", tarefaId)
       .single();
 
     if (fallbackError) throw fetchError;
