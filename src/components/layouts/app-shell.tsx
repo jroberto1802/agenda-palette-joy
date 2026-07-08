@@ -46,11 +46,11 @@ type NavItem = {
 
 const BASE_NAV: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/tarefas", label: "Tarefas", icon: ClipboardList },
-  { to: "/calendario", label: "Calendário", icon: CalendarDays },
   { to: "/avisos", label: "Avisos", icon: Megaphone },
-  { to: "/relatorios", label: "Relatórios", icon: BarChart3 },
+  { to: "/calendario", label: "Calendário", icon: CalendarDays },
+  { to: "/tarefas", label: "Tarefas", icon: ClipboardList },
   { to: "/equipe", label: "Equipe", icon: Users },
+  { to: "/relatorios", label: "Relatórios", icon: BarChart3 },
   { to: "/configuracoes", label: "Configurações", icon: Settings },
 ];
 

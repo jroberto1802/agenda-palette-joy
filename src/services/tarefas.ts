@@ -9,11 +9,13 @@ import {
 } from "@/utils/recorrencia";
 import type {
   DashboardKpis,
+  Profile,
   Subtarefa,
   TarefaComentario,
   TarefaDetail,
   TarefaFilters,
   TarefaFormData,
+  TarefaLembreteOpcao,
   TarefaStatus,
   TarefaWithRelations,
 } from "@/types";
@@ -23,8 +25,63 @@ const TAREFA_SELECT = `
   *,
   setor:setores(id, nome, cor),
   criador:profiles!criado_por(id, nome_completo, avatar_url),
-  responsavel:profiles!atribuido_a(id, nome_completo, avatar_url)
+  responsavel:profiles!atribuido_a(id, nome_completo, avatar_url),
+  observadores:tarefa_observadores(
+    usuario_id,
+    usuario:profiles!tarefa_observadores_usuario_id_fkey(id, nome_completo, avatar_url)
+  )
 `;
+
+function serializeLembretes(lembretes: TarefaLembreteOpcao[]): TarefaLembreteOpcao[] {
+  return lembretes;
+}
+
+async function getCurrentProfile(): Promise<Profile | null> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  return data;
+}
+
+function normalizeSetorForCreate(payload: TarefaFormData, profile: Profile | null): TarefaFormData {
+  if (!profile) return payload;
+
+  const isPrivileged = profile.papel === "admin" || profile.papel === "gerente";
+  if (isPrivileged) return payload;
+
+  return {
+    ...payload,
+    setor_id: profile.setor_id ?? payload.setor_id ?? null,
+  };
+}
+
+async function syncObservadores(tarefaId: string, usuarioIds: string[]): Promise<void> {
+  const { error: deleteError } = await supabase
+    .from("tarefa_observadores")
+    .delete()
+    .eq("tarefa_id", tarefaId);
+
+  if (deleteError) throw deleteError;
+
+  if (usuarioIds.length === 0) return;
+
+  const { error: insertError } = await supabase.from("tarefa_observadores").insert(
+    usuarioIds.map((usuario_id) => ({
+      tarefa_id: tarefaId,
+      usuario_id,
+    })),
+  );
+
+  if (insertError) throw insertError;
+}
 
 export async function listTarefas(filters: TarefaFilters = {}): Promise<TarefaWithRelations[]> {
   let query = supabase
@@ -124,9 +181,12 @@ async function spawnProximaOcorrencia(tarefa: TarefaWithRelations): Promise<void
     atribuido_a: tarefa.atribuido_a,
     prioridade: tarefa.prioridade,
     status: "a_fazer",
+    data_inicio: tarefa.data_inicio,
     data_vencimento: proxima.toISOString(),
     tags: tarefa.tags,
     recorrencia: serializeRecorrencia(config),
+    visibilidade: tarefa.visibilidade,
+    lembretes: tarefa.lembretes,
     criado_por: user.id,
   });
 
@@ -139,18 +199,35 @@ export async function createTarefa(payload: TarefaFormData): Promise<TarefaWithR
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Usuário não autenticado");
 
+  const profile = await getCurrentProfile();
+  const normalized = normalizeSetorForCreate(payload, profile);
+
+  if (normalized.visibilidade === "todos_setor" && !normalized.setor_id) {
+    throw new Error('Setor é obrigatório para visibilidade "Todos do setor".');
+  }
+
+  if (
+    normalized.visibilidade === "pessoas_especificas" &&
+    normalized.observador_ids.length === 0
+  ) {
+    throw new Error("Selecione ao menos uma pessoa para visibilidade específica.");
+  }
+
   const { data, error } = await supabase
     .from("tarefas")
     .insert({
-      titulo: payload.titulo,
-      descricao: payload.descricao || null,
-      setor_id: payload.setor_id,
-      atribuido_a: payload.atribuido_a,
-      prioridade: payload.prioridade,
-      status: payload.status,
-      data_vencimento: payload.data_vencimento,
-      tags: payload.tags,
-      recorrencia: serializeRecorrencia(payload.recorrencia),
+      titulo: normalized.titulo,
+      descricao: normalized.descricao || null,
+      setor_id: normalized.setor_id,
+      atribuido_a: normalized.atribuido_a,
+      prioridade: normalized.prioridade,
+      status: normalized.status,
+      data_inicio: normalized.data_inicio,
+      data_vencimento: normalized.data_vencimento,
+      tags: normalized.tags,
+      recorrencia: serializeRecorrencia(normalized.recorrencia),
+      visibilidade: normalized.visibilidade,
+      lembretes: serializeLembretes(normalized.lembretes),
       criado_por: user.id,
     })
     .select(TAREFA_SELECT)
@@ -158,6 +235,10 @@ export async function createTarefa(payload: TarefaFormData): Promise<TarefaWithR
 
   if (error) throw error;
   const tarefa = data as TarefaWithRelations;
+
+  if (normalized.visibilidade === "pessoas_especificas") {
+    await syncObservadores(tarefa.id, normalized.observador_ids);
+  }
 
   if (tarefa.atribuido_a) {
     await notifyUser({
@@ -188,9 +269,12 @@ export async function updateTarefa(
     atribuido_a: payload.atribuido_a,
     prioridade: payload.prioridade,
     status: payload.status,
+    data_inicio: payload.data_inicio,
     data_vencimento: payload.data_vencimento,
     tags: payload.tags,
     recorrencia: serializeRecorrencia(payload.recorrencia),
+    visibilidade: payload.visibilidade,
+    lembretes: serializeLembretes(payload.lembretes),
   };
 
   if (payload.status === "concluida") {
@@ -208,6 +292,12 @@ export async function updateTarefa(
 
   if (error) throw error;
   const tarefa = data as TarefaWithRelations;
+
+  if (payload.visibilidade === "pessoas_especificas") {
+    await syncObservadores(id, payload.observador_ids);
+  } else {
+    await syncObservadores(id, []);
+  }
 
   if (
     payload.atribuido_a &&

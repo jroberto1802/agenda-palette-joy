@@ -1,6 +1,10 @@
 import type {
+  Profile,
+  SetorWithGerente,
+  TarefaLembreteOpcao,
   TarefaPrioridade,
   TarefaStatus,
+  TarefaVisibilidade,
   TarefaWithRelations,
 } from "@/types";
 
@@ -39,6 +43,31 @@ export const TAREFA_STATUS_COLORS: Record<TarefaStatus, string> = {
   concluida: "bg-green-500/15 text-green-700 dark:text-green-400",
 };
 
+export const TAREFA_VISIBILIDADE_LABELS: Record<TarefaVisibilidade, string> = {
+  todos_empresa: "Todos da empresa",
+  todos_setor: "Todos do setor",
+  somente_para_mim: "Somente para mim",
+  pessoas_especificas: "Selecionar pessoas específicas",
+};
+
+export const TAREFA_LEMBRETE_LABELS: Record<TarefaLembreteOpcao, string> = {
+  no_prazo: "No prazo",
+  "1h_antes": "1 hora antes",
+  "1d_antes": "1 dia antes",
+  "1sem_antes": "1 semana antes",
+};
+
+export function getSetoresPermitidos(
+  setores: SetorWithGerente[],
+  profile: Profile | null | undefined,
+  isAdminUser: boolean,
+  isGerenteUser: boolean,
+): SetorWithGerente[] {
+  if (isAdminUser || isGerenteUser) return setores;
+  if (!profile?.setor_id) return [];
+  return setores.filter((s) => s.id === profile.setor_id);
+}
+
 export function canEditTarefa(
   tarefa: TarefaWithRelations,
   userId: string | undefined,
@@ -51,4 +80,25 @@ export function canEditTarefa(
   if (tarefa.criado_por === userId || tarefa.atribuido_a === userId) return true;
   if (isGerenteUser && tarefa.setor_id && tarefa.setor_id === userSetorId) return true;
   return false;
+}
+
+export function canEditVisibilidade(
+  tarefa: TarefaWithRelations | null | undefined,
+  userId: string | undefined,
+  isAdminUser: boolean,
+  isGerenteUser: boolean,
+  userSetorId: string | null | undefined,
+): boolean {
+  if (!userId) return false;
+  if (!tarefa) return true;
+  if (isAdminUser) return true;
+  if (tarefa.criado_por === userId) return true;
+  if (isGerenteUser && tarefa.setor_id && tarefa.setor_id === userSetorId) return true;
+  return false;
+}
+
+export function parseLembretes(value: unknown): TarefaLembreteOpcao[] {
+  if (!Array.isArray(value)) return [];
+  const allowed: TarefaLembreteOpcao[] = ["no_prazo", "1h_antes", "1d_antes", "1sem_antes"];
+  return value.filter((item): item is TarefaLembreteOpcao => allowed.includes(item as TarefaLembreteOpcao));
 }

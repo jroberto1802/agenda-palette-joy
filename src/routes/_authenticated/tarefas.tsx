@@ -16,18 +16,15 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TarefaCard } from "@/components/tarefas/tarefa-card";
-import { TarefaDetailSheet } from "@/components/tarefas/tarefa-detail-sheet";
 import { TarefaFiltersBar } from "@/components/tarefas/tarefa-filters";
-import { TarefaFormDialog } from "@/components/tarefas/tarefa-form-dialog";
 import { TarefaKanban } from "@/components/tarefas/tarefa-kanban";
+import { TarefaPanelSheet } from "@/components/tarefas/tarefa-panel-sheet";
 import { usePessoas } from "@/hooks/use-pessoas";
 import { useProfile } from "@/hooks/use-profile";
 import { useSetores } from "@/hooks/use-setores";
 import {
-  useCreateTarefa,
   useSoftDeleteTarefa,
   useTarefas,
-  useUpdateTarefa,
   useUpdateTarefaStatus,
 } from "@/hooks/use-tarefas";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
@@ -55,10 +52,9 @@ function TarefasPage() {
   });
   const [debouncedFilters, setDebouncedFilters] = useState(filters);
 
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing] = useState<TarefaWithRelations | null>(null);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [panelId, setPanelId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<TarefaWithRelations | null>(null);
-  const [detailId, setDetailId] = useState<string | null>(null);
 
   const kanbanFilters = useMemo(
     () => ({ ...debouncedFilters, status: "all" as const }),
@@ -68,8 +64,6 @@ function TarefasPage() {
   const { data: tarefas, isLoading } = useTarefas(
     view === "kanban" ? kanbanFilters : debouncedFilters,
   );
-  const createTarefa = useCreateTarefa();
-  const updateTarefa = useUpdateTarefa();
   const updateStatus = useUpdateTarefaStatus();
   const softDelete = useSoftDeleteTarefa();
 
@@ -95,24 +89,14 @@ function TarefasPage() {
   const canEdit = (tarefa: TarefaWithRelations) =>
     canEditTarefa(tarefa, profile?.id, isAdmin(profile), isGerente(profile), profile?.setor_id);
 
-  const openDetail = (tarefa: TarefaWithRelations) => setDetailId(tarefa.id);
+  const openCreate = () => {
+    setPanelId(null);
+    setPanelOpen(true);
+  };
 
-  const handleSave = async (data: Parameters<typeof createTarefa.mutateAsync>[0]) => {
-    try {
-      if (editing) {
-        await updateTarefa.mutateAsync({ id: editing.id, data });
-        toast.success("Tarefa atualizada");
-      } else {
-        await createTarefa.mutateAsync(data);
-        toast.success("Tarefa criada");
-      }
-      setDialogOpen(false);
-      setEditing(null);
-    } catch (error) {
-      toast.error("Erro ao salvar tarefa", {
-        description: getSupabaseErrorMessage(error as Error),
-      });
-    }
+  const openTarefa = (tarefa: TarefaWithRelations) => {
+    setPanelId(tarefa.id);
+    setPanelOpen(true);
   };
 
   const handleStatusChange = async (tarefa: TarefaWithRelations, status: TarefaStatus) => {
@@ -132,7 +116,10 @@ function TarefasPage() {
       await softDelete.mutateAsync(deleting.id);
       toast.success("Tarefa excluída");
       setDeleting(null);
-      if (detailId === deleting.id) setDetailId(null);
+      if (panelId === deleting.id) {
+        setPanelOpen(false);
+        setPanelId(null);
+      }
     } catch (error) {
       toast.error("Erro ao excluir tarefa", {
         description: getSupabaseErrorMessage(error as Error),
@@ -146,16 +133,10 @@ function TarefasPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Tarefas</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Lista, Kanban, comentários e subtarefas — Fase 3.
+            Lista, Kanban, comentários e subtarefas.
           </p>
         </div>
-        <Button
-          onClick={() => {
-            setEditing(null);
-            setDialogOpen(true);
-          }}
-          className="gap-2 shrink-0"
-        >
+        <Button onClick={openCreate} className="gap-2 shrink-0">
           <Plus className="h-4 w-4" />
           Nova tarefa
         </Button>
@@ -188,7 +169,7 @@ function TarefasPage() {
               ))}
             </div>
           ) : !tarefas?.length ? (
-            <EmptyState onCreate={() => { setEditing(null); setDialogOpen(true); }} />
+            <EmptyState onCreate={openCreate} />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {tarefas.map((tarefa) => (
@@ -197,11 +178,8 @@ function TarefasPage() {
                   tarefa={tarefa}
                   canEdit={canEdit(tarefa)}
                   canDelete={canDeleteTarefa(tarefa)}
-                  onOpen={() => openDetail(tarefa)}
-                  onEdit={() => {
-                    setEditing(tarefa);
-                    setDialogOpen(true);
-                  }}
+                  onOpen={() => openTarefa(tarefa)}
+                  onEdit={() => openTarefa(tarefa)}
                   onDelete={() => setDeleting(tarefa)}
                   onStatusChange={(status) => handleStatusChange(tarefa, status)}
                 />
@@ -218,42 +196,25 @@ function TarefasPage() {
               ))}
             </div>
           ) : !tarefas?.length ? (
-            <EmptyState onCreate={() => { setEditing(null); setDialogOpen(true); }} />
+            <EmptyState onCreate={openCreate} />
           ) : (
             <TarefaKanban
               tarefas={tarefas}
               onStatusChange={handleStatusChange}
-              onOpenTarefa={openDetail}
+              onOpenTarefa={openTarefa}
             />
           )}
         </TabsContent>
       </Tabs>
 
-      <TarefaFormDialog
-        open={dialogOpen}
+      <TarefaPanelSheet
+        tarefaId={panelId}
+        open={panelOpen}
         onOpenChange={(open) => {
-          setDialogOpen(open);
-          if (!open) setEditing(null);
+          setPanelOpen(open);
+          if (!open) setPanelId(null);
         }}
-        tarefa={editing}
-        setores={setores ?? []}
-        pessoas={pessoasAtivas}
-        defaultSetorId={profile?.setor_id}
-        onSubmit={handleSave}
-        loading={createTarefa.isPending || updateTarefa.isPending}
-      />
-
-      <TarefaDetailSheet
-        tarefaId={detailId}
-        open={!!detailId}
-        onOpenChange={(open) => !open && setDetailId(null)}
-        onEdit={() => {
-          const t = tarefas?.find((t) => t.id === detailId);
-          if (t) {
-            setEditing(t);
-            setDialogOpen(true);
-          }
-        }}
+        onSaved={(id) => setPanelId(id)}
       />
 
       <AlertDialog open={!!deleting} onOpenChange={(open) => !open && setDeleting(null)}>

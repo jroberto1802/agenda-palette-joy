@@ -510,6 +510,7 @@ export type Database = {
           deleted_at: string | null;
           descricao: string | null;
           id: string;
+          lembretes: Json;
           prioridade: "P1" | "P2" | "P3" | "P4";
           recorrencia: Json | null;
           setor_id: string | null;
@@ -517,6 +518,11 @@ export type Database = {
           tags: string[];
           titulo: string;
           updated_at: string;
+          visibilidade:
+            | "todos_empresa"
+            | "todos_setor"
+            | "somente_para_mim"
+            | "pessoas_especificas";
         };
         Insert: {
           atribuido_a?: string | null;
@@ -528,6 +534,7 @@ export type Database = {
           deleted_at?: string | null;
           descricao?: string | null;
           id?: string;
+          lembretes?: Json;
           prioridade?: "P1" | "P2" | "P3" | "P4";
           recorrencia?: Json | null;
           setor_id?: string | null;
@@ -535,6 +542,11 @@ export type Database = {
           tags?: string[];
           titulo: string;
           updated_at?: string;
+          visibilidade?:
+            | "todos_empresa"
+            | "todos_setor"
+            | "somente_para_mim"
+            | "pessoas_especificas";
         };
         Update: {
           atribuido_a?: string | null;
@@ -546,6 +558,7 @@ export type Database = {
           deleted_at?: string | null;
           descricao?: string | null;
           id?: string;
+          lembretes?: Json;
           prioridade?: "P1" | "P2" | "P3" | "P4";
           recorrencia?: Json | null;
           setor_id?: string | null;
@@ -553,6 +566,11 @@ export type Database = {
           tags?: string[];
           titulo?: string;
           updated_at?: string;
+          visibilidade?:
+            | "todos_empresa"
+            | "todos_setor"
+            | "somente_para_mim"
+            | "pessoas_especificas";
         };
         Relationships: [
           {

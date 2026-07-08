@@ -3,6 +3,8 @@ import type { Tables } from "./database";
 export type Papel = Tables<"profiles">["papel"];
 export type TarefaStatus = Tables<"tarefas">["status"];
 export type TarefaPrioridade = Tables<"tarefas">["prioridade"];
+export type TarefaVisibilidade = Tables<"tarefas">["visibilidade"];
+export type TarefaLembreteOpcao = "no_prazo" | "1h_antes" | "1d_antes" | "1sem_antes";
 
 export type Profile = Tables<"profiles">;
 export type Setor = Tables<"setores">;
@@ -51,6 +53,10 @@ export type TarefaWithRelations = Tarefa & {
   setor: Pick<Setor, "id" | "nome" | "cor"> | null;
   criador: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
   responsavel: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
+  observadores?: {
+    usuario_id: string;
+    usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
+  }[];
 };
 
 export type RecorrenciaTipo = "nenhuma" | "diaria" | "semanal" | "mensal";
@@ -69,9 +75,13 @@ export type TarefaFormData = {
   atribuido_a: string | null;
   prioridade: TarefaPrioridade;
   status: TarefaStatus;
+  data_inicio: string | null;
   data_vencimento: string | null;
   tags: string[];
   recorrencia: RecorrenciaConfig | null;
+  visibilidade: TarefaVisibilidade;
+  observador_ids: string[];
+  lembretes: TarefaLembreteOpcao[];
 };
 
 export type TarefaAnexo = Tables<"tarefa_anexos">;
