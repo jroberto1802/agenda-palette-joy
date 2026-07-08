@@ -6,7 +6,7 @@ import { TarefaDetailSheet } from "@/components/tarefas/tarefa-detail-sheet";
 export const Route = createFileRoute("/_authenticated/calendario")({
   head: () => ({
     meta: [
-      { title: "Calendário — Agenda" },
+      { title: "Calendário — CoreGestor" },
       { name: "description", content: "Visualize tarefas por data de vencimento." },
     ],
   }),

@@ -81,8 +81,8 @@ export function AppShell({ children }: { children: ReactNode }) {
                     <ClipboardList className="size-4" />
                   </div>
                   <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-semibold">Agenda</span>
-                    <span className="truncate text-xs text-muted-foreground">Corporativa</span>
+                    <span className="truncate font-semibold">CoreGestor</span>
+                    <span className="truncate text-xs text-sidebar-foreground/70">Gestão</span>
                   </div>
                 </Link>
               </SidebarMenuButton>

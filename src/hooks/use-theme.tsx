@@ -50,8 +50,7 @@ function applyTheme(s: Stored) {
   root.style.setProperty("--ring", s.primary);
   root.style.setProperty("--sidebar-primary", s.primary);
   root.style.setProperty("--accent", s.accent);
-  root.style.setProperty("--sidebar-accent", s.accent);
-  // Foreground para primary/accent — branco por padrão, funciona bem com cores saturadas.
+  // Não sobrescreve --sidebar / --sidebar-accent para manter o cinza do menu.
   root.style.setProperty("--primary-foreground", "#ffffff");
 }
 

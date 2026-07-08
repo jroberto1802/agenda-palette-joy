@@ -24,7 +24,7 @@ import { canManagePessoas, canManageSetores, isAdmin, PAPEL_LABELS } from "@/uti
 export const Route = createFileRoute("/_authenticated/configuracoes")({
   head: () => ({
     meta: [
-      { title: "Configurações — Agenda" },
+      { title: "Configurações — CoreGestor" },
       {
         name: "description",
         content: "Cadastros, aparência e segurança da conta.",

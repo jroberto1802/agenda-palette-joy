@@ -12,8 +12,8 @@ import { getVerifiedTotpFactor, needsMfaChallenge } from "@/services/mfa";
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
-      { title: "Entrar — Agenda" },
-      { name: "description", content: "Faça login ou crie sua conta para acessar a agenda." },
+      { title: "Entrar — CoreGestor" },
+      { name: "description", content: "Faça login ou crie sua conta para acessar o CoreGestor." },
     ],
   }),
   component: AuthPage,
@@ -35,7 +35,7 @@ function AuthPage() {
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Agenda</CardTitle>
+          <CardTitle className="text-2xl">CoreGestor</CardTitle>
           <CardDescription>Gerencie suas tarefas e as da equipe</CardDescription>
         </CardHeader>
         <CardContent>
