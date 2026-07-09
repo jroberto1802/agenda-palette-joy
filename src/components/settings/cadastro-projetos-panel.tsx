@@ -26,6 +26,7 @@ import {
 } from "@/hooks/use-projetos";
 import { useTarefas } from "@/hooks/use-tarefas";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
+import { CARD_GRID_CLASS } from "@/lib/layout";
 import type { ProjetoFormData, ProjetoWithResponsavel } from "@/types";
 import { PROJETO_STATUS_BADGE_CLASS, PROJETO_STATUS_LABELS } from "@/utils/projetos";
 import { cn } from "@/lib/utils";
@@ -156,8 +157,8 @@ export function CadastroProjetosPanel({
       </div>
 
       {isLoading ? (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {Array.from({ length: 2 }).map((_, i) => (
+        <div className={CARD_GRID_CLASS}>
+          {Array.from({ length: 3 }).map((_, i) => (
             <Skeleton key={i} className="h-32 rounded-xl" />
           ))}
         </div>
@@ -179,7 +180,7 @@ export function CadastroProjetosPanel({
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className={CARD_GRID_CLASS}>
           {projetos.map((projeto) => {
             const tarefasCount = tarefasPorProjeto.get(projeto.id) ?? 0;
             return (

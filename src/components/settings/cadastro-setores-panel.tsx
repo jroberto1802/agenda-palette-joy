@@ -23,6 +23,7 @@ import {
   useUpdateSetor,
 } from "@/hooks/use-setores";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
+import { CARD_GRID_CLASS } from "@/lib/layout";
 import type { SetorFormData, SetorWithGerente } from "@/types";
 
 export function CadastroSetoresPanel({ canManage }: { canManage: boolean }) {
@@ -113,8 +114,8 @@ export function CadastroSetoresPanel({ canManage }: { canManage: boolean }) {
       </div>
 
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {Array.from({ length: 2 }).map((_, i) => (
+        <div className={CARD_GRID_CLASS}>
+          {Array.from({ length: 3 }).map((_, i) => (
             <Skeleton key={i} className="h-28 rounded-xl" />
           ))}
         </div>
@@ -136,7 +137,7 @@ export function CadastroSetoresPanel({ canManage }: { canManage: boolean }) {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className={CARD_GRID_CLASS}>
           {setores.map((setor) => {
             const pessoasCount = pessoasPorSetor.get(setor.id) ?? 0;
             return (

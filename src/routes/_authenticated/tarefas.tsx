@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { LayoutGrid, List, Plus } from "lucide-react";
+import { Columns3, LayoutGrid, List, Plus } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -18,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TarefaCard } from "@/components/tarefas/tarefa-card";
 import { TarefaFiltersBar } from "@/components/tarefas/tarefa-filters";
 import { TarefaKanban } from "@/components/tarefas/tarefa-kanban";
+import { TarefaListView } from "@/components/tarefas/tarefa-list-view";
 import { TarefaPanelSheet } from "@/components/tarefas/tarefa-panel-sheet";
 import { usePessoas } from "@/hooks/use-pessoas";
 import { useProjetos } from "@/hooks/use-projetos";
@@ -29,6 +30,7 @@ import {
   useUpdateTarefaStatus,
 } from "@/hooks/use-tarefas";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
+import { CARD_GRID_CLASS } from "@/lib/layout";
 import type { Profile, TarefaFilters, TarefaStatus, TarefaWithRelations } from "@/types";
 import { isAdmin, isGerente } from "@/utils/permissions";
 import { canEditTarefa, TAREFA_STATUS_LABELS } from "@/utils/tarefas";
@@ -45,17 +47,19 @@ const DEFAULT_FILTERS: TarefaFilters = {
 
 type AgendaTab = "minha" | "geral";
 
+type AgendaViewMode = "cards" | "lista" | "kanban";
+
 type AgendaTabState = {
   filters: TarefaFilters;
   debouncedFilters: TarefaFilters;
-  view: "lista" | "kanban";
+  view: AgendaViewMode;
 };
 
 function createTabState(): AgendaTabState {
   return {
     filters: { ...DEFAULT_FILTERS },
     debouncedFilters: { ...DEFAULT_FILTERS },
-    view: "lista",
+    view: "cards",
   };
 }
 
@@ -143,7 +147,7 @@ function AgendaPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Agenda</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Suas tarefas e a visão geral da empresa em lista ou Kanban.
+            Suas tarefas e a visão geral da empresa em cards, lista ou Kanban.
           </p>
         </div>
         <Button onClick={openCreate} className="shrink-0 gap-2">
@@ -154,7 +158,7 @@ function AgendaPage() {
 
       <Tabs value={agendaTab} onValueChange={(value) => setAgendaTab(value as AgendaTab)}>
         <TabsList>
-          <TabsTrigger value="minha">Minha Agenda</TabsTrigger>
+          <TabsTrigger value="minha">Minha agenda</TabsTrigger>
           <TabsTrigger value="geral">Agenda Geral</TabsTrigger>
         </TabsList>
 
@@ -315,32 +319,36 @@ function AgendaTabPanel({
         onValueChange={(value) =>
           onTabStateChange({
             ...tabState,
-            view: value as "lista" | "kanban",
+            view: value as AgendaViewMode,
           })
         }
       >
         <TabsList>
+          <TabsTrigger value="cards" className="gap-2">
+            <LayoutGrid className="h-4 w-4" />
+            Cards
+          </TabsTrigger>
           <TabsTrigger value="lista" className="gap-2">
             <List className="h-4 w-4" />
             Lista
           </TabsTrigger>
           <TabsTrigger value="kanban" className="gap-2">
-            <LayoutGrid className="h-4 w-4" />
+            <Columns3 className="h-4 w-4" />
             Kanban
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="lista" className="mt-4">
+        <TabsContent value="cards" className="mt-4">
           {isLoading ? (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {Array.from({ length: 4 }).map((_, i) => (
+            <div className={CARD_GRID_CLASS}>
+              {Array.from({ length: 6 }).map((_, i) => (
                 <Skeleton key={i} className="h-40 rounded-xl" />
               ))}
             </div>
           ) : !tarefas?.length ? (
             <EmptyState message={emptyMessage} onCreate={onCreate} />
           ) : (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className={CARD_GRID_CLASS}>
               {tarefas.map((tarefa) => (
                 <TarefaCard
                   key={tarefa.id}
@@ -354,6 +362,20 @@ function AgendaTabPanel({
                 />
               ))}
             </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="lista" className="mt-4">
+          {isLoading ? (
+            <div className="space-y-2 rounded-xl border p-2">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-14 rounded-lg" />
+              ))}
+            </div>
+          ) : !tarefas?.length ? (
+            <EmptyState message={emptyMessage} onCreate={onCreate} />
+          ) : (
+            <TarefaListView tarefas={tarefas} onOpenTarefa={onOpenTarefa} />
           )}
         </TabsContent>
 

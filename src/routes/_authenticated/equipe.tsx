@@ -10,6 +10,7 @@ import { useTarefas } from "@/hooks/use-tarefas";
 import type { ProfileWithSetor, TarefaWithRelations } from "@/types";
 import { formatDate } from "@/utils/formatters";
 import { TAREFA_STATUS_LABELS } from "@/utils/tarefas";
+import { CARD_GRID_CLASS } from "@/lib/layout";
 
 export const Route = createFileRoute("/_authenticated/equipe")({
   head: () => ({
@@ -153,7 +154,7 @@ function EquipePage() {
       </div>
 
       {loadingPessoas || loadingTarefas ? (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className={CARD_GRID_CLASS}>
           {Array.from({ length: 6 }).map((_, index) => (
             <Skeleton key={index} className="h-72 rounded-xl" />
           ))}
@@ -167,7 +168,7 @@ function EquipePage() {
           {gruposPorSetor.map((grupo) => (
             <section key={grupo.id} className="space-y-4">
               <h2 className="text-lg font-semibold tracking-tight">{grupo.nome}</h2>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <div className={CARD_GRID_CLASS}>
                 {grupo.pessoas.map((pessoa) => (
                   <EquipePessoaCard
                     key={pessoa.id}

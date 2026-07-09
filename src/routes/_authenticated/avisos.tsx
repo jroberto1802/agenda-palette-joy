@@ -31,6 +31,7 @@ import { usePessoas } from "@/hooks/use-pessoas";
 import { useProfile } from "@/hooks/use-profile";
 import { useSetores } from "@/hooks/use-setores";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
+import { CARD_GRID_CLASS } from "@/lib/layout";
 import { isAvisoLido } from "@/services/avisos";
 import type { AvisoAba, AvisoLeituraFiltro, AvisoWithRelations } from "@/types";
 import { isAvisoAtivo, isAvisoFinalizado, matchesAvisoSearch } from "@/utils/avisos";
@@ -224,7 +225,7 @@ function AvisosPage() {
   function renderGrid() {
     if (isLoading) {
       return (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className={CARD_GRID_CLASS}>
           {Array.from({ length: 6 }).map((_, i) => (
             <Skeleton key={i} className="h-36 rounded-xl" />
           ))}
@@ -237,7 +238,7 @@ function AvisosPage() {
     }
 
     return (
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className={CARD_GRID_CLASS}>
         {avisosFiltrados.map((aviso) => (
           <AvisoCard
             key={aviso.id}
