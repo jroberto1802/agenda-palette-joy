@@ -28,6 +28,7 @@ export function useTarefas(filters: TarefaFilters = {}) {
     status: filters.status ?? "all",
     prioridade: filters.prioridade ?? "all",
     setor_id: filters.setor_id ?? "all",
+    projeto_id: filters.projeto_id ?? "all",
     atribuido_a: filters.atribuido_a ?? "all",
     tag: filters.tag ?? "",
   };

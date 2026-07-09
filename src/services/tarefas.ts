@@ -119,6 +119,10 @@ export async function listTarefas(filters: TarefaFilters = {}): Promise<TarefaWi
     query = query.eq("setor_id", filters.setor_id);
   }
 
+  if (filters.projeto_id && filters.projeto_id !== "all") {
+    query = query.eq("projeto_id", filters.projeto_id);
+  }
+
   if (filters.atribuido_a && filters.atribuido_a !== "all") {
     query = query.eq("atribuido_a", filters.atribuido_a);
   }

@@ -49,7 +49,7 @@ const BASE_NAV: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/avisos", label: "Avisos", icon: Megaphone },
   { to: "/calendario", label: "Calendário", icon: CalendarDays },
-  { to: "/tarefas", label: "Tarefas", icon: ClipboardList },
+  { to: "/tarefas", label: "Agenda", icon: ClipboardList },
   { to: "/projetos", label: "Projetos", icon: FolderKanban },
   { to: "/equipe", label: "Equipe", icon: Users },
   { to: "/relatorios", label: "Relatórios", icon: BarChart3 },

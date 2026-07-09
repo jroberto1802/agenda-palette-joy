@@ -109,6 +109,7 @@ export type TarefaFilters = {
   status?: TarefaStatus | "all";
   prioridade?: TarefaPrioridade | "all";
   setor_id?: string | "all";
+  projeto_id?: string | "all";
   atribuido_a?: string | "all";
   tag?: string;
 };

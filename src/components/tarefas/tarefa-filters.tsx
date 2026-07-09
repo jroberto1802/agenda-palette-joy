@@ -7,22 +7,37 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { ProfileWithSetor, SetorWithGerente, TarefaFilters } from "@/types";
+import type {
+  ProfileWithSetor,
+  Projeto,
+  SetorWithGerente,
+  TarefaFilters,
+} from "@/types";
 import { TAREFA_PRIORIDADE_LABELS, TAREFA_STATUS_LABELS } from "@/utils/tarefas";
+import { cn } from "@/lib/utils";
 
 export function TarefaFiltersBar({
   filters,
   onChange,
   setores,
+  projetos,
   pessoas,
+  hideResponsavel = false,
 }: {
   filters: TarefaFilters;
   onChange: (filters: TarefaFilters) => void;
   setores: SetorWithGerente[];
+  projetos: Pick<Projeto, "id" | "nome">[];
   pessoas: ProfileWithSetor[];
+  hideResponsavel?: boolean;
 }) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+    <div
+      className={cn(
+        "grid grid-cols-1 gap-3 sm:grid-cols-2",
+        hideResponsavel ? "lg:grid-cols-6" : "lg:grid-cols-7",
+      )}
+    >
       <div className="relative lg:col-span-2">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -89,21 +104,40 @@ export function TarefaFiltersBar({
       </Select>
 
       <Select
-        value={filters.atribuido_a ?? "all"}
-        onValueChange={(v) => onChange({ ...filters, atribuido_a: v })}
+        value={filters.projeto_id ?? "all"}
+        onValueChange={(v) => onChange({ ...filters, projeto_id: v })}
       >
         <SelectTrigger>
-          <SelectValue placeholder="Responsável" />
+          <SelectValue placeholder="Projeto" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">Todos responsáveis</SelectItem>
-          {pessoas.map((p) => (
-            <SelectItem key={p.id} value={p.id}>
-              {p.nome_completo}
+          <SelectItem value="all">Todos os projetos</SelectItem>
+          {projetos.map((projeto) => (
+            <SelectItem key={projeto.id} value={projeto.id}>
+              {projeto.nome}
             </SelectItem>
           ))}
         </SelectContent>
       </Select>
+
+      {!hideResponsavel && (
+        <Select
+          value={filters.atribuido_a ?? "all"}
+          onValueChange={(v) => onChange({ ...filters, atribuido_a: v })}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Responsável" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos responsáveis</SelectItem>
+            {pessoas.map((p) => (
+              <SelectItem key={p.id} value={p.id}>
+                {p.nome_completo}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
 
       <Input
         placeholder="Filtrar por tag..."
