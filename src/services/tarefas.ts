@@ -24,6 +24,7 @@ import type { TablesUpdate } from "@/types/database";
 const TAREFA_SELECT = `
   *,
   setor:setores(id, nome, cor),
+  projeto:projetos(id, nome),
   criador:profiles!criado_por(id, nome_completo, avatar_url),
   responsavel:profiles!atribuido_a(id, nome_completo, avatar_url),
   observadores:tarefa_observadores(
@@ -35,6 +36,7 @@ const TAREFA_SELECT = `
 const TAREFA_SELECT_LITE = `
   *,
   setor:setores(id, nome, cor),
+  projeto:projetos(id, nome),
   criador:profiles!criado_por(id, nome_completo, avatar_url),
   responsavel:profiles!atribuido_a(id, nome_completo, avatar_url)
 `;
@@ -192,6 +194,7 @@ async function spawnProximaOcorrencia(tarefa: TarefaWithRelations): Promise<void
   const { error } = await supabase.from("tarefas").insert({
     titulo: tarefa.titulo,
     descricao: tarefa.descricao,
+    projeto_id: tarefa.projeto_id,
     setor_id: tarefa.setor_id,
     atribuido_a: tarefa.atribuido_a,
     prioridade: tarefa.prioridade,
@@ -235,6 +238,7 @@ export async function createTarefa(payload: TarefaFormData): Promise<TarefaWithR
       id: tarefaId,
       titulo: normalized.titulo,
       descricao: normalized.descricao || null,
+      projeto_id: normalized.projeto_id,
       setor_id: normalized.setor_id,
       atribuido_a: normalized.atribuido_a,
       prioridade: normalized.prioridade,
@@ -312,6 +316,7 @@ export async function updateTarefa(
   const updateData: TablesUpdate<"tarefas"> = {
     titulo: payload.titulo,
     descricao: payload.descricao || null,
+    projeto_id: payload.projeto_id,
     setor_id: payload.setor_id,
     atribuido_a: payload.atribuido_a,
     prioridade: payload.prioridade,

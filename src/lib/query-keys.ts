@@ -10,6 +10,12 @@ export const setorKeys = {
   detail: (id: string) => [...setorKeys.all, id] as const,
 };
 
+export const projetoKeys = {
+  all: ["projetos"] as const,
+  list: (search?: string) => [...projetoKeys.all, "list", search ?? ""] as const,
+  detail: (id: string) => [...projetoKeys.all, id] as const,
+};
+
 export const tarefaKeys = {
   all: ["tarefas"] as const,
   list: (filters?: Record<string, string>) => [...tarefaKeys.all, "list", filters ?? {}] as const,

@@ -45,6 +45,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { usePessoas } from "@/hooks/use-pessoas";
+import { useProjetos } from "@/hooks/use-projetos";
 import { useProfile } from "@/hooks/use-profile";
 import { useSetores } from "@/hooks/use-setores";
 import {
@@ -91,6 +92,7 @@ const tarefaPanelSchema = z
   .object({
     titulo: z.string().min(2, "Título deve ter pelo menos 2 caracteres"),
     descricao: z.string(),
+    projeto_id: z.string().nullable(),
     setor_id: z.string().nullable(),
     atribuido_a: z.string().nullable(),
     prioridade: z.enum(["P1", "P2", "P3", "P4"]),
@@ -149,6 +151,7 @@ function toFormValues(
   return {
     titulo: tarefa?.titulo ?? "",
     descricao: tarefa?.descricao ?? "",
+    projeto_id: tarefa?.projeto_id ?? null,
     setor_id: tarefa?.setor_id ?? defaultSetorId ?? null,
     atribuido_a: tarefa?.atribuido_a ?? null,
     prioridade: tarefa?.prioridade ?? "P4",
@@ -181,6 +184,7 @@ function toPayload(values: TarefaPanelSchema): TarefaFormData {
   return {
     titulo: values.titulo,
     descricao: values.descricao,
+    projeto_id: values.projeto_id,
     setor_id: values.setor_id,
     atribuido_a: values.atribuido_a,
     prioridade: values.prioridade,
@@ -287,6 +291,7 @@ export function TarefaPanelSheet({
   const isCreate = !tarefaId;
   const { data: profile } = useProfile();
   const { data: setores } = useSetores();
+  const { data: projetos } = useProjetos();
   const { data: pessoas } = usePessoas();
   const { data: tarefa, isLoading } = useTarefaDetail(tarefaId);
 
@@ -348,8 +353,10 @@ export function TarefaPanelSheet({
   });
 
   const visibilidade = form.watch("visibilidade");
+  const projetoId = form.watch("projeto_id");
   const setorId = form.watch("setor_id");
   const atribuidoId = form.watch("atribuido_a");
+  const selectedProjeto = projetos?.find((p) => p.id === projetoId);
   const selectedSetor = setores?.find((s) => s.id === setorId);
 
   useEffect(() => {
@@ -464,6 +471,10 @@ export function TarefaPanelSheet({
               <SheetHeader className="px-6 py-4 border-b shrink-0">
                 <div className="flex items-center gap-1 text-xs text-muted-foreground mb-2">
                   <span>Projeto</span>
+                  <ChevronRight className="h-3 w-3" />
+                  <span>{selectedProjeto?.nome ?? "Nenhum"}</span>
+                  <ChevronRight className="h-3 w-3" />
+                  <span>Setor</span>
                   <ChevronRight className="h-3 w-3" />
                   <span>{selectedSetor?.nome ?? "Sem setor"}</span>
                   <ChevronRight className="h-3 w-3" />
@@ -731,10 +742,40 @@ export function TarefaPanelSheet({
                     <div className="p-4 space-y-5">
                       <FormField
                         control={form.control}
-                        name="setor_id"
+                        name="projeto_id"
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Projeto</FormLabel>
+                            <Select
+                              value={field.value ?? "none"}
+                              onValueChange={(v) => field.onChange(v === "none" ? null : v)}
+                              disabled={!canEdit}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Nenhum" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="none">Nenhum</SelectItem>
+                                {(projetos ?? []).map((projeto) => (
+                                  <SelectItem key={projeto.id} value={projeto.id}>
+                                    {projeto.nome}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="setor_id"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Setor</FormLabel>
                             <Select
                               value={field.value ?? "none"}
                               onValueChange={(v) => field.onChange(v === "none" ? null : v)}

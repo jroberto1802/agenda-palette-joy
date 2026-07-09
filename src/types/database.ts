@@ -283,6 +283,60 @@ export type Database = {
           },
         ];
       };
+      projetos: {
+        Row: {
+          created_at: string;
+          criado_por: string | null;
+          data_inicio: string | null;
+          data_termino_prevista: string | null;
+          descricao: string | null;
+          id: string;
+          nome: string;
+          responsavel_id: string | null;
+          status: "nao_iniciado" | "em_andamento" | "concluido" | "cancelado";
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          criado_por?: string | null;
+          data_inicio?: string | null;
+          data_termino_prevista?: string | null;
+          descricao?: string | null;
+          id?: string;
+          nome: string;
+          responsavel_id?: string | null;
+          status?: "nao_iniciado" | "em_andamento" | "concluido" | "cancelado";
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          criado_por?: string | null;
+          data_inicio?: string | null;
+          data_termino_prevista?: string | null;
+          descricao?: string | null;
+          id?: string;
+          nome?: string;
+          responsavel_id?: string | null;
+          status?: "nao_iniciado" | "em_andamento" | "concluido" | "cancelado";
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "projetos_criado_por_fkey",
+            columns: ["criado_por"],
+            isOneToOne: false,
+            referencedRelation: "profiles",
+            referencedColumns: ["id"],
+          },
+          {
+            foreignKeyName: "projetos_responsavel_id_fkey",
+            columns: ["responsavel_id"],
+            isOneToOne: false,
+            referencedRelation: "profiles",
+            referencedColumns: ["id"],
+          },
+        ];
+      };
       setores: {
         Row: {
           cor: string | null;
@@ -518,6 +572,7 @@ export type Database = {
           id: string;
           lembretes: Json;
           prioridade: "P1" | "P2" | "P3" | "P4";
+          projeto_id: string | null;
           recorrencia: Json | null;
           setor_id: string | null;
           status: "a_fazer" | "em_andamento" | "bloqueada" | "concluida";
@@ -542,6 +597,7 @@ export type Database = {
           id?: string;
           lembretes?: Json;
           prioridade?: "P1" | "P2" | "P3" | "P4";
+          projeto_id?: string | null;
           recorrencia?: Json | null;
           setor_id?: string | null;
           status?: "a_fazer" | "em_andamento" | "bloqueada" | "concluida";
@@ -566,6 +622,7 @@ export type Database = {
           id?: string;
           lembretes?: Json;
           prioridade?: "P1" | "P2" | "P3" | "P4";
+          projeto_id?: string | null;
           recorrencia?: Json | null;
           setor_id?: string | null;
           status?: "a_fazer" | "em_andamento" | "bloqueada" | "concluida";
@@ -579,6 +636,13 @@ export type Database = {
             | "pessoas_especificas";
         };
         Relationships: [
+          {
+            foreignKeyName: "tarefas_projeto_id_fkey",
+            columns: ["projeto_id"],
+            isOneToOne: false,
+            referencedRelation: "projetos",
+            referencedColumns: ["id"],
+          },
           {
             foreignKeyName: "tarefas_setor_id_fkey",
             columns: ["setor_id"],

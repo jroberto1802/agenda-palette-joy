@@ -26,6 +26,10 @@ export function canManagePessoas(profile: Profile | null | undefined): boolean {
   return isAdmin(profile);
 }
 
+export function canDeleteProjetos(profile: Profile | null | undefined): boolean {
+  return isAdminOrGerente(profile);
+}
+
 export const PAPEL_LABELS: Record<Papel, string> = {
   admin: "Administrador",
   gerente: "Gestor",

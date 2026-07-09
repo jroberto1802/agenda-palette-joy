@@ -26,6 +26,22 @@ export type SetorFormData = {
   gerente_id?: string | null;
 };
 
+export type Projeto = Tables<"projetos">;
+export type ProjetoStatus = Projeto["status"];
+
+export type ProjetoWithResponsavel = Projeto & {
+  responsavel: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
+};
+
+export type ProjetoFormData = {
+  nome: string;
+  descricao?: string;
+  responsavel_id: string | null;
+  data_inicio: string | null;
+  data_termino_prevista: string | null;
+  status: ProjetoStatus;
+};
+
 export type ProfileFormData = {
   nome_completo: string;
   email?: string;
@@ -51,6 +67,7 @@ export type DashboardKpis = {
 
 export type TarefaWithRelations = Tarefa & {
   setor: Pick<Setor, "id" | "nome" | "cor"> | null;
+  projeto: Pick<Projeto, "id" | "nome"> | null;
   criador: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
   responsavel: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
   observadores?: {
@@ -71,6 +88,7 @@ export type RecorrenciaConfig = {
 export type TarefaFormData = {
   titulo: string;
   descricao: string;
+  projeto_id: string | null;
   setor_id: string | null;
   atribuido_a: string | null;
   prioridade: TarefaPrioridade;
