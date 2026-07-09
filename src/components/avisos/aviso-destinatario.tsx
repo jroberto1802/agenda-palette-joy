@@ -24,12 +24,12 @@ export function AvisoDestinatarioDisplay({
               key={pessoa.id}
               name={pessoa.nome_completo}
               avatarUrl={pessoa.avatar_url}
-              className="h-6 w-6 border-2 border-background"
-              fallbackClassName="text-[10px]"
+              className="h-5 w-5 border-2 border-background"
+              fallbackClassName="text-[9px]"
             />
           ))}
           {restantes > 0 && (
-            <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-background bg-muted text-[10px] font-medium">
+            <div className="flex h-5 w-5 items-center justify-center rounded-full border-2 border-background bg-muted text-[9px] font-medium">
               +{restantes}
             </div>
           )}
@@ -44,7 +44,7 @@ export function AvisoDestinatarioDisplay({
   }
 
   return (
-    <p className="text-xs text-muted-foreground truncate">
+    <p className="truncate text-[11px] text-muted-foreground">
       Para: {getAvisoDestinatarioLabel(aviso)}
     </p>
   );

@@ -224,9 +224,9 @@ function AvisosPage() {
   function renderGrid() {
     if (isLoading) {
       return (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-44 rounded-xl" />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-36 rounded-xl" />
           ))}
         </div>
       );
@@ -237,7 +237,7 @@ function AvisosPage() {
     }
 
     return (
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {avisosFiltrados.map((aviso) => (
           <AvisoCard
             key={aviso.id}
