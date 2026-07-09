@@ -71,31 +71,30 @@ export async function createAviso(payload: AvisoFormData): Promise<AvisoWithRela
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Usuário não autenticado");
 
-  const { data: inserted, error } = await supabase
-    .from("avisos")
-    .insert({
-      titulo: payload.titulo,
-      conteudo: payload.conteudo,
-      alcance: payload.alcance,
-      fixado: payload.fixado,
-      comentarios_permitidos: payload.comentarios_permitidos,
-      criado_por: user.id,
-    })
-    .select("id")
-    .single();
+  const avisoId = crypto.randomUUID();
+
+  const { error } = await supabase.from("avisos").insert({
+    id: avisoId,
+    titulo: payload.titulo,
+    conteudo: payload.conteudo,
+    alcance: payload.alcance,
+    fixado: payload.fixado,
+    comentarios_permitidos: payload.comentarios_permitidos,
+    criado_por: user.id,
+  });
 
   if (error) throw error;
 
   if (payload.alcance === "por_setor" && payload.setor_ids.length > 0) {
     const { error: setorError } = await supabase.from("aviso_setores").insert(
-      payload.setor_ids.map((setor_id) => ({ aviso_id: inserted.id, setor_id })),
+      payload.setor_ids.map((setor_id) => ({ aviso_id: avisoId, setor_id })),
     );
     if (setorError) throw setorError;
   }
 
   if (payload.alcance === "pessoa_especifica" && payload.usuario_ids.length > 0) {
     const { error: pessoaError } = await supabase.from("aviso_pessoas").insert(
-      payload.usuario_ids.map((usuario_id) => ({ aviso_id: inserted.id, usuario_id })),
+      payload.usuario_ids.map((usuario_id) => ({ aviso_id: avisoId, usuario_id })),
     );
     if (pessoaError) throw pessoaError;
   }
@@ -103,14 +102,14 @@ export async function createAviso(payload: AvisoFormData): Promise<AvisoWithRela
   const { data: aviso, error: fetchError } = await supabase
     .from("avisos")
     .select(AVISO_SELECT)
-    .eq("id", inserted.id)
+    .eq("id", avisoId)
     .single();
 
   if (fetchError) {
     const { data: fallback, error: fallbackError } = await supabase
       .from("avisos")
       .select(AVISO_SELECT_LITE)
-      .eq("id", inserted.id)
+      .eq("id", avisoId)
       .single();
 
     if (fallbackError) throw fetchError;
@@ -145,7 +144,7 @@ export async function createAviso(payload: AvisoFormData): Promise<AvisoWithRela
   await notifyUsers(destinatarios, {
     tipo: "aviso_novo",
     referencia_tipo: "aviso",
-    referencia_id: inserted.id,
+    referencia_id: avisoId,
   });
 
   return aviso as AvisoWithRelations;

@@ -24,7 +24,7 @@ import { useSetores } from "@/hooks/use-setores";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
 import { isAvisoLido } from "@/services/avisos";
 import type { AvisoWithRelations } from "@/types";
-import { isAdmin, isAdminOrGerente } from "@/utils/permissions";
+import { isAdmin } from "@/utils/permissions";
 
 export const Route = createFileRoute("/_authenticated/avisos")({
   component: AvisosPage,
@@ -42,7 +42,7 @@ function AvisosPage() {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<AvisoWithRelations | null>(null);
 
-  const canCreate = isAdminOrGerente(profile);
+  const canCreate = !!profile;
   const pessoasAtivas = useMemo(() => (pessoas ?? []).filter((p) => p.ativo), [pessoas]);
 
   const naoLidos = useMemo(
