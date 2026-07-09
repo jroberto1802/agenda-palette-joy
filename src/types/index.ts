@@ -109,11 +109,12 @@ export type TarefaDetail = TarefaWithRelations & {
 
 export type Aviso = Tables<"avisos">;
 export type AvisoAlcance = Aviso["alcance"];
+export type AvisoPrioridade = Aviso["prioridade"];
 
 export type AvisoWithRelations = Aviso & {
-  criador: Pick<Profile, "id" | "nome_completo"> | null;
+  criador: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
   setores: { setor: Pick<Setor, "id" | "nome"> | null }[];
-  pessoas: { usuario: Pick<Profile, "id" | "nome_completo"> | null }[];
+  pessoas: { usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null }[];
   lido_por: { usuario_id: string }[];
 };
 
@@ -129,11 +130,16 @@ export type AvisoFormData = {
   titulo: string;
   conteudo: string;
   alcance: AvisoAlcance;
+  prioridade: AvisoPrioridade;
+  data_expiracao: string;
   fixado: boolean;
   comentarios_permitidos: boolean;
   setor_ids: string[];
   usuario_ids: string[];
 };
+
+export type AvisoLeituraFiltro = "todos" | "lidos" | "nao_lidos";
+export type AvisoAba = "ativos" | "finalizados";
 
 export type Notificacao = Tables<"notificacoes">;
 

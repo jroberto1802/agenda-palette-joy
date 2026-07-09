@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Plus } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -13,7 +13,16 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AvisoCard, AvisoEmptyState } from "@/components/avisos/aviso-card";
 import { AvisoDetailSheet } from "@/components/avisos/aviso-detail-sheet";
 import { AvisoFormDialog } from "@/components/avisos/aviso-form-dialog";
@@ -23,8 +32,9 @@ import { useProfile } from "@/hooks/use-profile";
 import { useSetores } from "@/hooks/use-setores";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
 import { isAvisoLido } from "@/services/avisos";
-import type { AvisoWithRelations } from "@/types";
-import { isAdmin } from "@/utils/permissions";
+import type { AvisoAba, AvisoLeituraFiltro, AvisoWithRelations } from "@/types";
+import { isAvisoAtivo, isAvisoFinalizado, matchesAvisoSearch } from "@/utils/avisos";
+import { isAdmin, isAdminOrGerente } from "@/utils/permissions";
 
 export const Route = createFileRoute("/_authenticated/avisos")({
   component: AvisosPage,
@@ -41,12 +51,31 @@ function AvisosPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<AvisoWithRelations | null>(null);
+  const [aba, setAba] = useState<AvisoAba>("ativos");
+  const [search, setSearch] = useState("");
+  const [leituraFiltro, setLeituraFiltro] = useState<AvisoLeituraFiltro>("todos");
 
   const canCreate = !!profile;
   const pessoasAtivas = useMemo(() => (pessoas ?? []).filter((p) => p.ativo), [pessoas]);
 
+  const avisosFiltrados = useMemo(() => {
+    return (avisos ?? []).filter((aviso) => {
+      const ativo = isAvisoAtivo(aviso);
+      if (aba === "ativos" && !ativo) return false;
+      if (aba === "finalizados" && !isAvisoFinalizado(aviso)) return false;
+      if (!matchesAvisoSearch(aviso, search)) return false;
+
+      const lido = isAvisoLido(aviso, profile?.id);
+      if (leituraFiltro === "lidos" && !lido) return false;
+      if (leituraFiltro === "nao_lidos" && lido) return false;
+
+      return true;
+    });
+  }, [avisos, aba, search, leituraFiltro, profile?.id]);
+
   const naoLidos = useMemo(
-    () => (avisos ?? []).filter((a) => !isAvisoLido(a, profile?.id)).length,
+    () =>
+      (avisos ?? []).filter((a) => isAvisoAtivo(a) && !isAvisoLido(a, profile?.id)).length,
     [avisos, profile?.id],
   );
 
@@ -74,51 +103,80 @@ function AvisosPage() {
     }
   };
 
-  const canDeleteAviso = (aviso: AvisoWithRelations) =>
-    isAdmin(profile) || aviso.criado_por === profile?.id;
+  const canDeleteAviso = (aviso: AvisoWithRelations) => {
+    if (isAvisoFinalizado(aviso)) {
+      return isAdminOrGerente(profile);
+    }
+    return isAdmin(profile) || aviso.criado_por === profile?.id;
+  };
 
   const selectedAviso = avisos?.find((a) => a.id === detailId);
 
+  const emptyMessage =
+    aba === "ativos"
+      ? "Nenhum aviso ativo encontrado."
+      : "Nenhum aviso finalizado encontrado.";
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Quadro de Avisos</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="mt-1 text-sm text-muted-foreground">
             Comunicados internos da empresa
             {naoLidos > 0 && (
-              <span className="text-primary font-medium"> · {naoLidos} não lido(s)</span>
+              <span className="font-medium text-primary"> · {naoLidos} não lido(s)</span>
             )}
           </p>
         </div>
         {canCreate && (
-          <Button onClick={() => setDialogOpen(true)} className="gap-2 shrink-0">
+          <Button onClick={() => setDialogOpen(true)} className="shrink-0 gap-2">
             <Plus className="h-4 w-4" />
             Novo aviso
           </Button>
         )}
       </div>
 
-      {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-36 rounded-xl" />
-          ))}
+      <Tabs value={aba} onValueChange={(value) => setAba(value as AvisoAba)}>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <TabsList>
+            <TabsTrigger value="ativos">Ativos</TabsTrigger>
+            <TabsTrigger value="finalizados">Finalizados</TabsTrigger>
+          </TabsList>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="relative w-full sm:w-72">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por título ou conteúdo..."
+                className="pl-9"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <Select
+              value={leituraFiltro}
+              onValueChange={(value) => setLeituraFiltro(value as AvisoLeituraFiltro)}
+            >
+              <SelectTrigger className="w-full sm:w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                <SelectItem value="lidos">Lidos</SelectItem>
+                <SelectItem value="nao_lidos">Não lidos</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-      ) : !avisos?.length ? (
-        <AvisoEmptyState />
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {avisos.map((aviso) => (
-            <AvisoCard
-              key={aviso.id}
-              aviso={aviso}
-              lido={isAvisoLido(aviso, profile?.id)}
-              onOpen={() => setDetailId(aviso.id)}
-            />
-          ))}
-        </div>
-      )}
+
+        <TabsContent value="ativos" className="mt-4">
+          {renderGrid()}
+        </TabsContent>
+        <TabsContent value="finalizados" className="mt-4">
+          {renderGrid()}
+        </TabsContent>
+      </Tabs>
 
       <AvisoFormDialog
         open={dialogOpen}
@@ -133,6 +191,7 @@ function AvisosPage() {
         avisoId={detailId}
         open={!!detailId}
         onOpenChange={(open) => !open && setDetailId(null)}
+        userId={profile?.id}
         canDelete={selectedAviso ? canDeleteAviso(selectedAviso) : false}
         onDelete={() => {
           const aviso = avisos?.find((a) => a.id === detailId);
@@ -161,4 +220,33 @@ function AvisosPage() {
       </AlertDialog>
     </div>
   );
+
+  function renderGrid() {
+    if (isLoading) {
+      return (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-44 rounded-xl" />
+          ))}
+        </div>
+      );
+    }
+
+    if (!avisosFiltrados.length) {
+      return <AvisoEmptyState message={emptyMessage} />;
+    }
+
+    return (
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        {avisosFiltrados.map((aviso) => (
+          <AvisoCard
+            key={aviso.id}
+            aviso={aviso}
+            lido={isAvisoLido(aviso, profile?.id)}
+            onOpen={() => setDetailId(aviso.id)}
+          />
+        ))}
+      </div>
+    );
+  }
 }

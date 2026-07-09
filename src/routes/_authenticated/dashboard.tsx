@@ -18,7 +18,7 @@ import { useAvisos } from "@/hooks/use-avisos";
 import { useProfile } from "@/hooks/use-profile";
 import { useDashboardKpis, useRecentTarefas } from "@/hooks/use-tarefas";
 import { isAvisoLido } from "@/services/avisos";
-import { formatDate } from "@/utils/formatters";
+import { isAvisoAtivo } from "@/utils/avisos";
 import { TAREFA_PRIORIDADE_COLORS, TAREFA_STATUS_LABELS } from "@/utils/tarefas";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -31,7 +31,9 @@ function Dashboard() {
   const { data: recentTarefas, isLoading: loadingRecent } = useRecentTarefas(5);
   const { data: avisos } = useAvisos();
 
-  const avisosNaoLidos = (avisos ?? []).filter((a) => !isAvisoLido(a, profile?.id)).length;
+  const avisosNaoLidos = (avisos ?? []).filter(
+    (a) => isAvisoAtivo(a) && !isAvisoLido(a, profile?.id),
+  ).length;
 
   return (
     <div className="space-y-6">

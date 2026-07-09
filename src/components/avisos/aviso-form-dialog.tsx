@@ -30,20 +30,42 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import type { AvisoAlcance, AvisoFormData, ProfileWithSetor, SetorWithGerente } from "@/types";
-import { AVISO_ALCANCE_LABELS } from "@/utils/avisos";
+import type {
+  AvisoAlcance,
+  AvisoFormData,
+  AvisoPrioridade,
+  ProfileWithSetor,
+  SetorWithGerente,
+} from "@/types";
+import { AVISO_ALCANCE_LABELS, AVISO_PRIORIDADE_LABELS } from "@/utils/avisos";
+
+function defaultExpirationValue(): string {
+  const date = new Date();
+  date.setDate(date.getDate() + 7);
+  date.setSeconds(0, 0);
+  return date.toISOString().slice(0, 16);
+}
 
 const avisoSchema = z
   .object({
     titulo: z.string().min(2, "Título obrigatório"),
     conteudo: z.string().min(5, "Conteúdo deve ter pelo menos 5 caracteres"),
     alcance: z.enum(["todos", "por_setor", "pessoa_especifica"]),
+    prioridade: z.enum(["urgente", "importante", "informativo", "geral"]),
+    data_expiracao: z.string().min(1, "Data de expiração obrigatória"),
     fixado: z.boolean(),
     comentarios_permitidos: z.boolean(),
     setor_ids: z.array(z.string()),
     usuario_ids: z.array(z.string()),
   })
   .superRefine((data, ctx) => {
+    if (new Date(data.data_expiracao) <= new Date()) {
+      ctx.addIssue({
+        code: "custom",
+        message: "A data de expiração deve ser futura",
+        path: ["data_expiracao"],
+      });
+    }
     if (data.alcance === "por_setor" && data.setor_ids.length === 0) {
       ctx.addIssue({ code: "custom", message: "Selecione ao menos um setor", path: ["setor_ids"] });
     }
@@ -79,6 +101,8 @@ export function AvisoFormDialog({
       titulo: "",
       conteudo: "",
       alcance: "todos",
+      prioridade: "geral",
+      data_expiracao: defaultExpirationValue(),
       fixado: false,
       comentarios_permitidos: true,
       setor_ids: [],
@@ -94,6 +118,8 @@ export function AvisoFormDialog({
         titulo: "",
         conteudo: "",
         alcance: "todos",
+        prioridade: "geral",
+        data_expiracao: defaultExpirationValue(),
         fixado: false,
         comentarios_permitidos: true,
         setor_ids: [],
@@ -103,7 +129,10 @@ export function AvisoFormDialog({
   }, [open, form]);
 
   const handleSubmit = form.handleSubmit(async (values) => {
-    await onSubmit(values);
+    await onSubmit({
+      ...values,
+      data_expiracao: new Date(values.data_expiracao).toISOString(),
+    });
   });
 
   const toggleSetor = (id: string, checked: boolean) => {
@@ -154,6 +183,48 @@ export function AvisoFormDialog({
                   <FormLabel>Conteúdo</FormLabel>
                   <FormControl>
                     <Textarea rows={5} placeholder="Escreva o aviso..." {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="prioridade"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Prioridade</FormLabel>
+                  <Select
+                    value={field.value}
+                    onValueChange={(v) => field.onChange(v as AvisoPrioridade)}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {(Object.keys(AVISO_PRIORIDADE_LABELS) as AvisoPrioridade[]).map((prioridade) => (
+                        <SelectItem key={prioridade} value={prioridade}>
+                          {AVISO_PRIORIDADE_LABELS[prioridade]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="data_expiracao"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Data de expiração</FormLabel>
+                  <FormControl>
+                    <Input type="datetime-local" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

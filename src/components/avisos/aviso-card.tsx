@@ -1,11 +1,18 @@
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Megaphone, Pin } from "lucide-react";
+import { CheckCircle2, Circle, Megaphone, Pin } from "lucide-react";
+import { ProfileAvatar } from "@/components/common/profile-avatar";
+import { AvisoDestinatarioDisplay } from "@/components/avisos/aviso-destinatario";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import type { AvisoWithRelations } from "@/types";
-import { AVISO_ALCANCE_LABELS } from "@/utils/avisos";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import type { AvisoWithRelations } from "@/types";
+import {
+  AVISO_PRIORIDADE_BADGE_CLASS,
+  AVISO_PRIORIDADE_BAND_CLASS,
+  AVISO_PRIORIDADE_LABELS,
+  formatAvisoExpiracao,
+} from "@/utils/avisos";
 
 export function AvisoCard({
   aviso,
@@ -22,7 +29,8 @@ export function AvisoCard({
   return (
     <Card
       className={cn(
-        "cursor-pointer hover:border-primary/40 transition-colors",
+        "cursor-pointer overflow-hidden border-l-4 transition-colors hover:border-primary/40",
+        AVISO_PRIORIDADE_BAND_CLASS[aviso.prioridade],
         !lido && "border-primary/30 bg-primary/5",
         aviso.fixado && "ring-1 ring-amber-500/30",
       )}
@@ -30,50 +38,57 @@ export function AvisoCard({
     >
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            {aviso.fixado && <Pin className="h-4 w-4 text-amber-500 shrink-0" />}
-            <CardTitle className="text-base truncate">{aviso.titulo}</CardTitle>
-          </div>
-          {!lido && (
-            <Badge variant="default" className="shrink-0 text-xs">
-              Novo
+          <div className="flex min-w-0 items-center gap-2">
+            {aviso.fixado && <Pin className="h-4 w-4 shrink-0 text-amber-500" />}
+            <Badge
+              variant="outline"
+              className={cn("shrink-0 text-xs", AVISO_PRIORIDADE_BADGE_CLASS[aviso.prioridade])}
+            >
+              {AVISO_PRIORIDADE_LABELS[aviso.prioridade]}
             </Badge>
+            <CardTitle className="truncate text-base">{aviso.titulo}</CardTitle>
+          </div>
+          {lido ? (
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-green-600" aria-label="Lido" />
+          ) : (
+            <Circle className="h-4 w-4 shrink-0 text-muted-foreground" aria-label="Não lido" />
           )}
         </div>
-        <CardDescription className="flex flex-wrap items-center gap-2 text-xs">
-          <span>{aviso.criador?.nome_completo ?? "Sistema"}</span>
-          <span>·</span>
-          <span>
-            {format(new Date(aviso.data_publicacao), "dd MMM yyyy", { locale: ptBR })}
-          </span>
-          <Badge variant="outline" className="text-xs">
-            {AVISO_ALCANCE_LABELS[aviso.alcance]}
-          </Badge>
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <p className="text-sm text-muted-foreground line-clamp-2">{preview}</p>
-        {aviso.alcance === "por_setor" && aviso.setores.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-3">
-            {aviso.setores.map((s) =>
-              s.setor ? (
-                <Badge key={s.setor.id} variant="secondary" className="text-xs">
-                  {s.setor.nome}
-                </Badge>
-              ) : null,
-            )}
+
+        <div className="mt-3 flex items-center gap-2">
+          <ProfileAvatar
+            name={aviso.criador?.nome_completo ?? "Sistema"}
+            avatarUrl={aviso.criador?.avatar_url}
+            className="h-7 w-7"
+            fallbackClassName="text-[10px]"
+          />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium">
+              {aviso.criador?.nome_completo ?? "Sistema"}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {format(new Date(aviso.data_publicacao), "dd MMM yyyy", { locale: ptBR })}
+            </p>
           </div>
-        )}
+        </div>
+      </CardHeader>
+
+      <CardContent className="space-y-3">
+        <AvisoDestinatarioDisplay aviso={aviso} compact />
+        <p className="line-clamp-2 text-sm text-muted-foreground">{preview}</p>
+        <p className="text-xs font-medium text-muted-foreground">
+          {formatAvisoExpiracao(aviso.data_expiracao)}
+        </p>
       </CardContent>
     </Card>
   );
 }
 
-export function AvisoEmptyState() {
+export function AvisoEmptyState({ message = "Nenhum aviso publicado ainda." }: { message?: string }) {
   return (
     <div className="rounded-xl border border-dashed p-12 text-center">
-      <Megaphone className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
-      <p className="text-muted-foreground">Nenhum aviso publicado ainda.</p>
+      <Megaphone className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
+      <p className="text-muted-foreground">{message}</p>
     </div>
   );
 }

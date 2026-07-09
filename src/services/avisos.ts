@@ -9,15 +9,15 @@ import type {
 
 const AVISO_SELECT = `
   *,
-  criador:profiles!criado_por(id, nome_completo),
+  criador:profiles!criado_por(id, nome_completo, avatar_url),
   setores:aviso_setores(setor:setores(id, nome)),
-  pessoas:aviso_pessoas(usuario:profiles(id, nome_completo)),
+  pessoas:aviso_pessoas(usuario:profiles(id, nome_completo, avatar_url)),
   lido_por:aviso_lido_por(usuario_id)
 `;
 
 const AVISO_SELECT_LITE = `
   *,
-  criador:profiles!criado_por(id, nome_completo)
+  criador:profiles!criado_por(id, nome_completo, avatar_url)
 `;
 
 const COMENTARIO_SELECT = `
@@ -78,6 +78,8 @@ export async function createAviso(payload: AvisoFormData): Promise<AvisoWithRela
     titulo: payload.titulo,
     conteudo: payload.conteudo,
     alcance: payload.alcance,
+    prioridade: payload.prioridade,
+    data_expiracao: payload.data_expiracao,
     fixado: payload.fixado,
     comentarios_permitidos: payload.comentarios_permitidos,
     criado_por: user.id,
@@ -152,6 +154,30 @@ export async function createAviso(payload: AvisoFormData): Promise<AvisoWithRela
 
 export async function deleteAviso(id: string): Promise<void> {
   const { error } = await supabase.from("avisos").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function setAvisoLido(avisoId: string, lido: boolean): Promise<void> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Usuário não autenticado");
+
+  if (lido) {
+    const { error } = await supabase.from("aviso_lido_por").upsert({
+      aviso_id: avisoId,
+      usuario_id: user.id,
+    });
+    if (error) throw error;
+    return;
+  }
+
+  const { error } = await supabase
+    .from("aviso_lido_por")
+    .delete()
+    .eq("aviso_id", avisoId)
+    .eq("usuario_id", user.id);
+
   if (error) throw error;
 }
 

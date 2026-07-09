@@ -6,6 +6,7 @@ import {
   deleteAviso,
   getAvisoDetail,
   listAvisos,
+  setAvisoLido,
 } from "@/services/avisos";
 import type { AvisoFormData } from "@/types";
 
@@ -45,6 +46,15 @@ export function useCreateAvisoComentario() {
   return useMutation({
     mutationFn: ({ avisoId, conteudo }: { avisoId: string; conteudo: string }) =>
       createAvisoComentario(avisoId, conteudo),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: avisoKeys.all }),
+  });
+}
+
+export function useSetAvisoLido() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ avisoId, lido }: { avisoId: string; lido: boolean }) =>
+      setAvisoLido(avisoId, lido),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: avisoKeys.all }),
   });
 }

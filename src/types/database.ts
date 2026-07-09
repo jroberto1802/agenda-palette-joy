@@ -142,9 +142,11 @@ export type Database = {
           conteudo: string;
           created_at: string;
           criado_por: string | null;
+          data_expiracao: string;
           data_publicacao: string;
           fixado: boolean;
           id: string;
+          prioridade: "urgente" | "importante" | "informativo" | "geral";
           titulo: string;
           updated_at: string;
         };
@@ -154,9 +156,11 @@ export type Database = {
           conteudo: string;
           created_at?: string;
           criado_por?: string | null;
+          data_expiracao: string;
           data_publicacao?: string;
           fixado?: boolean;
           id?: string;
+          prioridade?: "urgente" | "importante" | "informativo" | "geral";
           titulo: string;
           updated_at?: string;
         };
@@ -166,9 +170,11 @@ export type Database = {
           conteudo?: string;
           created_at?: string;
           criado_por?: string | null;
+          data_expiracao?: string;
           data_publicacao?: string;
           fixado?: boolean;
           id?: string;
+          prioridade?: "urgente" | "importante" | "informativo" | "geral";
           titulo?: string;
           updated_at?: string;
         };
