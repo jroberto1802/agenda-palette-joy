@@ -316,6 +316,8 @@ export function TarefaPanelSheet({
   onSaved,
   defaultProjetoId = null,
   lockProjeto = false,
+  initialAba,
+  highlightComentarioId = null,
 }: {
   tarefaId: string | null;
   open: boolean;
@@ -324,6 +326,8 @@ export function TarefaPanelSheet({
   onSaved?: (tarefaId: string) => void;
   defaultProjetoId?: string | null;
   lockProjeto?: boolean;
+  initialAba?: "comentarios" | "anexos";
+  highlightComentarioId?: string | null;
 }) {
   const isCreate = !tarefaId;
   const { data: profile } = useProfile();
@@ -342,6 +346,25 @@ export function TarefaPanelSheet({
 
   const [novaSubtarefa, setNovaSubtarefa] = useState("");
   const [novoComentario, setNovoComentario] = useState("");
+  const [sideTab, setSideTab] = useState<"comentarios" | "anexos">(
+    initialAba ?? "comentarios",
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    setSideTab(initialAba ?? "comentarios");
+  }, [open, initialAba, tarefaId]);
+
+  useEffect(() => {
+    if (!open || !highlightComentarioId) return;
+    setSideTab("comentarios");
+    const timer = window.setTimeout(() => {
+      document
+        .getElementById(`tarefa-comentario-${highlightComentarioId}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [open, highlightComentarioId, tarefa?.comentarios]);
 
   const pessoasAtivas = useMemo(
     () => (pessoas ?? []).filter((p) => p.ativo),
@@ -1079,7 +1102,11 @@ export function TarefaPanelSheet({
                 </ScrollArea>
 
                 <aside className="flex w-full shrink-0 flex-col border-t bg-muted/20 lg:w-96 lg:border-l lg:border-t-0">
-                  <Tabs defaultValue="comentarios" className="flex min-h-0 flex-1 flex-col">
+                  <Tabs
+                    value={sideTab}
+                    onValueChange={(value) => setSideTab(value as "comentarios" | "anexos")}
+                    className="flex min-h-0 flex-1 flex-col"
+                  >
                     <TabsList className="mx-4 mt-4 grid w-auto grid-cols-2">
                       <TabsTrigger value="anexos" className="gap-1.5">
                         <Paperclip className="h-3.5 w-3.5" />
@@ -1138,7 +1165,15 @@ export function TarefaPanelSheet({
                                   </p>
                                 )}
                                 {comentarios.map((c) => (
-                                  <div key={c.id} className="group flex gap-3">
+                                  <div
+                                    key={c.id}
+                                    id={`tarefa-comentario-${c.id}`}
+                                    className={cn(
+                                      "group flex gap-3 rounded-lg p-2 transition-colors",
+                                      highlightComentarioId === c.id &&
+                                        "bg-primary/10 ring-1 ring-primary/40",
+                                    )}
+                                  >
                                     <ProfileAvatar
                                       name={c.usuario?.nome_completo ?? "?"}
                                       avatarUrl={c.usuario?.avatar_url}

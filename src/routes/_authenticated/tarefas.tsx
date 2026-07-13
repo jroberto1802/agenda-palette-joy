@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Plus } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -32,7 +32,18 @@ import { canEditTarefa, TAREFA_STATUS_LABELS } from "@/utils/tarefas";
 
 type AgendaTab = "minha" | "geral";
 
+type AgendaSearch = {
+  tarefaId?: string;
+  aba?: "comentarios" | "anexos";
+  comentarioId?: string;
+};
+
 export const Route = createFileRoute("/_authenticated/tarefas")({
+  validateSearch: (search: Record<string, unknown>): AgendaSearch => ({
+    tarefaId: typeof search.tarefaId === "string" ? search.tarefaId : undefined,
+    aba: search.aba === "comentarios" || search.aba === "anexos" ? search.aba : undefined,
+    comentarioId: typeof search.comentarioId === "string" ? search.comentarioId : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Agenda — CoreGestor" },
@@ -43,6 +54,8 @@ export const Route = createFileRoute("/_authenticated/tarefas")({
 });
 
 function AgendaPage() {
+  const navigate = Route.useNavigate();
+  const search = Route.useSearch();
   const { data: profile } = useProfile();
   const { data: setores } = useSetores();
   const { data: projetos } = useProjetos();
@@ -54,7 +67,17 @@ function AgendaPage() {
 
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelId, setPanelId] = useState<string | null>(null);
+  const [panelAba, setPanelAba] = useState<"comentarios" | "anexos" | undefined>();
+  const [highlightComentarioId, setHighlightComentarioId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<TarefaWithRelations | null>(null);
+
+  useEffect(() => {
+    if (!search.tarefaId) return;
+    setPanelId(search.tarefaId);
+    setPanelAba(search.aba);
+    setHighlightComentarioId(search.comentarioId ?? null);
+    setPanelOpen(true);
+  }, [search.tarefaId, search.aba, search.comentarioId]);
 
   const updateStatus = useUpdateTarefaStatus();
   const softDelete = useSoftDeleteTarefa();
@@ -74,11 +97,15 @@ function AgendaPage() {
 
   const openCreate = () => {
     setPanelId(null);
+    setPanelAba(undefined);
+    setHighlightComentarioId(null);
     setPanelOpen(true);
   };
 
   const openTarefa = (tarefa: TarefaWithRelations) => {
     setPanelId(tarefa.id);
+    setPanelAba(undefined);
+    setHighlightComentarioId(null);
     setPanelOpen(true);
   };
 
@@ -173,9 +200,22 @@ function AgendaPage() {
         open={panelOpen}
         onOpenChange={(open) => {
           setPanelOpen(open);
-          if (!open) setPanelId(null);
+          if (!open) {
+            setPanelId(null);
+            setPanelAba(undefined);
+            setHighlightComentarioId(null);
+            if (search.tarefaId || search.aba || search.comentarioId) {
+              navigate({
+                to: "/tarefas",
+                search: {},
+                replace: true,
+              });
+            }
+          }
         }}
         onSaved={(id) => setPanelId(id)}
+        initialAba={panelAba}
+        highlightComentarioId={highlightComentarioId}
       />
 
       <AlertDialog open={!!deleting} onOpenChange={(open) => !open && setDeleting(null)}>
