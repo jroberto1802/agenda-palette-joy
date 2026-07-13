@@ -1,7 +1,7 @@
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { CheckCircle2, Circle, MessageSquare, Paperclip, Pin, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
 import { AvisoDestinatarioDisplay } from "@/components/avisos/aviso-destinatario";
@@ -38,7 +38,6 @@ export function AvisoDetailSheet({
   userId,
   canDelete,
   onDelete,
-  highlightComentarioId = null,
 }: {
   avisoId: string | null;
   open: boolean;
@@ -46,27 +45,11 @@ export function AvisoDetailSheet({
   userId?: string;
   canDelete?: boolean;
   onDelete?: () => void;
-  highlightComentarioId?: string | null;
 }) {
   const { data: aviso, isLoading } = useAvisoDetail(avisoId);
   const createComentario = useCreateAvisoComentario();
   const setAvisoLido = useSetAvisoLido();
   const [comentario, setComentario] = useState("");
-  const [sideTab, setSideTab] = useState("comentarios");
-
-  useEffect(() => {
-    if (open && highlightComentarioId) setSideTab("comentarios");
-  }, [open, highlightComentarioId]);
-
-  useEffect(() => {
-    if (!open || !highlightComentarioId) return;
-    const timer = window.setTimeout(() => {
-      document
-        .getElementById(`aviso-comentario-${highlightComentarioId}`)
-        ?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 250);
-    return () => window.clearTimeout(timer);
-  }, [open, highlightComentarioId, aviso?.comentarios]);
 
   const lido = aviso ? isAvisoLido(aviso, userId) : false;
   const finalizado = aviso ? isAvisoFinalizado(aviso) : false;
@@ -191,7 +174,7 @@ export function AvisoDetailSheet({
               </ScrollArea>
 
               <aside className="flex w-full shrink-0 flex-col border-t bg-muted/20 lg:w-96 lg:border-l lg:border-t-0">
-                <Tabs value={sideTab} onValueChange={setSideTab} className="flex min-h-0 flex-1 flex-col">
+                <Tabs defaultValue="comentarios" className="flex min-h-0 flex-1 flex-col">
                   <TabsList className="mx-4 mt-4 grid w-auto grid-cols-2">
                     <TabsTrigger value="anexos" className="gap-1.5">
                       <Paperclip className="h-3.5 w-3.5" />
@@ -236,14 +219,7 @@ export function AvisoDetailSheet({
                                 </p>
                               )}
                               {comentarios.map((c) => (
-                                <div
-                                  key={c.id}
-                                  id={`aviso-comentario-${c.id}`}
-                                  className={cn(
-                                    "flex gap-3 rounded-lg p-2 transition-colors",
-                                    highlightComentarioId === c.id && "bg-primary/10 ring-1 ring-primary/40",
-                                  )}
-                                >
+                                <div key={c.id} className="flex gap-3">
                                   <ProfileAvatar
                                     name={c.usuario?.nome_completo ?? "?"}
                                     avatarUrl={c.usuario?.avatar_url}

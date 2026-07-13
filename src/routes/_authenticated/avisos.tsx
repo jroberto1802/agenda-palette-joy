@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Plus, Search } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -37,22 +37,11 @@ import type { AvisoAba, AvisoLeituraFiltro, AvisoWithRelations } from "@/types";
 import { isAvisoAtivo, isAvisoFinalizado, matchesAvisoSearch } from "@/utils/avisos";
 import { isAdmin, isAdminOrGerente } from "@/utils/permissions";
 
-type AvisoSearch = {
-  avisoId?: string;
-  comentarioId?: string;
-};
-
 export const Route = createFileRoute("/_authenticated/avisos")({
-  validateSearch: (search: Record<string, unknown>): AvisoSearch => ({
-    avisoId: typeof search.avisoId === "string" ? search.avisoId : undefined,
-    comentarioId: typeof search.comentarioId === "string" ? search.comentarioId : undefined,
-  }),
   component: AvisosPage,
 });
 
 function AvisosPage() {
-  const navigate = Route.useNavigate();
-  const search = Route.useSearch();
   const { data: profile } = useProfile();
   const { data: avisos, isLoading } = useAvisos();
   const { data: setores } = useSetores();
@@ -62,17 +51,10 @@ function AvisosPage() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
-  const [highlightComentarioId, setHighlightComentarioId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<AvisoWithRelations | null>(null);
   const [aba, setAba] = useState<AvisoAba>("ativos");
-  const [searchText, setSearch] = useState("");
+  const [search, setSearch] = useState("");
   const [leituraFiltro, setLeituraFiltro] = useState<AvisoLeituraFiltro>("todos");
-
-  useEffect(() => {
-    if (!search.avisoId) return;
-    setDetailId(search.avisoId);
-    setHighlightComentarioId(search.comentarioId ?? null);
-  }, [search.avisoId, search.comentarioId]);
 
   const canCreate = !!profile;
   const pessoasAtivas = useMemo(() => (pessoas ?? []).filter((p) => p.ativo), [pessoas]);
@@ -82,7 +64,7 @@ function AvisosPage() {
       const ativo = isAvisoAtivo(aviso);
       if (aba === "ativos" && !ativo) return false;
       if (aba === "finalizados" && !isAvisoFinalizado(aviso)) return false;
-      if (!matchesAvisoSearch(aviso, searchText)) return false;
+      if (!matchesAvisoSearch(aviso, search)) return false;
 
       const lido = isAvisoLido(aviso, profile?.id);
       if (leituraFiltro === "lidos" && !lido) return false;
@@ -90,7 +72,7 @@ function AvisosPage() {
 
       return true;
     });
-  }, [avisos, aba, searchText, leituraFiltro, profile?.id]);
+  }, [avisos, aba, search, leituraFiltro, profile?.id]);
 
   const naoLidos = useMemo(
     () =>
@@ -169,7 +151,7 @@ function AvisosPage() {
               <Input
                 placeholder="Buscar por título ou conteúdo..."
                 className="pl-9"
-                value={searchText}
+                value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
@@ -209,18 +191,9 @@ function AvisosPage() {
       <AvisoDetailSheet
         avisoId={detailId}
         open={!!detailId}
-        onOpenChange={(open) => {
-          if (!open) {
-            setDetailId(null);
-            setHighlightComentarioId(null);
-            if (search.avisoId || search.comentarioId) {
-              navigate({ to: "/avisos", search: {}, replace: true });
-            }
-          }
-        }}
+        onOpenChange={(open) => !open && setDetailId(null)}
         userId={profile?.id}
         canDelete={selectedAviso ? canDeleteAviso(selectedAviso) : false}
-        highlightComentarioId={highlightComentarioId}
         onDelete={() => {
           const aviso = avisos?.find((a) => a.id === detailId);
           if (aviso) setDeleting(aviso);

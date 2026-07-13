@@ -19,10 +19,7 @@ import {
   useNotificacoes,
 } from "@/hooks/use-notificacoes";
 import { cn } from "@/lib/utils";
-import {
-  getNotificacaoMensagem,
-  getNotificacaoNavigateTarget,
-} from "@/utils/notificacoes";
+import { getNotificacaoLink, getNotificacaoMensagem } from "@/utils/notificacoes";
 
 export function NotificationBell() {
   const navigate = useNavigate();
@@ -30,19 +27,11 @@ export function NotificationBell() {
   const markLida = useMarkNotificacaoLida();
   const markAll = useMarkAllNotificacoesLidas();
 
-  const handleClick = async (id: string) => {
-    const notificacao = notificacoes?.find((n) => n.id === id);
-    if (!notificacao) return;
-
-    if (!notificacao.lida) {
+  const handleClick = async (id: string, link: string) => {
+    if (!notificacoes?.find((n) => n.id === id)?.lida) {
       await markLida.mutateAsync(id);
     }
-
-    const target = getNotificacaoNavigateTarget(notificacao);
-    navigate({
-      to: target.to,
-      ...(target.search ? { search: target.search } : {}),
-    });
+    navigate({ to: link });
   };
 
   return (
@@ -87,9 +76,9 @@ export function NotificationBell() {
                   "flex flex-col items-start gap-1 p-3 cursor-pointer",
                   !n.lida && "bg-primary/5",
                 )}
-                onClick={() => handleClick(n.id)}
+                onClick={() => handleClick(n.id, getNotificacaoLink(n))}
               >
-                <span className="text-sm font-medium leading-snug">{getNotificacaoMensagem(n)}</span>
+                <span className="text-sm font-medium">{getNotificacaoMensagem(n)}</span>
                 <span className="text-xs text-muted-foreground">
                   {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: ptBR })}
                 </span>

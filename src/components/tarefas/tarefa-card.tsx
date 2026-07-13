@@ -42,25 +42,7 @@ export function TarefaCard({
   const vencimentoVariant = getVencimentoVariant(tarefa.data_vencimento, tarefa.status);
 
   return (
-    <Card
-      className={cn(
-        tarefa.status === "concluida" ? "opacity-75" : undefined,
-        onOpen && "cursor-pointer transition-colors hover:border-primary/40",
-      )}
-      onClick={onOpen}
-      role={onOpen ? "button" : undefined}
-      tabIndex={onOpen ? 0 : undefined}
-      onKeyDown={
-        onOpen
-          ? (e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                onOpen();
-              }
-            }
-          : undefined
-      }
-    >
+    <Card className={tarefa.status === "concluida" ? "opacity-75" : undefined}>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 space-y-2">
@@ -91,59 +73,59 @@ export function TarefaCard({
             <CardTitle
               className={cn(
                 "text-base leading-snug",
+                onOpen && "cursor-pointer hover:text-primary transition-colors",
                 tarefa.status === "concluida" && "line-through text-muted-foreground",
               )}
+              onClick={onOpen}
             >
               {tarefa.titulo}
             </CardTitle>
           </div>
 
           {(canEdit || canDelete) && (
-            <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="shrink-0" aria-label="Ações da tarefa">
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {canEdit && (
-                    <>
-                      <DropdownMenuItem onClick={onEdit}>
-                        <Pencil className="h-4 w-4 mr-2" />
-                        Editar
-                      </DropdownMenuItem>
-                      {tarefa.status !== "em_andamento" && (
-                        <DropdownMenuItem onClick={() => onStatusChange("em_andamento")}>
-                          Iniciar
-                        </DropdownMenuItem>
-                      )}
-                      {tarefa.status !== "concluida" && (
-                        <DropdownMenuItem onClick={() => onStatusChange("concluida")}>
-                          Concluir
-                        </DropdownMenuItem>
-                      )}
-                      {tarefa.status !== "bloqueada" && tarefa.status !== "concluida" && (
-                        <DropdownMenuItem onClick={() => onStatusChange("bloqueada")}>
-                          Bloquear
-                        </DropdownMenuItem>
-                      )}
-                      {tarefa.status !== "a_fazer" && tarefa.status !== "concluida" && (
-                        <DropdownMenuItem onClick={() => onStatusChange("a_fazer")}>
-                          Voltar para a fazer
-                        </DropdownMenuItem>
-                      )}
-                    </>
-                  )}
-                  {canDelete && (
-                    <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Excluir
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="shrink-0" aria-label="Ações da tarefa">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {canEdit && (
+                  <>
+                    <DropdownMenuItem onClick={onEdit}>
+                      <Pencil className="h-4 w-4 mr-2" />
+                      Editar
                     </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+                    {tarefa.status !== "em_andamento" && (
+                      <DropdownMenuItem onClick={() => onStatusChange("em_andamento")}>
+                        Iniciar
+                      </DropdownMenuItem>
+                    )}
+                    {tarefa.status !== "concluida" && (
+                      <DropdownMenuItem onClick={() => onStatusChange("concluida")}>
+                        Concluir
+                      </DropdownMenuItem>
+                    )}
+                    {tarefa.status !== "bloqueada" && tarefa.status !== "concluida" && (
+                      <DropdownMenuItem onClick={() => onStatusChange("bloqueada")}>
+                        Bloquear
+                      </DropdownMenuItem>
+                    )}
+                    {tarefa.status !== "a_fazer" && tarefa.status !== "concluida" && (
+                      <DropdownMenuItem onClick={() => onStatusChange("a_fazer")}>
+                        Voltar para a fazer
+                      </DropdownMenuItem>
+                    )}
+                  </>
+                )}
+                {canDelete && (
+                  <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Excluir
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </div>
       </CardHeader>

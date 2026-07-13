@@ -1,11 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import {
-  getCurrentActor,
-  notifyAvisoComentario,
-  notifyAvisoMencao,
-  notifyAvisoNovo,
-  resolveMentionIds,
-} from "@/services/notificacao-events";
+import { notifyUsers } from "@/services/notificacoes";
 import type {
   AvisoComentario,
   AvisoDetail,
@@ -149,12 +143,10 @@ export async function createAviso(payload: AvisoFormData): Promise<AvisoWithRela
     destinatarios = payload.usuario_ids.filter((id) => id !== user.id);
   }
 
-  const ator = await getCurrentActor();
-  await notifyAvisoNovo({
-    usuarioIds: destinatarios,
-    avisoId,
-    titulo: aviso.titulo,
-    atorNome: ator?.nome ?? "Alguém",
+  await notifyUsers(destinatarios, {
+    tipo: "aviso_novo",
+    referencia_tipo: "aviso",
+    referencia_id: avisoId,
   });
 
   return aviso as AvisoWithRelations;
@@ -205,41 +197,7 @@ export async function createAvisoComentario(
     .single();
 
   if (error) throw error;
-  const comentario = data as AvisoComentario;
-
-  const [{ data: aviso }, ator, mentionedIds] = await Promise.all([
-    supabase.from("avisos").select("criado_por, titulo").eq("id", avisoId).single(),
-    getCurrentActor(),
-    resolveMentionIds(conteudo),
-  ]);
-
-  const atorNome = ator?.nome ?? "Alguém";
-  const titulo = aviso?.titulo ?? "aviso";
-  const mencoes = mentionedIds.filter((id) => id !== user.id);
-  const comentarioDestinatarios = [aviso?.criado_por]
-    .filter((id): id is string => !!id && id !== user.id && !mencoes.includes(id));
-
-  if (comentarioDestinatarios.length > 0) {
-    await notifyAvisoComentario({
-      usuarioIds: comentarioDestinatarios,
-      avisoId,
-      titulo,
-      comentarioId: comentario.id,
-      atorNome,
-    }).catch(() => undefined);
-  }
-
-  if (mencoes.length > 0) {
-    await notifyAvisoMencao({
-      usuarioIds: mencoes,
-      avisoId,
-      titulo,
-      comentarioId: comentario.id,
-      atorNome,
-    }).catch(() => undefined);
-  }
-
-  return comentario;
+  return data as AvisoComentario;
 }
 
 export function isAvisoLido(aviso: AvisoWithRelations, userId?: string): boolean {

@@ -97,14 +97,6 @@ export type RecorrenciaConfig = {
   data_fim?: string | null;
 };
 
-export type SubtarefaFormData = {
-  titulo: string;
-  descricao?: string | null;
-  prioridade?: TarefaPrioridade | null;
-  data_prazo?: string | null;
-  atribuido_ids?: string[];
-};
-
 export type TarefaFormData = {
   titulo: string;
   descricao: string;
@@ -122,8 +114,6 @@ export type TarefaFormData = {
   visibilidade: TarefaVisibilidade;
   observador_ids: string[];
   lembretes: TarefaLembreteOpcao[];
-  /** Subtarefas a criar junto com a tarefa (somente na criação). */
-  subtarefas?: SubtarefaFormData[];
 };
 
 export type TarefaAnexo = Tables<"tarefa_anexos">;
@@ -143,21 +133,12 @@ export type TarefaFilters = {
 
 export type Subtarefa = Tables<"subtarefas">;
 
-export type SubtarefaWithRelations = Subtarefa & {
-  criador: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
-  concluido_por_usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
-  responsaveis?: {
-    usuario_id: string;
-    usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
-  }[];
-};
-
 export type TarefaComentario = Tables<"tarefa_comentarios"> & {
   usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
 };
 
 export type TarefaDetail = TarefaWithRelations & {
-  subtarefas: SubtarefaWithRelations[];
+  subtarefas: Subtarefa[];
   comentarios: TarefaComentario[];
   anexos: TarefaAnexo[];
 };
