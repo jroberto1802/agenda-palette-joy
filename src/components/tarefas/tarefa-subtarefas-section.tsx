@@ -393,7 +393,7 @@ function PersistedSubtarefaRow({
           className="h-7 w-7 shrink-0 opacity-0 group-hover:opacity-100"
           onClick={async () => {
             try {
-              await deleteSubtarefa.mutateAsync({ id: sub.id, tarefaId: sub.tarefa_id });
+              await deleteSubtarefa.mutateAsync(sub.id);
             } catch (error) {
               toast.error(getSupabaseErrorMessage(error as Error));
             }
@@ -421,44 +421,27 @@ function DraftSubtarefaRow({
   onChange: (next: DraftSubtarefa) => void;
   onRemove: () => void;
 }) {
-  const [titulo, setTitulo] = useState(draft.titulo);
-  const [descricao, setDescricao] = useState(draft.descricao);
-
-  useEffect(() => {
-    setTitulo(draft.titulo);
-    setDescricao(draft.descricao);
-  }, [draft.localId, draft.titulo, draft.descricao]);
-
-  const flushText = () => {
-    if (titulo === draft.titulo && descricao === draft.descricao) return;
-    onChange({ ...draft, titulo, descricao });
-  };
-
   return (
     <div className="group flex items-start gap-2 rounded-lg border border-dashed bg-muted/20 p-3">
       <Checkbox className="mt-1" checked={draft.concluida} disabled />
-      <div className="min-w-0 flex-1" onBlur={flushText}>
-        <SubtarefaFields
-          canEdit={canEdit}
-          forceEdit
-          titulo={titulo}
-          descricao={descricao}
-          prioridade={draft.prioridade}
-          dataPrazo={draft.data_prazo}
-          atribuidoIds={draft.atribuido_ids}
-          pessoas={pessoas}
-          criador={profile ?? null}
-          concluidoPor={null}
-          concluida={draft.concluida}
-          onTituloChange={setTitulo}
-          onDescricaoChange={setDescricao}
-          onPrioridadeChange={(prioridade) => onChange({ ...draft, titulo, descricao, prioridade })}
-          onPrazoChange={(data_prazo) => onChange({ ...draft, titulo, descricao, data_prazo })}
-          onAtribuidoChange={(atribuido_ids) =>
-            onChange({ ...draft, titulo, descricao, atribuido_ids })
-          }
-        />
-      </div>
+      <SubtarefaFields
+        canEdit={canEdit}
+        forceEdit
+        titulo={draft.titulo}
+        descricao={draft.descricao}
+        prioridade={draft.prioridade}
+        dataPrazo={draft.data_prazo}
+        atribuidoIds={draft.atribuido_ids}
+        pessoas={pessoas}
+        criador={profile ?? null}
+        concluidoPor={null}
+        concluida={draft.concluida}
+        onTituloChange={(titulo) => onChange({ ...draft, titulo })}
+        onDescricaoChange={(descricao) => onChange({ ...draft, descricao })}
+        onPrioridadeChange={(prioridade) => onChange({ ...draft, prioridade })}
+        onPrazoChange={(data_prazo) => onChange({ ...draft, data_prazo })}
+        onAtribuidoChange={(atribuido_ids) => onChange({ ...draft, atribuido_ids })}
+      />
       {canEdit && (
         <Button
           type="button"
