@@ -11,9 +11,11 @@ export type NotificacaoTipo =
   | "tarefa_anexo"
   | "tarefa_comentario"
   | "tarefa_mencao"
+  | "tarefa_resposta"
   | "aviso_novo"
   | "aviso_comentario"
   | "aviso_mencao"
+  | "aviso_resposta"
   | "sistema";
 
 export type NotificacaoAba = "comentarios" | "anexos";
@@ -36,9 +38,11 @@ export const NOTIFICACAO_TIPO_LABELS: Record<NotificacaoTipo, string> = {
   tarefa_anexo: "Novo anexo",
   tarefa_comentario: "Novo comentário",
   tarefa_mencao: "Menção em comentário",
+  tarefa_resposta: "Resposta ao seu comentário",
   aviso_novo: "Novo aviso",
   aviso_comentario: "Comentário em aviso",
   aviso_mencao: "Menção em aviso",
+  aviso_resposta: "Resposta ao seu comentário",
   sistema: "Sistema",
 };
 

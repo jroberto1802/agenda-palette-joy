@@ -1,5 +1,14 @@
 import { endOfDay, startOfDay } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  getCurrentActor,
+  getTarefaStakeholderIds,
+  listTarefaMencionaveis,
+  notifyTarefaComentario,
+  notifyTarefaMencao,
+  notifyTarefaResposta,
+  resolveMentionIds,
+} from "@/services/notificacao-events";
 import { notifyUsers } from "@/services/notificacoes";
 import {
   calcularProximaData,
@@ -577,37 +586,99 @@ export async function deleteSubtarefa(id: string): Promise<void> {
 export async function createTarefaComentario(
   tarefaId: string,
   conteudo: string,
+  parentId: string | null = null,
 ): Promise<TarefaComentario> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Usuário não autenticado");
 
+  if (parentId) {
+    const { data: parent, error: parentError } = await supabase
+      .from("tarefa_comentarios")
+      .select("id, parent_id, usuario_id, tarefa_id")
+      .eq("id", parentId)
+      .single();
+    if (parentError || !parent) throw new Error("Comentário original não encontrado.");
+    if (parent.tarefa_id !== tarefaId) throw new Error("Comentário inválido para esta tarefa.");
+    if (parent.parent_id) throw new Error("Apenas um nível de resposta é permitido.");
+  }
+
   const { data, error } = await supabase
     .from("tarefa_comentarios")
-    .insert({ tarefa_id: tarefaId, usuario_id: user.id, conteudo })
+    .insert({
+      tarefa_id: tarefaId,
+      usuario_id: user.id,
+      conteudo,
+      parent_id: parentId,
+    })
     .select(COMENTARIO_SELECT)
     .single();
 
   if (error) throw error;
   const comentario = data as TarefaComentario;
 
-  const { data: tarefa } = await supabase
-    .from("tarefas")
-    .select("criado_por")
-    .eq("id", tarefaId)
-    .single();
+  const [{ data: tarefa }, ator, mencionaveis] = await Promise.all([
+    supabase.from("tarefas").select("criado_por, titulo").eq("id", tarefaId).single(),
+    getCurrentActor(),
+    listTarefaMencionaveis(tarefaId),
+  ]);
 
-  const responsavelIds = await listResponsavelIds(tarefaId);
-  const destinatarios = [...new Set([tarefa?.criado_por, ...responsavelIds])].filter(
-    (id): id is string => !!id && id !== user.id,
-  );
+  const atorNome = ator?.nome ?? "Alguém";
+  const titulo = tarefa?.titulo ?? "tarefa";
+  const mentionedIds = (
+    await resolveMentionIds(conteudo, mencionaveis)
+  ).filter((id) => id !== user.id);
 
-  await notifyUsers(destinatarios, {
-    tipo: "tarefa_comentario",
-    referencia_tipo: "tarefa",
-    referencia_id: tarefaId,
-  });
+  const jobs: Promise<unknown>[] = [];
+
+  if (parentId) {
+    const { data: parent } = await supabase
+      .from("tarefa_comentarios")
+      .select("usuario_id")
+      .eq("id", parentId)
+      .single();
+    if (parent?.usuario_id && parent.usuario_id !== user.id) {
+      jobs.push(
+        notifyTarefaResposta({
+          usuarioIds: [parent.usuario_id],
+          tarefaId,
+          titulo,
+          comentarioId: comentario.id,
+          atorNome,
+        }),
+      );
+    }
+  } else {
+    const stakeholders = await getTarefaStakeholderIds(tarefaId);
+    const comentarioOnly = stakeholders.filter(
+      (id) => id !== user.id && !mentionedIds.includes(id),
+    );
+    if (comentarioOnly.length > 0) {
+      jobs.push(
+        notifyTarefaComentario({
+          usuarioIds: comentarioOnly,
+          tarefaId,
+          titulo,
+          comentarioId: comentario.id,
+          atorNome,
+        }),
+      );
+    }
+  }
+
+  if (mentionedIds.length > 0) {
+    jobs.push(
+      notifyTarefaMencao({
+        usuarioIds: mentionedIds,
+        tarefaId,
+        comentarioId: comentario.id,
+        atorNome,
+      }),
+    );
+  }
+
+  void Promise.all(jobs.map((job) => job.catch(() => undefined)));
 
   return comentario;
 }

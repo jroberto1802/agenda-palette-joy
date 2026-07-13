@@ -44,8 +44,15 @@ export function useDeleteAviso() {
 export function useCreateAvisoComentario() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ avisoId, conteudo }: { avisoId: string; conteudo: string }) =>
-      createAvisoComentario(avisoId, conteudo),
+    mutationFn: ({
+      avisoId,
+      conteudo,
+      parentId = null,
+    }: {
+      avisoId: string;
+      conteudo: string;
+      parentId?: string | null;
+    }) => createAvisoComentario(avisoId, conteudo, parentId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: avisoKeys.all }),
   });
 }

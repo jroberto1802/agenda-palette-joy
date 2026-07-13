@@ -238,6 +238,23 @@ export async function notifyTarefaMencao(params: {
   });
 }
 
+export async function notifyTarefaResposta(params: {
+  usuarioIds: string[];
+  tarefaId: string;
+  titulo: string;
+  comentarioId: string;
+  atorNome: string;
+}) {
+  await notifyEvent({
+    usuarioIds: params.usuarioIds,
+    tipo: "tarefa_resposta",
+    mensagem: `${params.atorNome} respondeu seu comentário na tarefa ${params.titulo}`,
+    referencia_tipo: "tarefa",
+    referencia_id: params.tarefaId,
+    meta: { aba: "comentarios", comentario_id: params.comentarioId },
+  });
+}
+
 export async function notifyAvisoNovo(params: {
   usuarioIds: string[];
   avisoId: string;
@@ -287,13 +304,145 @@ export async function notifyAvisoMencao(params: {
   });
 }
 
-export async function resolveMentionIds(conteudo: string): Promise<string[]> {
+export async function notifyAvisoResposta(params: {
+  usuarioIds: string[];
+  avisoId: string;
+  titulo: string;
+  comentarioId: string;
+  atorNome: string;
+}) {
+  await notifyEvent({
+    usuarioIds: params.usuarioIds,
+    tipo: "aviso_resposta",
+    mensagem: `${params.atorNome} respondeu seu comentário no aviso ${params.titulo}`,
+    referencia_tipo: "aviso",
+    referencia_id: params.avisoId,
+    meta: { comentario_id: params.comentarioId },
+  });
+}
+
+export async function resolveMentionIds(
+  conteudo: string,
+  candidatos?: { id: string; nome_completo: string }[],
+): Promise<string[]> {
+  if (candidatos) {
+    return extractMentionedUserIds(conteudo, candidatos);
+  }
+
   const { data: pessoas } = await supabase
     .from("profiles")
     .select("id, nome_completo")
     .eq("ativo", true);
 
   return extractMentionedUserIds(conteudo, pessoas ?? []);
+}
+
+/** Pessoas elegíveis para @ em uma tarefa (projeto/setor/responsáveis/acesso). */
+export async function listTarefaMencionaveis(
+  tarefaId: string,
+): Promise<{ id: string; nome_completo: string; avatar_url: string | null }[]> {
+  const { data: tarefa } = await supabase
+    .from("tarefas")
+    .select("criado_por, setor_id, projeto_id")
+    .eq("id", tarefaId)
+    .single();
+
+  if (!tarefa) return [];
+
+  const ids = new Set<string>();
+  if (tarefa.criado_por) ids.add(tarefa.criado_por);
+
+  const [{ data: responsaveis }, { data: observadores }] = await Promise.all([
+    supabase.from("tarefa_responsaveis").select("usuario_id").eq("tarefa_id", tarefaId),
+    supabase.from("tarefa_observadores").select("usuario_id").eq("tarefa_id", tarefaId),
+  ]);
+
+  for (const row of responsaveis ?? []) ids.add(row.usuario_id);
+  for (const row of observadores ?? []) ids.add(row.usuario_id);
+
+  if (tarefa.projeto_id) {
+    const { data: membros } = await supabase
+      .from("projeto_membros")
+      .select("usuario_id")
+      .eq("projeto_id", tarefa.projeto_id);
+    for (const row of membros ?? []) ids.add(row.usuario_id);
+  } else if (tarefa.setor_id) {
+    const { data: doSetor } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("ativo", true)
+      .eq("setor_id", tarefa.setor_id);
+    for (const row of doSetor ?? []) ids.add(row.id);
+  }
+
+  if (ids.size === 0) return [];
+
+  const { data: pessoas } = await supabase
+    .from("profiles")
+    .select("id, nome_completo, avatar_url")
+    .eq("ativo", true)
+    .in("id", [...ids]);
+
+  return (pessoas ?? []).map((p) => ({
+    id: p.id,
+    nome_completo: p.nome_completo,
+    avatar_url: p.avatar_url,
+  }));
+}
+
+/** Pessoas elegíveis para @ em um aviso (alcance do aviso + criador). */
+export async function listAvisoMencionaveis(
+  avisoId: string,
+): Promise<{ id: string; nome_completo: string; avatar_url: string | null }[]> {
+  const { data: aviso } = await supabase
+    .from("avisos")
+    .select(
+      "criado_por, alcance, setores:aviso_setores(setor_id), pessoas:aviso_pessoas(usuario_id)",
+    )
+    .eq("id", avisoId)
+    .single();
+
+  if (!aviso) return [];
+
+  const ids = new Set<string>();
+  if (aviso.criado_por) ids.add(aviso.criado_por);
+
+  if (aviso.alcance === "todos") {
+    const { data: todos } = await supabase.from("profiles").select("id").eq("ativo", true);
+    for (const row of todos ?? []) ids.add(row.id);
+  } else if (aviso.alcance === "por_setor") {
+    const setorIds = (aviso.setores ?? [])
+      .map((s: { setor_id: string }) => s.setor_id)
+      .filter(Boolean);
+    if (setorIds.length > 0) {
+      const { data: doSetor } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("ativo", true)
+        .in("setor_id", setorIds);
+      for (const row of doSetor ?? []) ids.add(row.id);
+    }
+  } else {
+    for (const row of aviso.pessoas ?? []) {
+      if ((row as { usuario_id: string }).usuario_id) {
+        ids.add((row as { usuario_id: string }).usuario_id);
+      }
+    }
+  }
+
+  if (ids.size === 0) return [];
+
+  const { data: pessoas } = await supabase
+    .from("profiles")
+    .select("id, nome_completo, avatar_url")
+    .eq("ativo", true)
+    .in("id", [...ids]);
+
+  return (pessoas ?? []).map((p) => ({
+    id: p.id,
+    nome_completo: p.nome_completo,
+    avatar_url: p.avatar_url,
+  }));
 }
 
 export async function resolveDestinoLabel(params: {

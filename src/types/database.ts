@@ -9,6 +9,7 @@ export type Database = {
           conteudo: string;
           created_at: string;
           id: string;
+          parent_id: string | null;
           usuario_id: string | null;
         };
         Insert: {
@@ -16,6 +17,7 @@ export type Database = {
           conteudo: string;
           created_at?: string;
           id?: string;
+          parent_id?: string | null;
           usuario_id?: string | null;
         };
         Update: {
@@ -23,6 +25,7 @@ export type Database = {
           conteudo?: string;
           created_at?: string;
           id?: string;
+          parent_id?: string | null;
           usuario_id?: string | null;
         };
         Relationships: [
@@ -31,6 +34,13 @@ export type Database = {
             columns: ["aviso_id"],
             isOneToOne: false,
             referencedRelation: "avisos",
+            referencedColumns: ["id"],
+          },
+          {
+            foreignKeyName: "aviso_comentarios_parent_id_fkey",
+            columns: ["parent_id"],
+            isOneToOne: false,
+            referencedRelation: "aviso_comentarios",
             referencedColumns: ["id"],
           },
           {
@@ -450,6 +460,7 @@ export type Database = {
           conteudo: string;
           created_at: string;
           id: string;
+          parent_id: string | null;
           tarefa_id: string;
           usuario_id: string | null;
         };
@@ -457,6 +468,7 @@ export type Database = {
           conteudo: string;
           created_at?: string;
           id?: string;
+          parent_id?: string | null;
           tarefa_id: string;
           usuario_id?: string | null;
         };
@@ -464,10 +476,18 @@ export type Database = {
           conteudo?: string;
           created_at?: string;
           id?: string;
+          parent_id?: string | null;
           tarefa_id?: string;
           usuario_id?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "tarefa_comentarios_parent_id_fkey",
+            columns: ["parent_id"],
+            isOneToOne: false,
+            referencedRelation: "tarefa_comentarios",
+            referencedColumns: ["id"],
+          },
           {
             foreignKeyName: "tarefa_comentarios_tarefa_id_fkey",
             columns: ["tarefa_id"],

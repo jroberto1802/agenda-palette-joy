@@ -7,6 +7,7 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
+import { CommentsThread } from "@/components/common/comments-thread";
 import { TarefaAnexosSection } from "@/components/tarefas/tarefa-anexos-section";
 import {
   TarefaRecorrenciaFields,
@@ -76,7 +77,6 @@ import type {
   TarefaVisibilidade,
   TarefaWithRelations,
 } from "@/types";
-import { formatDateTime } from "@/utils/formatters";
 import { formatRecorrencia, parseRecorrencia } from "@/utils/recorrencia";
 import { isAdmin, isGerente } from "@/utils/permissions";
 import {
@@ -345,7 +345,6 @@ export function TarefaPanelSheet({
   const deleteComentario = useDeleteTarefaComentario();
 
   const [novaSubtarefa, setNovaSubtarefa] = useState("");
-  const [novoComentario, setNovoComentario] = useState("");
   const [sideTab, setSideTab] = useState<"comentarios" | "anexos">(
     initialAba ?? "comentarios",
   );
@@ -437,7 +436,6 @@ export function TarefaPanelSheet({
     if (!open) return;
     form.reset(toFormValues(tarefa ?? null, profile?.setor_id, undefined, defaultProjetoId));
     setNovaSubtarefa("");
-    setNovoComentario("");
   }, [open, tarefa, profile?.setor_id, defaultProjetoId, form]);
 
   useEffect(() => {
@@ -477,6 +475,33 @@ export function TarefaPanelSheet({
   const concluidas = subtarefas.filter((s) => s.concluida).length;
   const recorrencia = tarefa ? parseRecorrencia(tarefa.recorrencia) : null;
 
+  const observadorIds = form.watch("observador_ids");
+
+  const pessoasMencionaveis = useMemo(() => {
+    const ids = new Set<string>([...(atribuidoIds ?? []), ...(observadorIds ?? [])]);
+    if (criadorDisplay?.id) ids.add(criadorDisplay.id);
+    if (projetoId) {
+      for (const m of projetoMembros ?? []) ids.add(m.id);
+    } else if (setorId) {
+      for (const p of pessoasAtivas) {
+        if (p.setor_id === setorId) ids.add(p.id);
+      }
+    }
+    for (const c of comentarios) {
+      if (c.usuario_id) ids.add(c.usuario_id);
+    }
+    return pessoasAtivas.filter((p) => ids.has(p.id));
+  }, [
+    atribuidoIds,
+    observadorIds,
+    criadorDisplay?.id,
+    projetoId,
+    projetoMembros,
+    setorId,
+    pessoasAtivas,
+    comentarios,
+  ]);
+
   const handleSave = form.handleSubmit(async (values) => {
     try {
       const payload = toPayload(values);
@@ -502,18 +527,6 @@ export function TarefaPanelSheet({
       setNovaSubtarefa("");
     } catch (error) {
       toast.error("Erro ao adicionar subtarefa", {
-        description: getSupabaseErrorMessage(error as Error),
-      });
-    }
-  };
-
-  const handleAddComentario = async () => {
-    if (!tarefaId || !novoComentario.trim()) return;
-    try {
-      await createComentario.mutateAsync({ tarefaId, conteudo: novoComentario.trim() });
-      setNovoComentario("");
-    } catch (error) {
-      toast.error("Erro ao comentar", {
         description: getSupabaseErrorMessage(error as Error),
       });
     }
@@ -1151,88 +1164,43 @@ export function TarefaPanelSheet({
                       className="mt-0 min-h-0 flex-1 data-[state=inactive]:hidden"
                     >
                       <ScrollArea className="h-full max-h-[calc(90vh-10rem)]">
-                        <div className="space-y-4 p-4">
+                        <div className="p-4">
                           {!showInteractions ? (
                             <p className="text-sm text-muted-foreground">
                               Salve a tarefa para adicionar comentários.
                             </p>
                           ) : (
-                            <>
-                              <div className="space-y-4">
-                                {comentarios.length === 0 && (
-                                  <p className="text-sm text-muted-foreground">
-                                    Nenhum comentário ainda.
-                                  </p>
-                                )}
-                                {comentarios.map((c) => (
-                                  <div
-                                    key={c.id}
-                                    id={`tarefa-comentario-${c.id}`}
-                                    className={cn(
-                                      "group flex gap-3 rounded-lg p-2 transition-colors",
-                                      highlightComentarioId === c.id &&
-                                        "bg-primary/10 ring-1 ring-primary/40",
-                                    )}
-                                  >
-                                    <ProfileAvatar
-                                      name={c.usuario?.nome_completo ?? "?"}
-                                      avatarUrl={c.usuario?.avatar_url}
-                                      className="h-8 w-8 shrink-0"
-                                    />
-                                    <div className="min-w-0 flex-1">
-                                      <div className="flex items-center gap-2">
-                                        <p className="text-sm font-medium">
-                                          {c.usuario?.nome_completo}
-                                        </p>
-                                        <p className="text-xs text-muted-foreground">
-                                          {formatDateTime(c.created_at)}
-                                        </p>
-                                        {c.usuario_id === profile?.id && (
-                                          <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="icon"
-                                            className="ml-auto h-6 w-6 opacity-0 group-hover:opacity-100"
-                                            onClick={async () => {
-                                              try {
-                                                await deleteComentario.mutateAsync(c.id);
-                                              } catch (error) {
-                                                toast.error(
-                                                  getSupabaseErrorMessage(error as Error),
-                                                );
-                                              }
-                                            }}
-                                          >
-                                            <Trash2 className="h-3 w-3" />
-                                          </Button>
-                                        )}
-                                      </div>
-                                      <p className="mt-0.5 whitespace-pre-wrap text-sm text-muted-foreground">
-                                        {c.conteudo}
-                                      </p>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                              {canEdit && (
-                                <div className="space-y-2 border-t pt-3">
-                                  <Textarea
-                                    placeholder="Escreva um comentário..."
-                                    rows={3}
-                                    value={novoComentario}
-                                    onChange={(e) => setNovoComentario(e.target.value)}
-                                  />
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    onClick={handleAddComentario}
-                                    disabled={!novoComentario.trim() || createComentario.isPending}
-                                  >
-                                    Comentar
-                                  </Button>
-                                </div>
-                              )}
-                            </>
+                            <CommentsThread
+                              comentarios={comentarios}
+                              pessoasMencionaveis={pessoasMencionaveis}
+                              currentUserId={profile?.id}
+                              canComment={canEdit}
+                              highlightId={highlightComentarioId}
+                              idPrefix="tarefa-comentario"
+                              pending={createComentario.isPending}
+                              onSubmit={async (conteudo, parentId) => {
+                                try {
+                                  await createComentario.mutateAsync({
+                                    tarefaId: tarefaId!,
+                                    conteudo,
+                                    parentId,
+                                  });
+                                } catch (error) {
+                                  toast.error("Erro ao comentar", {
+                                    description: getSupabaseErrorMessage(error as Error),
+                                  });
+                                  throw error;
+                                }
+                              }}
+                              onDelete={async (id) => {
+                                try {
+                                  await deleteComentario.mutateAsync(id);
+                                } catch (error) {
+                                  toast.error(getSupabaseErrorMessage(error as Error));
+                                  throw error;
+                                }
+                              }}
+                            />
                           )}
                         </div>
                       </ScrollArea>

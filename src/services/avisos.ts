@@ -1,9 +1,11 @@
 import { supabase } from "@/integrations/supabase/client";
 import {
   getCurrentActor,
+  listAvisoMencionaveis,
   notifyAvisoComentario,
   notifyAvisoMencao,
   notifyAvisoNovo,
+  notifyAvisoResposta,
   resolveMentionIds,
 } from "@/services/notificacao-events";
 import type {
@@ -192,52 +194,99 @@ export async function setAvisoLido(avisoId: string, lido: boolean): Promise<void
 export async function createAvisoComentario(
   avisoId: string,
   conteudo: string,
+  parentId: string | null = null,
 ): Promise<AvisoComentario> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Usuário não autenticado");
 
+  if (parentId) {
+    const { data: parent, error: parentError } = await supabase
+      .from("aviso_comentarios")
+      .select("id, parent_id, usuario_id, aviso_id")
+      .eq("id", parentId)
+      .single();
+    if (parentError || !parent) throw new Error("Comentário original não encontrado.");
+    if (parent.aviso_id !== avisoId) throw new Error("Comentário inválido para este aviso.");
+    if (parent.parent_id) throw new Error("Apenas um nível de resposta é permitido.");
+  }
+
   const { data, error } = await supabase
     .from("aviso_comentarios")
-    .insert({ aviso_id: avisoId, usuario_id: user.id, conteudo })
+    .insert({
+      aviso_id: avisoId,
+      usuario_id: user.id,
+      conteudo,
+      parent_id: parentId,
+    })
     .select(COMENTARIO_SELECT)
     .single();
 
   if (error) throw error;
   const comentario = data as AvisoComentario;
 
-  const [{ data: aviso }, ator, mentionedIds] = await Promise.all([
+  const [{ data: aviso }, ator, mencionaveis] = await Promise.all([
     supabase.from("avisos").select("criado_por, titulo").eq("id", avisoId).single(),
     getCurrentActor(),
-    resolveMentionIds(conteudo),
+    listAvisoMencionaveis(avisoId),
   ]);
 
   const atorNome = ator?.nome ?? "Alguém";
   const titulo = aviso?.titulo ?? "aviso";
-  const mencoes = mentionedIds.filter((id) => id !== user.id);
-  const comentarioDestinatarios = [aviso?.criado_por]
-    .filter((id): id is string => !!id && id !== user.id && !mencoes.includes(id));
+  const mencoes = (await resolveMentionIds(conteudo, mencionaveis)).filter(
+    (id) => id !== user.id,
+  );
 
-  if (comentarioDestinatarios.length > 0) {
-    await notifyAvisoComentario({
-      usuarioIds: comentarioDestinatarios,
-      avisoId,
-      titulo,
-      comentarioId: comentario.id,
-      atorNome,
-    }).catch(() => undefined);
+  const jobs: Promise<unknown>[] = [];
+
+  if (parentId) {
+    const { data: parent } = await supabase
+      .from("aviso_comentarios")
+      .select("usuario_id")
+      .eq("id", parentId)
+      .single();
+    if (parent?.usuario_id && parent.usuario_id !== user.id) {
+      jobs.push(
+        notifyAvisoResposta({
+          usuarioIds: [parent.usuario_id],
+          avisoId,
+          titulo,
+          comentarioId: comentario.id,
+          atorNome,
+        }),
+      );
+    }
+  } else {
+    const comentarioDestinatarios = [aviso?.criado_por].filter(
+      (id): id is string => !!id && id !== user.id && !mencoes.includes(id),
+    );
+    if (comentarioDestinatarios.length > 0) {
+      jobs.push(
+        notifyAvisoComentario({
+          usuarioIds: comentarioDestinatarios,
+          avisoId,
+          titulo,
+          comentarioId: comentario.id,
+          atorNome,
+        }),
+      );
+    }
   }
 
   if (mencoes.length > 0) {
-    await notifyAvisoMencao({
-      usuarioIds: mencoes,
-      avisoId,
-      titulo,
-      comentarioId: comentario.id,
-      atorNome,
-    }).catch(() => undefined);
+    jobs.push(
+      notifyAvisoMencao({
+        usuarioIds: mencoes,
+        avisoId,
+        titulo,
+        comentarioId: comentario.id,
+        atorNome,
+      }),
+    );
   }
+
+  void Promise.all(jobs.map((job) => job.catch(() => undefined)));
 
   return comentario;
 }

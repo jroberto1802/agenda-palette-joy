@@ -1,8 +1,9 @@
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { CheckCircle2, Circle, MessageSquare, Paperclip, Pin, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { CommentsThread } from "@/components/common/comments-thread";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
 import { AvisoDestinatarioDisplay } from "@/components/avisos/aviso-destinatario";
 import { Badge } from "@/components/ui/badge";
@@ -17,8 +18,8 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
 import { useAvisoDetail, useCreateAvisoComentario, useSetAvisoLido } from "@/hooks/use-avisos";
+import { usePessoas } from "@/hooks/use-pessoas";
 import { LARGE_MODAL_CONTENT_CLASS } from "@/lib/layout";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
 import { isAvisoLido } from "@/services/avisos";
@@ -49,9 +50,9 @@ export function AvisoDetailSheet({
   highlightComentarioId?: string | null;
 }) {
   const { data: aviso, isLoading } = useAvisoDetail(avisoId);
+  const { data: pessoas } = usePessoas();
   const createComentario = useCreateAvisoComentario();
   const setAvisoLido = useSetAvisoLido();
-  const [comentario, setComentario] = useState("");
   const [sideTab, setSideTab] = useState("comentarios");
 
   useEffect(() => {
@@ -73,6 +74,35 @@ export function AvisoDetailSheet({
   const readOnly = finalizado;
   const comentarios = aviso?.comentarios ?? [];
 
+  const pessoasMencionaveis = useMemo(() => {
+    const ativos = (pessoas ?? []).filter((p) => p.ativo);
+    if (!aviso) return [];
+
+    if (aviso.alcance === "todos") return ativos;
+
+    const ids = new Set<string>();
+    if (aviso.criado_por) ids.add(aviso.criado_por);
+
+    if (aviso.alcance === "por_setor") {
+      const setorIds = new Set(
+        (aviso.setores ?? []).map((s) => s.setor?.id).filter((id): id is string => !!id),
+      );
+      for (const p of ativos) {
+        if (p.setor_id && setorIds.has(p.setor_id)) ids.add(p.id);
+      }
+    } else {
+      for (const row of aviso.pessoas ?? []) {
+        if (row.usuario?.id) ids.add(row.usuario.id);
+      }
+    }
+
+    for (const c of comentarios) {
+      if (c.usuario_id) ids.add(c.usuario_id);
+    }
+
+    return ativos.filter((p) => ids.has(p.id));
+  }, [aviso, pessoas, comentarios]);
+
   const handleToggleLido = async () => {
     if (!avisoId) return;
     try {
@@ -81,16 +111,6 @@ export function AvisoDetailSheet({
       toast.error("Erro ao atualizar leitura", {
         description: getSupabaseErrorMessage(error as Error),
       });
-    }
-  };
-
-  const handleComentar = async () => {
-    if (!avisoId || !comentario.trim() || readOnly) return;
-    try {
-      await createComentario.mutateAsync({ avisoId, conteudo: comentario.trim() });
-      setComentario("");
-    } catch (error) {
-      toast.error("Erro ao comentar", { description: getSupabaseErrorMessage(error as Error) });
     }
   };
 
@@ -222,65 +242,36 @@ export function AvisoDetailSheet({
                     className="mt-0 min-h-0 flex-1 data-[state=inactive]:hidden"
                   >
                     <ScrollArea className="h-full max-h-[calc(90vh-12rem)]">
-                      <div className="space-y-4 p-4">
+                      <div className="p-4">
                         {!aviso.comentarios_permitidos ? (
                           <p className="text-sm text-muted-foreground">
                             Comentários desabilitados neste aviso.
                           </p>
                         ) : (
-                          <>
-                            <div className="space-y-4">
-                              {comentarios.length === 0 && (
-                                <p className="text-sm text-muted-foreground">
-                                  Nenhum comentário ainda.
-                                </p>
-                              )}
-                              {comentarios.map((c) => (
-                                <div
-                                  key={c.id}
-                                  id={`aviso-comentario-${c.id}`}
-                                  className={cn(
-                                    "flex gap-3 rounded-lg p-2 transition-colors",
-                                    highlightComentarioId === c.id && "bg-primary/10 ring-1 ring-primary/40",
-                                  )}
-                                >
-                                  <ProfileAvatar
-                                    name={c.usuario?.nome_completo ?? "?"}
-                                    avatarUrl={c.usuario?.avatar_url}
-                                    className="h-8 w-8 shrink-0"
-                                  />
-                                  <div>
-                                    <p className="text-sm font-medium">{c.usuario?.nome_completo}</p>
-                                    <p className="text-xs text-muted-foreground">
-                                      {format(new Date(c.created_at), "dd/MM/yyyy HH:mm", {
-                                        locale: ptBR,
-                                      })}
-                                    </p>
-                                    <p className="mt-0.5 whitespace-pre-wrap text-sm text-muted-foreground">
-                                      {c.conteudo}
-                                    </p>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                            {!readOnly && (
-                              <div className="space-y-2 border-t pt-3">
-                                <Textarea
-                                  placeholder="Escreva um comentário..."
-                                  rows={3}
-                                  value={comentario}
-                                  onChange={(e) => setComentario(e.target.value)}
-                                />
-                                <Button
-                                  size="sm"
-                                  onClick={handleComentar}
-                                  disabled={!comentario.trim() || createComentario.isPending}
-                                >
-                                  Comentar
-                                </Button>
-                              </div>
-                            )}
-                          </>
+                          <CommentsThread
+                            comentarios={comentarios}
+                            pessoasMencionaveis={pessoasMencionaveis}
+                            currentUserId={userId}
+                            canComment={!readOnly}
+                            canDeleteOwn={false}
+                            highlightId={highlightComentarioId}
+                            idPrefix="aviso-comentario"
+                            pending={createComentario.isPending}
+                            onSubmit={async (conteudo, parentId) => {
+                              try {
+                                await createComentario.mutateAsync({
+                                  avisoId: avisoId!,
+                                  conteudo,
+                                  parentId,
+                                });
+                              } catch (error) {
+                                toast.error("Erro ao comentar", {
+                                  description: getSupabaseErrorMessage(error as Error),
+                                });
+                                throw error;
+                              }
+                            }}
+                          />
                         )}
                       </div>
                     </ScrollArea>

@@ -131,8 +131,15 @@ export function useDeleteSubtarefa() {
 export function useCreateTarefaComentario() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ tarefaId, conteudo }: { tarefaId: string; conteudo: string }) =>
-      createTarefaComentario(tarefaId, conteudo),
+    mutationFn: ({
+      tarefaId,
+      conteudo,
+      parentId = null,
+    }: {
+      tarefaId: string;
+      conteudo: string;
+      parentId?: string | null;
+    }) => createTarefaComentario(tarefaId, conteudo, parentId),
     onSuccess: () => invalidateTarefas(queryClient),
   });
 }
