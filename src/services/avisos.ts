@@ -162,6 +162,61 @@ export async function createAviso(payload: AvisoFormData): Promise<AvisoWithRela
   return aviso as AvisoWithRelations;
 }
 
+export async function updateAviso(
+  id: string,
+  payload: AvisoFormData,
+): Promise<AvisoWithRelations> {
+  const { error } = await supabase
+    .from("avisos")
+    .update({
+      titulo: payload.titulo,
+      conteudo: payload.conteudo,
+      alcance: payload.alcance,
+      prioridade: payload.prioridade,
+      data_expiracao: payload.data_expiracao,
+      fixado: payload.fixado,
+      comentarios_permitidos: payload.comentarios_permitidos,
+    })
+    .eq("id", id);
+
+  if (error) throw error;
+
+  const { error: deleteSetoresError } = await supabase
+    .from("aviso_setores")
+    .delete()
+    .eq("aviso_id", id);
+  if (deleteSetoresError) throw deleteSetoresError;
+
+  const { error: deletePessoasError } = await supabase
+    .from("aviso_pessoas")
+    .delete()
+    .eq("aviso_id", id);
+  if (deletePessoasError) throw deletePessoasError;
+
+  if (payload.alcance === "por_setor" && payload.setor_ids.length > 0) {
+    const { error: setorError } = await supabase.from("aviso_setores").insert(
+      payload.setor_ids.map((setor_id) => ({ aviso_id: id, setor_id })),
+    );
+    if (setorError) throw setorError;
+  }
+
+  if (payload.alcance === "pessoa_especifica" && payload.usuario_ids.length > 0) {
+    const { error: pessoaError } = await supabase.from("aviso_pessoas").insert(
+      payload.usuario_ids.map((usuario_id) => ({ aviso_id: id, usuario_id })),
+    );
+    if (pessoaError) throw pessoaError;
+  }
+
+  const { data: aviso, error: fetchError } = await supabase
+    .from("avisos")
+    .select(AVISO_SELECT)
+    .eq("id", id)
+    .single();
+
+  if (fetchError) throw fetchError;
+  return aviso as AvisoWithRelations;
+}
+
 export async function deleteAviso(id: string): Promise<void> {
   const { error } = await supabase.from("avisos").delete().eq("id", id);
   if (error) throw error;

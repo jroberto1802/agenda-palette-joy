@@ -34,6 +34,7 @@ import type {
   AvisoAlcance,
   AvisoFormData,
   AvisoPrioridade,
+  AvisoWithRelations,
   ProfileWithSetor,
   SetorWithGerente,
 } from "@/types";
@@ -46,20 +47,27 @@ function defaultExpirationValue(): string {
   return date.toISOString().slice(0, 16);
 }
 
-const avisoSchema = z
-  .object({
-    titulo: z.string().min(2, "Título obrigatório"),
-    conteudo: z.string().min(5, "Conteúdo deve ter pelo menos 5 caracteres"),
-    alcance: z.enum(["todos", "por_setor", "pessoa_especifica"]),
-    prioridade: z.enum(["urgente", "importante", "informativo", "geral"]),
-    data_expiracao: z.string().min(1, "Data de expiração obrigatória"),
-    fixado: z.boolean(),
-    comentarios_permitidos: z.boolean(),
-    setor_ids: z.array(z.string()),
-    usuario_ids: z.array(z.string()),
-  })
-  .superRefine((data, ctx) => {
-    if (new Date(data.data_expiracao) <= new Date()) {
+function toDatetimeLocalValue(iso: string): string {
+  const date = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+const avisoBaseSchema = z.object({
+  titulo: z.string().min(2, "Título obrigatório"),
+  conteudo: z.string().min(5, "Conteúdo deve ter pelo menos 5 caracteres"),
+  alcance: z.enum(["todos", "por_setor", "pessoa_especifica"]),
+  prioridade: z.enum(["urgente", "importante", "informativo", "geral"]),
+  data_expiracao: z.string().min(1, "Data de expiração obrigatória"),
+  fixado: z.boolean(),
+  comentarios_permitidos: z.boolean(),
+  setor_ids: z.array(z.string()),
+  usuario_ids: z.array(z.string()),
+});
+
+function createAvisoSchema(requireFutureExpiration: boolean) {
+  return avisoBaseSchema.superRefine((data, ctx) => {
+    if (requireFutureExpiration && new Date(data.data_expiracao) <= new Date()) {
       ctx.addIssue({
         code: "custom",
         message: "A data de expiração deve ser futura",
@@ -77,12 +85,44 @@ const avisoSchema = z
       });
     }
   });
+}
 
-type AvisoSchema = z.infer<typeof avisoSchema>;
+type AvisoSchema = z.infer<typeof avisoBaseSchema>;
+
+const emptyDefaults: AvisoSchema = {
+  titulo: "",
+  conteudo: "",
+  alcance: "todos",
+  prioridade: "geral",
+  data_expiracao: defaultExpirationValue(),
+  fixado: false,
+  comentarios_permitidos: true,
+  setor_ids: [],
+  usuario_ids: [],
+};
+
+function avisoToFormValues(aviso: AvisoWithRelations): AvisoSchema {
+  return {
+    titulo: aviso.titulo,
+    conteudo: aviso.conteudo,
+    alcance: aviso.alcance,
+    prioridade: aviso.prioridade,
+    data_expiracao: toDatetimeLocalValue(aviso.data_expiracao),
+    fixado: aviso.fixado,
+    comentarios_permitidos: aviso.comentarios_permitidos,
+    setor_ids: (aviso.setores ?? [])
+      .map((row) => row.setor?.id)
+      .filter((id): id is string => !!id),
+    usuario_ids: (aviso.pessoas ?? [])
+      .map((row) => row.usuario?.id)
+      .filter((id): id is string => !!id),
+  };
+}
 
 export function AvisoFormDialog({
   open,
   onOpenChange,
+  aviso,
   setores,
   pessoas,
   onSubmit,
@@ -90,43 +130,32 @@ export function AvisoFormDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  aviso?: AvisoWithRelations | null;
   setores: SetorWithGerente[];
   pessoas: ProfileWithSetor[];
   onSubmit: (data: AvisoFormData) => Promise<void>;
   loading?: boolean;
 }) {
+  const isEdit = !!aviso;
+
   const form = useForm<AvisoSchema>({
-    resolver: zodResolver(avisoSchema),
-    defaultValues: {
-      titulo: "",
-      conteudo: "",
-      alcance: "todos",
-      prioridade: "geral",
-      data_expiracao: defaultExpirationValue(),
-      fixado: false,
-      comentarios_permitidos: true,
-      setor_ids: [],
-      usuario_ids: [],
-    },
+    resolver: zodResolver(createAvisoSchema(!isEdit)),
+    defaultValues: emptyDefaults,
   });
 
   const alcance = form.watch("alcance");
 
   useEffect(() => {
-    if (open) {
-      form.reset({
-        titulo: "",
-        conteudo: "",
-        alcance: "todos",
-        prioridade: "geral",
-        data_expiracao: defaultExpirationValue(),
-        fixado: false,
-        comentarios_permitidos: true,
-        setor_ids: [],
-        usuario_ids: [],
-      });
+    if (!open) return;
+    if (aviso) {
+      form.reset(avisoToFormValues(aviso));
+      return;
     }
-  }, [open, form]);
+    form.reset({
+      ...emptyDefaults,
+      data_expiracao: defaultExpirationValue(),
+    });
+  }, [open, aviso, form]);
 
   const handleSubmit = form.handleSubmit(async (values) => {
     await onSubmit({
@@ -155,8 +184,12 @@ export function AvisoFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Novo aviso</DialogTitle>
-          <DialogDescription>Publique um comunicado para a equipe.</DialogDescription>
+          <DialogTitle>{isEdit ? "Editar aviso" : "Novo aviso"}</DialogTitle>
+          <DialogDescription>
+            {isEdit
+              ? "Atualize as informações do comunicado."
+              : "Publique um comunicado para a equipe."}
+          </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
@@ -338,7 +371,13 @@ export function AvisoFormDialog({
                 Cancelar
               </Button>
               <Button type="submit" disabled={loading}>
-                {loading ? "Publicando..." : "Publicar"}
+                {loading
+                  ? isEdit
+                    ? "Salvando..."
+                    : "Publicando..."
+                  : isEdit
+                    ? "Salvar"
+                    : "Publicar"}
               </Button>
             </DialogFooter>
           </form>

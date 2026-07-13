@@ -1,6 +1,6 @@
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CheckCircle2, Circle, MessageSquare, Paperclip, Pin, Trash2 } from "lucide-react";
+import { CheckCircle2, Circle, MessageSquare, Paperclip, Pencil, Pin, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { CommentsThread } from "@/components/common/comments-thread";
@@ -37,6 +37,8 @@ export function AvisoDetailSheet({
   open,
   onOpenChange,
   userId,
+  canEdit,
+  onEdit,
   canDelete,
   onDelete,
   highlightComentarioId = null,
@@ -45,6 +47,8 @@ export function AvisoDetailSheet({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   userId?: string;
+  canEdit?: boolean;
+  onEdit?: () => void;
   canDelete?: boolean;
   onDelete?: () => void;
   highlightComentarioId?: string | null;
@@ -131,75 +135,91 @@ export function AvisoDetailSheet({
         ) : (
           <>
             <DialogHeader className="shrink-0 space-y-0 border-b p-6 pb-4 pr-12 text-left">
-              <div className="mb-2 flex flex-wrap items-center gap-2">
-                {aviso.fixado && <Pin className="h-4 w-4 text-amber-500" />}
-                <Badge
-                  variant="outline"
-                  className={cn("text-xs", AVISO_PRIORIDADE_BADGE_CLASS[aviso.prioridade])}
-                >
-                  {AVISO_PRIORIDADE_LABELS[aviso.prioridade]}
-                </Badge>
-                {finalizado && <Badge variant="secondary">Finalizado</Badge>}
-              </div>
-              <DialogTitle className="text-left">{aviso.titulo}</DialogTitle>
-              <DialogDescription asChild>
-                <div className="mt-3 space-y-3 text-left">
-                  <div className="flex items-center gap-2">
-                    <ProfileAvatar
-                      name={aviso.criador?.nome_completo ?? "Sistema"}
-                      avatarUrl={aviso.criador?.avatar_url}
-                      className="h-8 w-8"
-                    />
-                    <div>
-                      <p className="text-sm font-medium text-foreground">
-                        {aviso.criador?.nome_completo ?? "Sistema"}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {format(new Date(aviso.data_publicacao), "dd 'de' MMMM 'de' yyyy", {
-                          locale: ptBR,
-                        })}
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0 flex-1">
+                  <div className="mb-2 flex flex-wrap items-center gap-2">
+                    {aviso.fixado && <Pin className="h-4 w-4 text-amber-500" />}
+                    <Badge
+                      variant="outline"
+                      className={cn("text-xs", AVISO_PRIORIDADE_BADGE_CLASS[aviso.prioridade])}
+                    >
+                      {AVISO_PRIORIDADE_LABELS[aviso.prioridade]}
+                    </Badge>
+                    {finalizado && <Badge variant="secondary">Finalizado</Badge>}
+                  </div>
+                  <DialogTitle className="text-left">{aviso.titulo}</DialogTitle>
+                  <DialogDescription asChild>
+                    <div className="mt-3 space-y-3 text-left">
+                      <div className="flex items-center gap-2">
+                        <ProfileAvatar
+                          name={aviso.criador?.nome_completo ?? "Sistema"}
+                          avatarUrl={aviso.criador?.avatar_url}
+                          className="h-8 w-8"
+                        />
+                        <div>
+                          <p className="text-sm font-medium text-foreground">
+                            {aviso.criador?.nome_completo ?? "Sistema"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {format(new Date(aviso.data_publicacao), "dd 'de' MMMM 'de' yyyy", {
+                              locale: ptBR,
+                            })}
+                          </p>
+                        </div>
+                      </div>
+                      <AvisoDestinatarioDisplay aviso={aviso} />
+                      <p className="text-xs font-medium text-muted-foreground">
+                        {formatAvisoExpiracao(aviso.data_expiracao)}
                       </p>
                     </div>
-                  </div>
-                  <AvisoDestinatarioDisplay aviso={aviso} />
-                  <p className="text-xs font-medium text-muted-foreground">
-                    {formatAvisoExpiracao(aviso.data_expiracao)}
-                  </p>
+                  </DialogDescription>
                 </div>
-              </DialogDescription>
 
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="gap-2"
-                  onClick={handleToggleLido}
-                  disabled={setAvisoLido.isPending}
-                >
-                  {lido ? (
-                    <>
-                      <CheckCircle2 className="h-4 w-4 text-green-600" />
-                      Lido
-                    </>
-                  ) : (
-                    <>
-                      <Circle className="h-4 w-4" />
-                      Não lido
-                    </>
-                  )}
-                </Button>
-                {canDelete && onDelete && (
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
                   <Button
+                    type="button"
                     variant="outline"
                     size="sm"
-                    className="gap-2 text-destructive hover:text-destructive"
-                    onClick={onDelete}
+                    className="gap-2"
+                    onClick={handleToggleLido}
+                    disabled={setAvisoLido.isPending}
                   >
-                    <Trash2 className="h-4 w-4" />
-                    Excluir aviso
+                    {lido ? (
+                      <>
+                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        Lido
+                      </>
+                    ) : (
+                      <>
+                        <Circle className="h-4 w-4" />
+                        Não lido
+                      </>
+                    )}
                   </Button>
-                )}
+                  {canEdit && onEdit && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                      onClick={onEdit}
+                    >
+                      <Pencil className="h-4 w-4" />
+                      Editar
+                    </Button>
+                  )}
+                  {canDelete && onDelete && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 text-destructive hover:text-destructive"
+                      onClick={onDelete}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Excluir aviso
+                    </Button>
+                  )}
+                </div>
               </div>
             </DialogHeader>
 

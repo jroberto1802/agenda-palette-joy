@@ -42,7 +42,25 @@ export function TarefaCard({
   const vencimentoVariant = getVencimentoVariant(tarefa.data_vencimento, tarefa.status);
 
   return (
-    <Card className={tarefa.status === "concluida" ? "opacity-75" : undefined}>
+    <Card
+      className={cn(
+        tarefa.status === "concluida" && "opacity-75",
+        onOpen && "cursor-pointer transition-colors hover:bg-muted/40",
+      )}
+      onClick={onOpen}
+      role={onOpen ? "button" : undefined}
+      tabIndex={onOpen ? 0 : undefined}
+      onKeyDown={
+        onOpen
+          ? (event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onOpen();
+              }
+            }
+          : undefined
+      }
+    >
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 space-y-2">
@@ -73,10 +91,8 @@ export function TarefaCard({
             <CardTitle
               className={cn(
                 "text-base leading-snug",
-                onOpen && "cursor-pointer hover:text-primary transition-colors",
                 tarefa.status === "concluida" && "line-through text-muted-foreground",
               )}
-              onClick={onOpen}
             >
               {tarefa.titulo}
             </CardTitle>
@@ -85,7 +101,13 @@ export function TarefaCard({
           {(canEdit || canDelete) && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="shrink-0" aria-label="Ações da tarefa">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0"
+                  aria-label="Ações da tarefa"
+                  onClick={(event) => event.stopPropagation()}
+                >
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>

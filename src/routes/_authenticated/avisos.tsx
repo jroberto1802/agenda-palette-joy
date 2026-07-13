@@ -26,7 +26,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AvisoCard, AvisoEmptyState } from "@/components/avisos/aviso-card";
 import { AvisoDetailSheet } from "@/components/avisos/aviso-detail-sheet";
 import { AvisoFormDialog } from "@/components/avisos/aviso-form-dialog";
-import { useAvisos, useCreateAviso, useDeleteAviso } from "@/hooks/use-avisos";
+import { useAvisos, useCreateAviso, useDeleteAviso, useUpdateAviso } from "@/hooks/use-avisos";
 import { usePessoas } from "@/hooks/use-pessoas";
 import { useProfile } from "@/hooks/use-profile";
 import { useSetores } from "@/hooks/use-setores";
@@ -58,9 +58,11 @@ function AvisosPage() {
   const { data: setores } = useSetores();
   const { data: pessoas } = usePessoas();
   const createAviso = useCreateAviso();
+  const updateAviso = useUpdateAviso();
   const deleteAviso = useDeleteAviso();
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<AvisoWithRelations | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [highlightComentarioId, setHighlightComentarioId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<AvisoWithRelations | null>(null);
@@ -110,6 +112,19 @@ function AvisosPage() {
     }
   };
 
+  const handleUpdate = async (data: Parameters<typeof updateAviso.mutateAsync>[0]["data"]) => {
+    if (!editing) return;
+    try {
+      await updateAviso.mutateAsync({ id: editing.id, data });
+      toast.success("Aviso atualizado");
+      setEditing(null);
+    } catch (error) {
+      toast.error("Erro ao atualizar aviso", {
+        description: getSupabaseErrorMessage(error as Error),
+      });
+    }
+  };
+
   const handleDelete = async () => {
     if (!deleting) return;
     try {
@@ -149,7 +164,13 @@ function AvisosPage() {
           </p>
         </div>
         {canCreate && (
-          <Button onClick={() => setDialogOpen(true)} className="shrink-0 gap-2">
+          <Button
+            onClick={() => {
+              setEditing(null);
+              setDialogOpen(true);
+            }}
+            className="shrink-0 gap-2"
+          >
             <Plus className="h-4 w-4" />
             Novo aviso
           </Button>
@@ -198,12 +219,19 @@ function AvisosPage() {
       </Tabs>
 
       <AvisoFormDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
+        key={editing?.id ?? "create"}
+        open={dialogOpen || !!editing}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDialogOpen(false);
+            setEditing(null);
+          }
+        }}
+        aviso={editing}
         setores={setores ?? []}
         pessoas={pessoasAtivas}
-        onSubmit={handleCreate}
-        loading={createAviso.isPending}
+        onSubmit={editing ? handleUpdate : handleCreate}
+        loading={editing ? updateAviso.isPending : createAviso.isPending}
       />
 
       <AvisoDetailSheet
@@ -219,6 +247,10 @@ function AvisosPage() {
           }
         }}
         userId={profile?.id}
+        canEdit={isAdmin(profile)}
+        onEdit={() => {
+          if (selectedAviso) setEditing(selectedAviso);
+        }}
         canDelete={selectedAviso ? canDeleteAviso(selectedAviso) : false}
         highlightComentarioId={highlightComentarioId}
         onDelete={() => {
