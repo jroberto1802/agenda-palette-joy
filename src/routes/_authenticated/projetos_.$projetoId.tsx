@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, Columns3, LayoutGrid, List, Plus } from "lucide-react";
+import { ArrowLeft, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -15,45 +15,27 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProjetoEquipeAvatars } from "@/components/projetos/projeto-equipe-avatars";
 import { ProjetoEquipeSheet } from "@/components/projetos/projeto-equipe-sheet";
-import { TarefaCard } from "@/components/tarefas/tarefa-card";
-import { TarefaFiltersBar } from "@/components/tarefas/tarefa-filters";
-import { TarefaKanban } from "@/components/tarefas/tarefa-kanban";
-import { TarefaListView } from "@/components/tarefas/tarefa-list-view";
+import {
+  createAgendaBoardState,
+  TarefaAgendaBoard,
+  type AgendaBoardState,
+} from "@/components/tarefas/tarefa-agenda-board";
 import { TarefaPanelSheet } from "@/components/tarefas/tarefa-panel-sheet";
 import { usePessoas } from "@/hooks/use-pessoas";
 import { useProjeto, useProjetoMembros } from "@/hooks/use-projetos";
 import { useProfile } from "@/hooks/use-profile";
 import { useSetores } from "@/hooks/use-setores";
-import {
-  useSoftDeleteTarefa,
-  useTarefas,
-  useUpdateTarefaStatus,
-} from "@/hooks/use-tarefas";
-import { CARD_GRID_CLASS } from "@/lib/layout";
+import { useSoftDeleteTarefa, useUpdateTarefaStatus } from "@/hooks/use-tarefas";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
-import type { TarefaFilters, TarefaStatus, TarefaWithRelations } from "@/types";
+import type { TarefaStatus, TarefaWithRelations } from "@/types";
 import { isAdmin, isGerente } from "@/utils/permissions";
 import { PROJETO_STATUS_BADGE_CLASS, PROJETO_STATUS_LABELS } from "@/utils/projetos";
 import { canEditTarefa, TAREFA_STATUS_LABELS } from "@/utils/tarefas";
 import { cn } from "@/lib/utils";
 
-const DEFAULT_FILTERS: TarefaFilters = {
-  status: "all",
-  prioridade: "all",
-  setor_id: "all",
-  projeto_id: "all",
-  atribuido_a: "all",
-  atribuido_ids: [],
-  search: "",
-  tag: "",
-};
-
-type ViewMode = "cards" | "lista" | "kanban";
-
-export const Route = createFileRoute("/_authenticated/projetos/$projetoId")({
+export const Route = createFileRoute("/_authenticated/projetos_/$projetoId")({
   head: () => ({
     meta: [{ title: "Projeto — CoreGestor" }],
   }),
@@ -68,13 +50,8 @@ function ProjetoDetailPage() {
   const { data: setores } = useSetores();
   const { data: pessoas } = usePessoas();
 
-  const [filters, setFilters] = useState<TarefaFilters>({ ...DEFAULT_FILTERS });
-  const [debouncedFilters, setDebouncedFilters] = useState<TarefaFilters>({
-    ...DEFAULT_FILTERS,
-  });
-  const [view, setView] = useState<ViewMode>("cards");
+  const [boardState, setBoardState] = useState<AgendaBoardState>(createAgendaBoardState);
   const [equipeOpen, setEquipeOpen] = useState(false);
-
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelId, setPanelId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<TarefaWithRelations | null>(null);
@@ -91,25 +68,6 @@ function ProjetoDetailPage() {
     const memberIds = new Set(membros.map((m) => m.id));
     return pessoasAtivas.filter((p) => memberIds.has(p.id));
   }, [pessoasAtivas, membros]);
-
-  const handleFiltersChange = useMemo(() => {
-    let timeout: ReturnType<typeof setTimeout>;
-    return (next: TarefaFilters) => {
-      setFilters(next);
-      clearTimeout(timeout);
-      timeout = setTimeout(() => setDebouncedFilters(next), 300);
-    };
-  }, []);
-
-  const queryFilters = useMemo(() => {
-    const base =
-      view === "kanban"
-        ? { ...debouncedFilters, status: "all" as const }
-        : debouncedFilters;
-    return { ...base, projeto_id: projetoId };
-  }, [debouncedFilters, projetoId, view]);
-
-  const { data: tarefas, isLoading: loadingTarefas } = useTarefas(queryFilters);
 
   const canDeleteTarefa = (tarefa: TarefaWithRelations) => {
     if (isAdmin(profile)) return true;
@@ -223,90 +181,22 @@ function ProjetoDetailPage() {
         </div>
       </div>
 
-      <TarefaFiltersBar
-        filters={filters}
-        onChange={handleFiltersChange}
+      <TarefaAgendaBoard
+        state={boardState}
+        onStateChange={setBoardState}
         setores={setores ?? []}
         projetos={[]}
         pessoas={pessoasEquipe}
         hideProjeto
+        forceProjetoId={projetoId}
+        emptyMessage="Nenhuma tarefa vinculada a este projeto."
+        canEdit={canEdit}
+        canDeleteTarefa={canDeleteTarefa}
+        onOpenTarefa={openTarefa}
+        onCreate={openCreate}
+        onStatusChange={handleStatusChange}
+        onDelete={setDeleting}
       />
-
-      <Tabs value={view} onValueChange={(value) => setView(value as ViewMode)}>
-        <TabsList>
-          <TabsTrigger value="cards" className="gap-2">
-            <LayoutGrid className="h-4 w-4" />
-            Cards
-          </TabsTrigger>
-          <TabsTrigger value="lista" className="gap-2">
-            <List className="h-4 w-4" />
-            Lista
-          </TabsTrigger>
-          <TabsTrigger value="kanban" className="gap-2">
-            <Columns3 className="h-4 w-4" />
-            Kanban
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="cards" className="mt-4">
-          {loadingTarefas ? (
-            <div className={CARD_GRID_CLASS}>
-              {Array.from({ length: 6 }).map((_, i) => (
-                <Skeleton key={i} className="h-40 rounded-xl" />
-              ))}
-            </div>
-          ) : !tarefas?.length ? (
-            <EmptyState onCreate={openCreate} />
-          ) : (
-            <div className={CARD_GRID_CLASS}>
-              {tarefas.map((tarefa) => (
-                <TarefaCard
-                  key={tarefa.id}
-                  tarefa={tarefa}
-                  canEdit={canEdit(tarefa)}
-                  canDelete={canDeleteTarefa(tarefa)}
-                  onOpen={() => openTarefa(tarefa)}
-                  onEdit={() => openTarefa(tarefa)}
-                  onDelete={() => setDeleting(tarefa)}
-                  onStatusChange={(status) => handleStatusChange(tarefa, status)}
-                />
-              ))}
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="lista" className="mt-4">
-          {loadingTarefas ? (
-            <div className="space-y-2 rounded-xl border p-2">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <Skeleton key={i} className="h-14 rounded-lg" />
-              ))}
-            </div>
-          ) : !tarefas?.length ? (
-            <EmptyState onCreate={openCreate} />
-          ) : (
-            <TarefaListView tarefas={tarefas} onOpenTarefa={openTarefa} />
-          )}
-        </TabsContent>
-
-        <TabsContent value="kanban" className="mt-4">
-          {loadingTarefas ? (
-            <div className="flex gap-4">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <Skeleton key={i} className="h-[520px] min-w-[280px] flex-1 rounded-xl" />
-              ))}
-            </div>
-          ) : !tarefas?.length ? (
-            <EmptyState onCreate={openCreate} />
-          ) : (
-            <TarefaKanban
-              tarefas={tarefas}
-              onStatusChange={handleStatusChange}
-              onOpenTarefa={openTarefa}
-            />
-          )}
-        </TabsContent>
-      </Tabs>
 
       <TarefaPanelSheet
         tarefaId={panelId}
@@ -349,18 +239,6 @@ function ProjetoDetailPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
-  );
-}
-
-function EmptyState({ onCreate }: { onCreate: () => void }) {
-  return (
-    <div className="rounded-xl border border-dashed p-12 text-center">
-      <p className="text-muted-foreground">Nenhuma tarefa vinculada a este projeto.</p>
-      <Button variant="outline" className="mt-4 gap-2" onClick={onCreate}>
-        <Plus className="h-4 w-4" />
-        Criar primeira tarefa
-      </Button>
     </div>
   );
 }

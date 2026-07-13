@@ -35,9 +35,12 @@ import { cn } from "@/lib/utils";
 export function CadastroProjetosPanel({
   canManage,
   canDelete,
+  compactHeader = false,
 }: {
   canManage: boolean;
   canDelete: boolean;
+  /** Oculta o título interno quando a página já exibe o cabeçalho. */
+  compactHeader?: boolean;
 }) {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
@@ -128,12 +131,24 @@ export function CadastroProjetosPanel({
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold tracking-tight">Projetos</h2>
-          <p className="text-sm text-muted-foreground">
-            Agrupe tarefas relacionadas em projetos.
-          </p>
-        </div>
+        {!compactHeader ? (
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight">Projetos</h2>
+            <p className="text-sm text-muted-foreground">
+              Agrupe tarefas relacionadas em projetos.
+            </p>
+          </div>
+        ) : (
+          <div className="relative max-w-md flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nome..."
+              className="pl-9"
+              value={search}
+              onChange={(e) => handleSearch(e.target.value)}
+            />
+          </div>
+        )}
         {canManage && (
           <Button
             onClick={() => {
@@ -148,15 +163,17 @@ export function CadastroProjetosPanel({
         )}
       </div>
 
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Buscar por nome..."
-          className="pl-9"
-          value={search}
-          onChange={(e) => handleSearch(e.target.value)}
-        />
-      </div>
+      {!compactHeader && (
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por nome..."
+            className="pl-9"
+            value={search}
+            onChange={(e) => handleSearch(e.target.value)}
+          />
+        </div>
+      )}
 
       {isLoading ? (
         <div className={CARD_GRID_CLASS}>
@@ -189,13 +206,24 @@ export function CadastroProjetosPanel({
             return (
               <Card
                 key={projeto.id}
-                className="cursor-pointer transition-colors hover:border-primary/40"
+                role="link"
+                tabIndex={0}
+                className="cursor-pointer transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 onClick={() =>
                   navigate({
                     to: "/projetos/$projetoId",
                     params: { projetoId: projeto.id },
                   })
                 }
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    navigate({
+                      to: "/projetos/$projetoId",
+                      params: { projetoId: projeto.id },
+                    });
+                  }
+                }}
               >
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between gap-3">

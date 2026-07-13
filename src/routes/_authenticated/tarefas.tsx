@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Columns3, LayoutGrid, List, Plus } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { Plus } from "lucide-react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -13,56 +13,24 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TarefaCard } from "@/components/tarefas/tarefa-card";
-import { TarefaFiltersBar } from "@/components/tarefas/tarefa-filters";
-import { TarefaKanban } from "@/components/tarefas/tarefa-kanban";
-import { TarefaListView } from "@/components/tarefas/tarefa-list-view";
+import {
+  createAgendaBoardState,
+  TarefaAgendaBoard,
+  type AgendaBoardState,
+} from "@/components/tarefas/tarefa-agenda-board";
 import { TarefaPanelSheet } from "@/components/tarefas/tarefa-panel-sheet";
 import { usePessoas } from "@/hooks/use-pessoas";
 import { useProjetos } from "@/hooks/use-projetos";
 import { useProfile } from "@/hooks/use-profile";
 import { useSetores } from "@/hooks/use-setores";
-import {
-  useSoftDeleteTarefa,
-  useTarefas,
-  useUpdateTarefaStatus,
-} from "@/hooks/use-tarefas";
+import { useSoftDeleteTarefa, useUpdateTarefaStatus } from "@/hooks/use-tarefas";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
-import { CARD_GRID_CLASS } from "@/lib/layout";
-import type { Profile, TarefaFilters, TarefaStatus, TarefaWithRelations } from "@/types";
+import type { Profile, TarefaStatus, TarefaWithRelations } from "@/types";
 import { isAdmin, isGerente } from "@/utils/permissions";
 import { canEditTarefa, TAREFA_STATUS_LABELS } from "@/utils/tarefas";
 
-const DEFAULT_FILTERS: TarefaFilters = {
-  status: "all",
-  prioridade: "all",
-  setor_id: "all",
-  projeto_id: "all",
-  atribuido_a: "all",
-  atribuido_ids: [],
-  search: "",
-  tag: "",
-};
-
 type AgendaTab = "minha" | "geral";
-
-type AgendaViewMode = "cards" | "lista" | "kanban";
-
-type AgendaTabState = {
-  filters: TarefaFilters;
-  debouncedFilters: TarefaFilters;
-  view: AgendaViewMode;
-};
-
-function createTabState(): AgendaTabState {
-  return {
-    filters: { ...DEFAULT_FILTERS },
-    debouncedFilters: { ...DEFAULT_FILTERS },
-    view: "cards",
-  };
-}
 
 export const Route = createFileRoute("/_authenticated/tarefas")({
   head: () => ({
@@ -81,8 +49,8 @@ function AgendaPage() {
   const { data: pessoas } = usePessoas();
 
   const [agendaTab, setAgendaTab] = useState<AgendaTab>("minha");
-  const [minhaTab, setMinhaTab] = useState<AgendaTabState>(createTabState);
-  const [geralTab, setGeralTab] = useState<AgendaTabState>(createTabState);
+  const [minhaTab, setMinhaTab] = useState<AgendaBoardState>(createAgendaBoardState);
+  const [geralTab, setGeralTab] = useState<AgendaBoardState>(createAgendaBoardState);
 
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelId, setPanelId] = useState<string | null>(null);
@@ -163,7 +131,7 @@ function AgendaPage() {
           <TabsTrigger value="geral">Agenda Geral</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="minha" className="mt-4 space-y-4">
+        <TabsContent value="minha" className="mt-4">
           <AgendaTabPanel
             mode="minha"
             profile={profile}
@@ -181,7 +149,7 @@ function AgendaPage() {
           />
         </TabsContent>
 
-        <TabsContent value="geral" className="mt-4 space-y-4">
+        <TabsContent value="geral" className="mt-4">
           <AgendaTabPanel
             mode="geral"
             profile={profile}
@@ -250,11 +218,11 @@ function AgendaTabPanel({
 }: {
   mode: AgendaTab;
   profile: Profile | null | undefined;
-  tabState: AgendaTabState;
-  onTabStateChange: (state: AgendaTabState) => void;
-  setores: Parameters<typeof TarefaFiltersBar>[0]["setores"];
-  projetos: Parameters<typeof TarefaFiltersBar>[0]["projetos"];
-  pessoas: Parameters<typeof TarefaFiltersBar>[0]["pessoas"];
+  tabState: AgendaBoardState;
+  onTabStateChange: (state: AgendaBoardState) => void;
+  setores: Parameters<typeof TarefaAgendaBoard>[0]["setores"];
+  projetos: Parameters<typeof TarefaAgendaBoard>[0]["projetos"];
+  pessoas: Parameters<typeof TarefaAgendaBoard>[0]["pessoas"];
   canEdit: (tarefa: TarefaWithRelations) => boolean;
   canDeleteTarefa: (tarefa: TarefaWithRelations) => boolean;
   onOpenTarefa: (tarefa: TarefaWithRelations) => void;
@@ -262,154 +230,62 @@ function AgendaTabPanel({
   onStatusChange: (tarefa: TarefaWithRelations, status: TarefaStatus) => void;
   onDelete: (tarefa: TarefaWithRelations) => void;
 }) {
-  const { filters, debouncedFilters, view } = tabState;
-  const tabStateRef = useRef(tabState);
-  tabStateRef.current = tabState;
-
-  const handleFiltersChange = useMemo(() => {
-    let timeout: ReturnType<typeof setTimeout>;
-    return (next: TarefaFilters) => {
-      onTabStateChange({
-        ...tabStateRef.current,
-        filters: next,
-      });
-      clearTimeout(timeout);
-      timeout = setTimeout(() => {
-        onTabStateChange({
-          ...tabStateRef.current,
-          filters: next,
-          debouncedFilters: next,
-        });
-      }, 300);
-    };
-  }, [onTabStateChange]);
-
-  const queryFilters = useMemo(() => {
-    const base =
-      view === "kanban"
-        ? { ...debouncedFilters, status: "all" as const }
-        : debouncedFilters;
-
+  const boardState = useMemo(() => {
     if (mode === "minha" && profile?.id) {
-      return { ...base, atribuido_ids: [profile.id], atribuido_a: "all" as const };
+      return {
+        ...tabState,
+        filters: {
+          ...tabState.filters,
+          atribuido_ids: [profile.id],
+          atribuido_a: "all" as const,
+        },
+        debouncedFilters: {
+          ...tabState.debouncedFilters,
+          atribuido_ids: [profile.id],
+          atribuido_a: "all" as const,
+        },
+      };
     }
-
-    return base;
-  }, [debouncedFilters, mode, profile?.id, view]);
-
-  const { data: tarefas, isLoading } = useTarefas(queryFilters);
-
-  const emptyMessage =
-    mode === "minha"
-      ? "Nenhuma tarefa atribuída a você."
-      : "Nenhuma tarefa encontrada.";
+    return tabState;
+  }, [mode, profile?.id, tabState]);
 
   return (
-    <>
-      <TarefaFiltersBar
-        filters={filters}
-        onChange={handleFiltersChange}
-        setores={setores}
-        projetos={projetos}
-        pessoas={pessoas}
-        hideResponsavel={mode === "minha"}
-      />
-
-      <Tabs
-        value={view}
-        onValueChange={(value) =>
+    <TarefaAgendaBoard
+      state={boardState}
+      onStateChange={(next) => {
+        if (mode === "minha") {
           onTabStateChange({
-            ...tabState,
-            view: value as AgendaViewMode,
-          })
+            ...next,
+            filters: {
+              ...next.filters,
+              atribuido_ids: [],
+              atribuido_a: "all",
+            },
+            debouncedFilters: {
+              ...next.debouncedFilters,
+              atribuido_ids: [],
+              atribuido_a: "all",
+            },
+          });
+          return;
         }
-      >
-        <TabsList>
-          <TabsTrigger value="cards" className="gap-2">
-            <LayoutGrid className="h-4 w-4" />
-            Cards
-          </TabsTrigger>
-          <TabsTrigger value="lista" className="gap-2">
-            <List className="h-4 w-4" />
-            Lista
-          </TabsTrigger>
-          <TabsTrigger value="kanban" className="gap-2">
-            <Columns3 className="h-4 w-4" />
-            Kanban
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="cards" className="mt-4">
-          {isLoading ? (
-            <div className={CARD_GRID_CLASS}>
-              {Array.from({ length: 6 }).map((_, i) => (
-                <Skeleton key={i} className="h-40 rounded-xl" />
-              ))}
-            </div>
-          ) : !tarefas?.length ? (
-            <EmptyState message={emptyMessage} onCreate={onCreate} />
-          ) : (
-            <div className={CARD_GRID_CLASS}>
-              {tarefas.map((tarefa) => (
-                <TarefaCard
-                  key={tarefa.id}
-                  tarefa={tarefa}
-                  canEdit={canEdit(tarefa)}
-                  canDelete={canDeleteTarefa(tarefa)}
-                  onOpen={() => onOpenTarefa(tarefa)}
-                  onEdit={() => onOpenTarefa(tarefa)}
-                  onDelete={() => onDelete(tarefa)}
-                  onStatusChange={(status) => onStatusChange(tarefa, status)}
-                />
-              ))}
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="lista" className="mt-4">
-          {isLoading ? (
-            <div className="space-y-2 rounded-xl border p-2">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <Skeleton key={i} className="h-14 rounded-lg" />
-              ))}
-            </div>
-          ) : !tarefas?.length ? (
-            <EmptyState message={emptyMessage} onCreate={onCreate} />
-          ) : (
-            <TarefaListView tarefas={tarefas} onOpenTarefa={onOpenTarefa} />
-          )}
-        </TabsContent>
-
-        <TabsContent value="kanban" className="mt-4">
-          {isLoading ? (
-            <div className="flex gap-4">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <Skeleton key={i} className="h-[520px] min-w-[280px] flex-1 rounded-xl" />
-              ))}
-            </div>
-          ) : !tarefas?.length ? (
-            <EmptyState message={emptyMessage} onCreate={onCreate} />
-          ) : (
-            <TarefaKanban
-              tarefas={tarefas}
-              onStatusChange={onStatusChange}
-              onOpenTarefa={onOpenTarefa}
-            />
-          )}
-        </TabsContent>
-      </Tabs>
-    </>
-  );
-}
-
-function EmptyState({ message, onCreate }: { message: string; onCreate: () => void }) {
-  return (
-    <div className="rounded-xl border border-dashed p-12 text-center">
-      <p className="text-muted-foreground">{message}</p>
-      <Button variant="outline" className="mt-4 gap-2" onClick={onCreate}>
-        <Plus className="h-4 w-4" />
-        Criar primeira tarefa
-      </Button>
-    </div>
+        onTabStateChange(next);
+      }}
+      setores={setores}
+      projetos={projetos}
+      pessoas={pessoas}
+      hideResponsavel={mode === "minha"}
+      emptyMessage={
+        mode === "minha"
+          ? "Nenhuma tarefa atribuída a você."
+          : "Nenhuma tarefa encontrada."
+      }
+      canEdit={canEdit}
+      canDeleteTarefa={canDeleteTarefa}
+      onOpenTarefa={onOpenTarefa}
+      onCreate={onCreate}
+      onStatusChange={onStatusChange}
+      onDelete={onDelete}
+    />
   );
 }

@@ -17,16 +17,17 @@ function ProjetosPage() {
   const { data: profile } = useProfile();
 
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Projetos</h1>
-        <p className="text-sm text-muted-foreground mt-1">
+        <p className="mt-1 text-sm text-muted-foreground">
           Crie e gerencie projetos para agrupar tarefas relacionadas.
         </p>
       </div>
       <CadastroProjetosPanel
         canManage={!!profile}
         canDelete={canDeleteProjetos(profile)}
+        compactHeader
       />
     </div>
   );
