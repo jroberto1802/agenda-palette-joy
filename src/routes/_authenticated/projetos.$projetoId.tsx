@@ -16,7 +16,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ProjetoEquipeSection } from "@/components/projetos/projeto-equipe-section";
+import { ProjetoEquipeAvatars } from "@/components/projetos/projeto-equipe-avatars";
+import { ProjetoEquipeSheet } from "@/components/projetos/projeto-equipe-sheet";
 import { TarefaCard } from "@/components/tarefas/tarefa-card";
 import { TarefaFiltersBar } from "@/components/tarefas/tarefa-filters";
 import { TarefaKanban } from "@/components/tarefas/tarefa-kanban";
@@ -72,6 +73,7 @@ function ProjetoDetailPage() {
     ...DEFAULT_FILTERS,
   });
   const [view, setView] = useState<ViewMode>("cards");
+  const [equipeOpen, setEquipeOpen] = useState(false);
 
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelId, setPanelId] = useState<string | null>(null);
@@ -159,7 +161,7 @@ function ProjetoDetailPage() {
     return (
       <div className="space-y-4">
         <Skeleton className="h-8 w-64" />
-        <Skeleton className="h-24 w-full rounded-xl" />
+        <Skeleton className="h-10 w-48 rounded-full" />
         <Skeleton className="h-40 w-full rounded-xl" />
       </div>
     );
@@ -183,8 +185,8 @@ function ProjetoDetailPage() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-3">
-        <Button variant="ghost" asChild className="gap-2 px-0 text-muted-foreground">
+      <div className="space-y-1">
+        <Button variant="ghost" asChild className="mb-2 gap-2 px-0 text-muted-foreground">
           <Link to="/projetos">
             <ArrowLeft className="h-4 w-4" />
             Projetos
@@ -192,33 +194,34 @@ function ProjetoDetailPage() {
         </Button>
 
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-semibold tracking-tight">{projeto.nome}</h1>
-              <Badge
-                variant="outline"
-                className={cn("text-xs", PROJETO_STATUS_BADGE_CLASS[projeto.status])}
-              >
-                {PROJETO_STATUS_LABELS[projeto.status]}
-              </Badge>
+          <div className="space-y-3">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-2xl font-semibold tracking-tight">{projeto.nome}</h1>
+                <Badge
+                  variant="outline"
+                  className={cn("text-xs", PROJETO_STATUS_BADGE_CLASS[projeto.status])}
+                >
+                  {PROJETO_STATUS_LABELS[projeto.status]}
+                </Badge>
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Tarefas do projeto em cards, lista ou Kanban.
+              </p>
             </div>
-            {projeto.descricao && (
-              <p className="max-w-3xl text-sm text-muted-foreground">{projeto.descricao}</p>
-            )}
+
+            <ProjetoEquipeAvatars
+              membros={membros}
+              onClick={() => setEquipeOpen(true)}
+            />
           </div>
+
           <Button onClick={openCreate} className="shrink-0 gap-2">
             <Plus className="h-4 w-4" />
             Nova tarefa
           </Button>
         </div>
       </div>
-
-      <ProjetoEquipeSection
-        projetoId={projetoId}
-        membros={membros}
-        pessoas={pessoasAtivas}
-        canManage={!!profile}
-      />
 
       <TarefaFiltersBar
         filters={filters}
@@ -315,6 +318,16 @@ function ProjetoDetailPage() {
         onSaved={(id) => setPanelId(id)}
         defaultProjetoId={projetoId}
         lockProjeto
+      />
+
+      <ProjetoEquipeSheet
+        open={equipeOpen}
+        onOpenChange={setEquipeOpen}
+        projetoId={projetoId}
+        projetoNome={projeto.nome}
+        membros={membros}
+        pessoas={pessoasAtivas}
+        canManage={!!profile}
       />
 
       <AlertDialog open={!!deleting} onOpenChange={(open) => !open && setDeleting(null)}>

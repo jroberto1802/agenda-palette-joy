@@ -20,11 +20,14 @@ export function ProjetoEquipeSection({
   membros,
   pessoas,
   canManage,
+  embedded = false,
 }: {
   projetoId: string;
   membros: ProjetoMembro[];
   pessoas: ProfileWithSetor[];
   canManage: boolean;
+  /** Remove borda/título quando usado dentro do sheet de equipe. */
+  embedded?: boolean;
 }) {
   const [addingId, setAddingId] = useState<string>("");
   const addMembro = useAddProjetoMembro();
@@ -59,51 +62,64 @@ export function ProjetoEquipeSection({
     }
   };
 
-  return (
-    <section className="space-y-3 rounded-xl border p-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-base font-semibold tracking-tight">Equipe do projeto</h2>
-          <p className="text-sm text-muted-foreground">
-            {membros.length === 0
-              ? "Nenhum membro vinculado ainda."
-              : `${membros.length} ${membros.length === 1 ? "membro" : "membros"}`}
-          </p>
-        </div>
-        {canManage && disponiveis.length > 0 && (
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <Select value={addingId || undefined} onValueChange={setAddingId}>
-              <SelectTrigger className="w-full sm:w-[220px]">
-                <SelectValue placeholder="Adicionar pessoa" />
-              </SelectTrigger>
-              <SelectContent>
-                {disponiveis.map((pessoa) => (
-                  <SelectItem key={pessoa.id} value={pessoa.id}>
-                    {pessoa.nome_completo}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button
-              type="button"
-              variant="outline"
-              className="gap-2"
-              disabled={!addingId || addMembro.isPending}
-              onClick={handleAdd}
-            >
-              <Plus className="h-4 w-4" />
-              Adicionar
-            </Button>
-          </div>
-        )}
+  const addControls =
+    canManage && disponiveis.length > 0 ? (
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <Select value={addingId || undefined} onValueChange={setAddingId}>
+          <SelectTrigger className="w-full sm:w-[220px]">
+            <SelectValue placeholder="Adicionar pessoa" />
+          </SelectTrigger>
+          <SelectContent>
+            {disponiveis.map((pessoa) => (
+              <SelectItem key={pessoa.id} value={pessoa.id}>
+                {pessoa.nome_completo}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button
+          type="button"
+          variant="outline"
+          className="gap-2"
+          disabled={!addingId || addMembro.isPending}
+          onClick={handleAdd}
+        >
+          <Plus className="h-4 w-4" />
+          Adicionar
+        </Button>
       </div>
+    ) : null;
+
+  return (
+    <section className={embedded ? "space-y-3" : "space-y-3 rounded-xl border p-4"}>
+      {!embedded && (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-base font-semibold tracking-tight">Equipe do projeto</h2>
+            <p className="text-sm text-muted-foreground">
+              {membros.length === 0
+                ? "Nenhum membro vinculado ainda."
+                : `${membros.length} ${membros.length === 1 ? "membro" : "membros"}`}
+            </p>
+          </div>
+          {addControls}
+        </div>
+      )}
+
+      {embedded && addControls}
 
       {membros.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           Defina a equipe para poder atribuir responsáveis às tarefas deste projeto.
         </p>
       ) : (
-        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        <ul
+          className={
+            embedded
+              ? "grid grid-cols-1 gap-2"
+              : "grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3"
+          }
+        >
           {membros.map((membro) => (
             <li
               key={membro.id}

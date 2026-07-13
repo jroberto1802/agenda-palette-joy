@@ -216,11 +216,16 @@ export function CadastroProjetosPanel({
                       )}
                     </div>
                     {canManage && (
-                      <div className="flex shrink-0 gap-1" onClick={(e) => e.stopPropagation()}>
+                      <div
+                        className="flex shrink-0 gap-1"
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                      >
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setEditing(projeto);
                             setDialogOpen(true);
                           }}
@@ -232,7 +237,10 @@ export function CadastroProjetosPanel({
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => requestDelete(projeto)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              requestDelete(projeto);
+                            }}
                             aria-label="Excluir projeto"
                             className="text-destructive hover:text-destructive"
                           >
