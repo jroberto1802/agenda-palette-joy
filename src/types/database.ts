@@ -193,6 +193,8 @@ export type Database = {
           created_at: string;
           id: string;
           lida: boolean;
+          mensagem: string | null;
+          meta: Record<string, unknown>;
           referencia_id: string | null;
           referencia_tipo: string | null;
           tipo: string;
@@ -202,6 +204,8 @@ export type Database = {
           created_at?: string;
           id?: string;
           lida?: boolean;
+          mensagem?: string | null;
+          meta?: Record<string, unknown>;
           referencia_id?: string | null;
           referencia_tipo?: string | null;
           tipo: string;
@@ -211,6 +215,8 @@ export type Database = {
           created_at?: string;
           id?: string;
           lida?: boolean;
+          mensagem?: string | null;
+          meta?: Record<string, unknown>;
           referencia_id?: string | null;
           referencia_tipo?: string | null;
           tipo?: string;
@@ -378,31 +384,93 @@ export type Database = {
       subtarefas: {
         Row: {
           concluida: boolean;
+          concluida_em: string | null;
+          concluido_por: string | null;
           created_at: string;
+          criado_por: string | null;
+          data_prazo: string | null;
+          descricao: string | null;
           id: string;
+          prioridade: "P1" | "P2" | "P3" | "P4" | null;
           tarefa_id: string;
           titulo: string;
         };
         Insert: {
           concluida?: boolean;
+          concluida_em?: string | null;
+          concluido_por?: string | null;
           created_at?: string;
+          criado_por?: string | null;
+          data_prazo?: string | null;
+          descricao?: string | null;
           id?: string;
+          prioridade?: "P1" | "P2" | "P3" | "P4" | null;
           tarefa_id: string;
           titulo: string;
         };
         Update: {
           concluida?: boolean;
+          concluida_em?: string | null;
+          concluido_por?: string | null;
           created_at?: string;
+          criado_por?: string | null;
+          data_prazo?: string | null;
+          descricao?: string | null;
           id?: string;
+          prioridade?: "P1" | "P2" | "P3" | "P4" | null;
           tarefa_id?: string;
           titulo?: string;
         };
         Relationships: [
           {
+            foreignKeyName: "subtarefas_concluido_por_fkey",
+            columns: ["concluido_por"],
+            isOneToOne: false,
+            referencedRelation: "profiles",
+            referencedColumns: ["id"],
+          },
+          {
+            foreignKeyName: "subtarefas_criado_por_fkey",
+            columns: ["criado_por"],
+            isOneToOne: false,
+            referencedRelation: "profiles",
+            referencedColumns: ["id"],
+          },
+          {
             foreignKeyName: "subtarefas_tarefa_id_fkey",
             columns: ["tarefa_id"],
             isOneToOne: false,
             referencedRelation: "tarefas",
+            referencedColumns: ["id"],
+          },
+        ];
+      };
+      subtarefa_responsaveis: {
+        Row: {
+          subtarefa_id: string;
+          usuario_id: string;
+        };
+        Insert: {
+          subtarefa_id: string;
+          usuario_id: string;
+        };
+        Update: {
+          subtarefa_id?: string;
+          usuario_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "subtarefa_responsaveis_subtarefa_id_fkey",
+            columns: ["subtarefa_id"],
+            isOneToOne: false,
+            referencedRelation: "subtarefas",
+            referencedColumns: ["id"],
+          },
+          {
+            foreignKeyName: "subtarefa_responsaveis_usuario_id_fkey",
+            columns: ["usuario_id"],
+            isOneToOne: false,
+            referencedRelation: "profiles",
             referencedColumns: ["id"],
           },
         ];
@@ -735,8 +803,10 @@ export type Database = {
           p_tipo: string;
           p_referencia_tipo?: string | null;
           p_referencia_id?: string | null;
+          p_mensagem?: string | null;
+          p_meta?: Record<string, unknown> | null;
         };
-        Returns: void;
+        Returns: string;
       };
     };
     Enums: Record<string, never>;

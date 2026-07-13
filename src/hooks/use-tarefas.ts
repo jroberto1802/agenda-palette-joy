@@ -13,8 +13,11 @@ import {
   listTarefasCalendario,
   softDeleteTarefa,
   toggleSubtarefa,
+  updateSubtarefa,
   updateTarefa,
   updateTarefaStatus,
+  type CreateSubtarefaParams,
+  type UpdateSubtarefaParams,
 } from "@/services/tarefas";
 import type { TarefaFilters, TarefaFormData, TarefaStatus } from "@/types";
 
@@ -105,8 +108,16 @@ export function useSoftDeleteTarefa() {
 export function useCreateSubtarefa() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ tarefaId, titulo }: { tarefaId: string; titulo: string }) =>
-      createSubtarefa(tarefaId, titulo),
+    mutationFn: (params: CreateSubtarefaParams) => createSubtarefa(params),
+    onSuccess: () => invalidateTarefas(queryClient),
+  });
+}
+
+export function useUpdateSubtarefa() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: UpdateSubtarefaParams }) =>
+      updateSubtarefa(id, data),
     onSuccess: () => invalidateTarefas(queryClient),
   });
 }

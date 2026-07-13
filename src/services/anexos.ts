@@ -1,4 +1,9 @@
 import { supabase } from "@/integrations/supabase/client";
+import {
+  getCurrentActor,
+  getTarefaStakeholderIds,
+  notifyTarefaAnexo,
+} from "@/services/notificacao-events";
 import type { TarefaAnexo } from "@/types";
 
 const BUCKET = "tarefa-anexos";
@@ -39,6 +44,19 @@ export async function uploadAnexo(tarefaId: string, file: File): Promise<TarefaA
     await supabase.storage.from(BUCKET).remove([storagePath]);
     throw error;
   }
+
+  const [{ data: tarefa }, ator, stakeholders] = await Promise.all([
+    supabase.from("tarefas").select("titulo").eq("id", tarefaId).single(),
+    getCurrentActor(),
+    getTarefaStakeholderIds(tarefaId),
+  ]);
+
+  await notifyTarefaAnexo({
+    usuarioIds: stakeholders,
+    tarefaId,
+    titulo: tarefa?.titulo ?? "tarefa",
+    atorNome: ator?.nome ?? "Alguém",
+  }).catch(() => undefined);
 
   return data;
 }

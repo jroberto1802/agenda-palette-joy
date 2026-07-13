@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Notificacao } from "@/types";
+import type { NotificacaoMeta } from "@/utils/notificacoes";
 
 export async function listNotificacoes(limit = 30): Promise<Notificacao[]> {
   const {
@@ -15,7 +16,7 @@ export async function listNotificacoes(limit = 30): Promise<Notificacao[]> {
     .limit(limit);
 
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []) as Notificacao[];
 }
 
 export async function countNotificacoesNaoLidas(): Promise<number> {
@@ -59,12 +60,16 @@ export async function notifyUser(params: {
   tipo: string;
   referencia_tipo?: string | null;
   referencia_id?: string | null;
+  mensagem?: string | null;
+  meta?: NotificacaoMeta | Record<string, unknown> | null;
 }): Promise<void> {
   const { error } = await supabase.rpc("notify_user", {
     p_usuario_id: params.usuario_id,
     p_tipo: params.tipo,
     p_referencia_tipo: params.referencia_tipo ?? null,
     p_referencia_id: params.referencia_id ?? null,
+    p_mensagem: params.mensagem ?? null,
+    p_meta: params.meta ?? {},
   });
 
   if (error) throw error;

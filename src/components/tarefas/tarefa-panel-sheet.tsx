@@ -1,13 +1,11 @@
-import { zodResolver } from "@hookform/resolvers/zod";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
-import { Bell, CalendarIcon, ChevronRight, MessageSquare, Paperclip, Plus, Save, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { useForm } from "react-hook-form";
-import { toast } from "sonner";
-import { z } from "zod";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
+import { EditableSurface } from "@/components/common/editable-surface";
 import { TarefaAnexosSection } from "@/components/tarefas/tarefa-anexos-section";
+import {
+  draftToFormData,
+  TarefaSubtarefasSection,
+  type DraftSubtarefa,
+} from "@/components/tarefas/tarefa-subtarefas-section";
 import {
   TarefaRecorrenciaFields,
   type RecorrenciaFormValues,
@@ -44,6 +42,12 @@ import {
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Textarea } from "@/components/ui/textarea";
 import { PessoasMultiSelect } from "@/components/common/pessoas-multi-select";
 import { usePessoas } from "@/hooks/use-pessoas";
@@ -54,19 +58,15 @@ import { useSetores } from "@/hooks/use-setores";
 import { listProjetoMembros } from "@/services/projetos";
 import { useQuery } from "@tanstack/react-query";
 import {
-  useCreateSubtarefa,
   useCreateTarefa,
   useCreateTarefaComentario,
-  useDeleteSubtarefa,
   useDeleteTarefaComentario,
   useTarefaDetail,
-  useToggleSubtarefa,
   useUpdateTarefa,
 } from "@/hooks/use-tarefas";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
 import { cn } from "@/lib/utils";
 import type {
-  ProfileWithSetor,
   RecorrenciaConfig,
   RecorrenciaTipo,
   TarefaFormData,
@@ -92,7 +92,14 @@ import {
   parseLembretes,
 } from "@/utils/tarefas";
 import type { UseFormReturn } from "react-hook-form";
-
+import { Bell, CalendarIcon, ChevronRight, MessageSquare, Paperclip, Save, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useForm } from "react-hook-form";
+import { toast } from "sonner";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 const tarefaPanelSchema = z
   .object({
     titulo: z.string().min(2, "Título deve ter pelo menos 2 caracteres"),
@@ -244,7 +251,7 @@ function DateField({
           <Calendar
             mode="single"
             selected={value ?? undefined}
-            onSelect={onChange}
+            onSelect={(date) => onChange(date ?? null)}
             locale={ptBR}
             initialFocus
           />
@@ -316,6 +323,8 @@ export function TarefaPanelSheet({
   onSaved,
   defaultProjetoId = null,
   lockProjeto = false,
+  initialAba,
+  highlightComentarioId = null,
 }: {
   tarefaId: string | null;
   open: boolean;
@@ -324,6 +333,8 @@ export function TarefaPanelSheet({
   onSaved?: (tarefaId: string) => void;
   defaultProjetoId?: string | null;
   lockProjeto?: boolean;
+  initialAba?: "comentarios" | "anexos";
+  highlightComentarioId?: string | null;
 }) {
   const isCreate = !tarefaId;
   const { data: profile } = useProfile();
@@ -334,14 +345,30 @@ export function TarefaPanelSheet({
 
   const createTarefa = useCreateTarefa();
   const updateTarefa = useUpdateTarefa();
-  const createSubtarefa = useCreateSubtarefa();
-  const toggleSubtarefa = useToggleSubtarefa();
-  const deleteSubtarefa = useDeleteSubtarefa();
   const createComentario = useCreateTarefaComentario();
   const deleteComentario = useDeleteTarefaComentario();
 
-  const [novaSubtarefa, setNovaSubtarefa] = useState("");
+  const [draftSubtarefas, setDraftSubtarefas] = useState<DraftSubtarefa[]>([]);
   const [novoComentario, setNovoComentario] = useState("");
+  const [sideTab, setSideTab] = useState<"comentarios" | "anexos">(
+    initialAba ?? "comentarios",
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    setSideTab(initialAba ?? "comentarios");
+  }, [open, initialAba, tarefaId]);
+
+  useEffect(() => {
+    if (!open || !highlightComentarioId) return;
+    setSideTab("comentarios");
+    const timer = window.setTimeout(() => {
+      document
+        .getElementById(`tarefa-comentario-${highlightComentarioId}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [open, highlightComentarioId, tarefa?.comentarios]);
 
   const pessoasAtivas = useMemo(
     () => (pessoas ?? []).filter((p) => p.ativo),
@@ -393,6 +420,15 @@ export function TarefaPanelSheet({
   const projetoId = form.watch("projeto_id");
   const setorId = form.watch("setor_id");
   const atribuidoIds = form.watch("atribuido_ids");
+  const observadorIds = form.watch("observador_ids");
+  const tituloValue = form.watch("titulo");
+  const descricaoValue = form.watch("descricao");
+  const prioridadeValue = form.watch("prioridade");
+  const statusValue = form.watch("status");
+  const dataInicioValue = form.watch("data_inicio");
+  const dataVencimentoValue = form.watch("data_vencimento");
+  const tagsInputValue = form.watch("tagsInput");
+  const lembretesValue = form.watch("lembretes");
   const selectedProjeto = projetos?.find((p) => p.id === projetoId);
   const selectedSetor = setores?.find((s) => s.id === setorId);
 
@@ -413,7 +449,7 @@ export function TarefaPanelSheet({
   useEffect(() => {
     if (!open) return;
     form.reset(toFormValues(tarefa ?? null, profile?.setor_id, undefined, defaultProjetoId));
-    setNovaSubtarefa("");
+    setDraftSubtarefas([]);
     setNovoComentario("");
   }, [open, tarefa, profile?.setor_id, defaultProjetoId, form]);
 
@@ -451,13 +487,19 @@ export function TarefaPanelSheet({
   const subtarefas = tarefa?.subtarefas ?? [];
   const comentarios = tarefa?.comentarios ?? [];
   const anexos = tarefa?.anexos ?? [];
-  const concluidas = subtarefas.filter((s) => s.concluida).length;
   const recorrencia = tarefa ? parseRecorrencia(tarefa.recorrencia) : null;
+
+  const pessoasComAcesso = useMemo(() => {
+    const ids = new Set<string>([...(atribuidoIds ?? []), ...(observadorIds ?? [])]);
+    if (criadorDisplay?.id) ids.add(criadorDisplay.id);
+    return pessoasAtivas.filter((p) => ids.has(p.id));
+  }, [atribuidoIds, observadorIds, criadorDisplay?.id, pessoasAtivas]);
 
   const handleSave = form.handleSubmit(async (values) => {
     try {
       const payload = toPayload(values);
       if (isCreate) {
+        payload.subtarefas = draftToFormData(draftSubtarefas);
         const created = await createTarefa.mutateAsync(payload);
         toast.success("Tarefa criada");
         onSaved?.(created.id);
@@ -472,18 +514,6 @@ export function TarefaPanelSheet({
     }
   });
 
-  const handleAddSubtarefa = async () => {
-    if (!tarefaId || !novaSubtarefa.trim()) return;
-    try {
-      await createSubtarefa.mutateAsync({ tarefaId, titulo: novaSubtarefa.trim() });
-      setNovaSubtarefa("");
-    } catch (error) {
-      toast.error("Erro ao adicionar subtarefa", {
-        description: getSupabaseErrorMessage(error as Error),
-      });
-    }
-  };
-
   const handleAddComentario = async () => {
     if (!tarefaId || !novoComentario.trim()) return;
     try {
@@ -494,15 +524,6 @@ export function TarefaPanelSheet({
         description: getSupabaseErrorMessage(error as Error),
       });
     }
-  };
-
-  const toggleObservador = (pessoaId: string, checked: boolean) => {
-    const current = form.getValues("observador_ids");
-    form.setValue(
-      "observador_ids",
-      checked ? [...current, pessoaId] : current.filter((id) => id !== pessoaId),
-      { shouldValidate: true },
-    );
   };
 
   const toggleLembrete = (opcao: TarefaLembreteOpcao, checked: boolean) => {
@@ -516,6 +537,7 @@ export function TarefaPanelSheet({
 
   const saving = createTarefa.isPending || updateTarefa.isPending;
   const showInteractions = !isCreate && !!tarefaId;
+  const forceFieldEdit = isCreate;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -588,14 +610,23 @@ export function TarefaPanelSheet({
                       name="titulo"
                       render={({ field }) => (
                         <FormItem>
-                          <FormControl>
-                            <Input
-                              placeholder="Título da tarefa"
-                              className="border-0 px-0 text-lg font-semibold shadow-none focus-visible:ring-0"
-                              disabled={!canEdit}
-                              {...field}
-                            />
-                          </FormControl>
+                          <EditableSurface
+                            canEdit={canEdit}
+                            forceEdit={forceFieldEdit}
+                            display={
+                              <p className="text-lg font-semibold leading-snug">
+                                {tituloValue || "Sem título"}
+                              </p>
+                            }
+                          >
+                            <FormControl>
+                              <Input
+                                placeholder="Título da tarefa"
+                                className="border-0 px-0 text-lg font-semibold shadow-none focus-visible:ring-0"
+                                {...field}
+                              />
+                            </FormControl>
+                          </EditableSurface>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -607,31 +638,43 @@ export function TarefaPanelSheet({
                         name="projeto_id"
                         render={({ field }) => (
                           <FormItem className="space-y-0">
-                            <MetaChip label="Projeto">
-                              <Select
-                                value={field.value ?? "none"}
-                                onValueChange={(v) => {
-                                  const next = v === "none" ? null : v;
-                                  field.onChange(next);
-                                  if (next) form.setValue("atribuido_ids", []);
-                                }}
-                                disabled={!canEdit || lockProjeto}
-                              >
-                                <FormControl>
-                                  <SelectTrigger className="h-auto border-0 bg-transparent p-0 shadow-none focus:ring-0 [&>svg]:h-3.5 [&>svg]:w-3.5">
-                                    <SelectValue placeholder="Nenhum" />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  <SelectItem value="none">Nenhum</SelectItem>
-                                  {(projetos ?? []).map((projeto) => (
-                                    <SelectItem key={projeto.id} value={projeto.id}>
-                                      {projeto.nome}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </MetaChip>
+                            <EditableSurface
+                              canEdit={canEdit && !lockProjeto}
+                              forceEdit={forceFieldEdit}
+                              display={
+                                <MetaChip label="Projeto">
+                                  <span className="font-medium text-foreground">
+                                    {selectedProjeto?.nome ?? "Nenhum"}
+                                  </span>
+                                </MetaChip>
+                              }
+                            >
+                              <MetaChip label="Projeto">
+                                <Select
+                                  value={field.value ?? "none"}
+                                  onValueChange={(v) => {
+                                    const next = v === "none" ? null : v;
+                                    field.onChange(next);
+                                    if (next) form.setValue("atribuido_ids", []);
+                                  }}
+                                  disabled={lockProjeto}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger className="h-auto border-0 bg-transparent p-0 shadow-none focus:ring-0 [&>svg]:h-3.5 [&>svg]:w-3.5">
+                                      <SelectValue placeholder="Nenhum" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="none">Nenhum</SelectItem>
+                                    {(projetos ?? []).map((projeto) => (
+                                      <SelectItem key={projeto.id} value={projeto.id}>
+                                        {projeto.nome}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </MetaChip>
+                            </EditableSurface>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -642,27 +685,38 @@ export function TarefaPanelSheet({
                         name="setor_id"
                         render={({ field }) => (
                           <FormItem className="space-y-0">
-                            <MetaChip label="Setor">
-                              <Select
-                                value={field.value ?? "none"}
-                                onValueChange={(v) => field.onChange(v === "none" ? null : v)}
-                                disabled={!canEdit}
-                              >
-                                <FormControl>
-                                  <SelectTrigger className="h-auto border-0 bg-transparent p-0 shadow-none focus:ring-0 [&>svg]:h-3.5 [&>svg]:w-3.5">
-                                    <SelectValue placeholder="Nenhum" />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  <SelectItem value="none">Nenhum</SelectItem>
-                                  {setoresPermitidos.map((s) => (
-                                    <SelectItem key={s.id} value={s.id}>
-                                      {s.nome}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </MetaChip>
+                            <EditableSurface
+                              canEdit={canEdit}
+                              forceEdit={forceFieldEdit}
+                              display={
+                                <MetaChip label="Setor">
+                                  <span className="font-medium text-foreground">
+                                    {selectedSetor?.nome ?? "Nenhum"}
+                                  </span>
+                                </MetaChip>
+                              }
+                            >
+                              <MetaChip label="Setor">
+                                <Select
+                                  value={field.value ?? "none"}
+                                  onValueChange={(v) => field.onChange(v === "none" ? null : v)}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger className="h-auto border-0 bg-transparent p-0 shadow-none focus:ring-0 [&>svg]:h-3.5 [&>svg]:w-3.5">
+                                      <SelectValue placeholder="Nenhum" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="none">Nenhum</SelectItem>
+                                    {setoresPermitidos.map((s) => (
+                                      <SelectItem key={s.id} value={s.id}>
+                                        {s.nome}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </MetaChip>
+                            </EditableSurface>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -681,37 +735,59 @@ export function TarefaPanelSheet({
                         name="atribuido_ids"
                         render={({ field }) => (
                           <FormItem className="space-y-0">
-                            <MetaChip label="Responsáveis" className="max-w-full">
-                              <Popover>
-                                <PopoverTrigger asChild>
-                                  <button
-                                    type="button"
-                                    disabled={!canEdit}
-                                    className="flex max-w-[220px] items-center gap-1 truncate text-left font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-70"
-                                  >
-                                    {responsaveisDisplay.length === 0
-                                      ? "Nenhum"
-                                      : responsaveisDisplay.length === 1
-                                        ? responsaveisDisplay[0].nome_completo
-                                        : `${responsaveisDisplay.length} pessoas`}
-                                  </button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-80 p-3" align="start">
-                                  <PessoasMultiSelect
-                                    pessoas={pessoasParaResponsavel}
-                                    value={field.value}
-                                    onChange={field.onChange}
-                                    disabled={!canEdit}
-                                    placeholder="Selecione responsáveis"
-                                    emptyLabel={
-                                      projetoId
-                                        ? "Defina a equipe do projeto antes de atribuir responsáveis"
-                                        : "Nenhuma pessoa disponível"
-                                    }
-                                  />
-                                </PopoverContent>
-                              </Popover>
-                            </MetaChip>
+                            <EditableSurface
+                              canEdit={canEdit}
+                              forceEdit={forceFieldEdit}
+                              display={
+                                <MetaChip label="Responsáveis" className="max-w-full">
+                                  {responsaveisDisplay.length === 0 ? (
+                                    <span className="font-medium text-foreground">Nenhum</span>
+                                  ) : (
+                                    <div className="flex -space-x-1.5">
+                                      {responsaveisDisplay.map((p) => (
+                                        <ProfileAvatar
+                                          key={p.id}
+                                          name={p.nome_completo}
+                                          avatarUrl={p.avatar_url}
+                                          className="h-5 w-5 ring-2 ring-background"
+                                        />
+                                      ))}
+                                    </div>
+                                  )}
+                                </MetaChip>
+                              }
+                            >
+                              <MetaChip label="Responsáveis" className="max-w-full">
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <button
+                                      type="button"
+                                      className="flex max-w-[220px] items-center gap-1 truncate text-left font-medium text-foreground"
+                                    >
+                                      {responsaveisDisplay.length === 0
+                                        ? "Nenhum"
+                                        : responsaveisDisplay.length === 1
+                                          ? responsaveisDisplay[0].nome_completo
+                                          : `${responsaveisDisplay.length} pessoas`}
+                                    </button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-80 p-3" align="start">
+                                    <PessoasMultiSelect
+                                      pessoas={pessoasParaResponsavel}
+                                      value={field.value}
+                                      onChange={field.onChange}
+                                      disabled={!canEdit}
+                                      placeholder="Selecione responsáveis"
+                                      emptyLabel={
+                                        projetoId
+                                          ? "Defina a equipe do projeto antes de atribuir responsáveis"
+                                          : "Nenhuma pessoa disponível"
+                                      }
+                                    />
+                                  </PopoverContent>
+                                </Popover>
+                              </MetaChip>
+                            </EditableSurface>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -722,43 +798,53 @@ export function TarefaPanelSheet({
                         name="data_inicio"
                         render={({ field }) => (
                           <FormItem className="space-y-0">
-                            <MetaChip label="Data">
-                              <Popover>
-                                <PopoverTrigger asChild>
-                                  <button
-                                    type="button"
-                                    disabled={!canEdit}
-                                    className="font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-70"
-                                  >
-                                    {field.value
-                                      ? format(field.value, "dd/MM/yyyy", { locale: ptBR })
+                            <EditableSurface
+                              canEdit={canEdit}
+                              forceEdit={forceFieldEdit}
+                              display={
+                                <MetaChip label="Data">
+                                  <span className="font-medium text-foreground">
+                                    {dataInicioValue
+                                      ? format(dataInicioValue, "dd/MM/yyyy", { locale: ptBR })
                                       : "Sem data"}
-                                  </button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
-                                  <Calendar
-                                    mode="single"
-                                    selected={field.value ?? undefined}
-                                    onSelect={field.onChange}
-                                    locale={ptBR}
-                                    initialFocus
-                                  />
-                                  {field.value && (
-                                    <div className="border-t p-2">
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        className="w-full"
-                                        onClick={() => field.onChange(null)}
-                                      >
-                                        Remover data
-                                      </Button>
-                                    </div>
-                                  )}
-                                </PopoverContent>
-                              </Popover>
-                            </MetaChip>
+                                  </span>
+                                </MetaChip>
+                              }
+                            >
+                              <MetaChip label="Data">
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <button type="button" className="font-medium text-foreground">
+                                      {field.value
+                                        ? format(field.value, "dd/MM/yyyy", { locale: ptBR })
+                                        : "Sem data"}
+                                    </button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-auto p-0" align="start">
+                                    <Calendar
+                                      mode="single"
+                                      selected={field.value ?? undefined}
+                                      onSelect={field.onChange}
+                                      locale={ptBR}
+                                      initialFocus
+                                    />
+                                    {field.value && (
+                                      <div className="border-t p-2">
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="sm"
+                                          className="w-full"
+                                          onClick={() => field.onChange(null)}
+                                        >
+                                          Remover data
+                                        </Button>
+                                      </div>
+                                    )}
+                                  </PopoverContent>
+                                </Popover>
+                              </MetaChip>
+                            </EditableSurface>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -770,104 +856,38 @@ export function TarefaPanelSheet({
                       name="descricao"
                       render={({ field }) => (
                         <FormItem>
-                          <FormControl>
-                            <Textarea
-                              placeholder="Adicione uma descrição..."
-                              rows={4}
-                              disabled={!canEdit}
-                              {...field}
-                            />
-                          </FormControl>
+                          <EditableSurface
+                            canEdit={canEdit}
+                            forceEdit={forceFieldEdit}
+                            display={
+                              <p className="whitespace-pre-wrap text-sm text-muted-foreground">
+                                {descricaoValue?.trim() || "Sem descrição"}
+                              </p>
+                            }
+                          >
+                            <FormControl>
+                              <Textarea
+                                placeholder="Adicione uma descrição..."
+                                rows={4}
+                                {...field}
+                              />
+                            </FormControl>
+                          </EditableSurface>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
 
-                    <section>
-                      <div className="mb-3 flex items-center justify-between">
-                        <h3 className="text-sm font-semibold">
-                          Subtarefas{" "}
-                          {subtarefas.length > 0 && `(${concluidas}/${subtarefas.length})`}
-                        </h3>
-                      </div>
-                      {!showInteractions ? (
-                        <p className="text-sm text-muted-foreground">
-                          Salve a tarefa para adicionar subtarefas.
-                        </p>
-                      ) : (
-                        <>
-                          <div className="space-y-2">
-                            {subtarefas.map((sub) => (
-                              <div key={sub.id} className="group flex items-center gap-2">
-                                <Checkbox
-                                  checked={sub.concluida}
-                                  disabled={!canEdit}
-                                  onCheckedChange={async (checked) => {
-                                    try {
-                                      await toggleSubtarefa.mutateAsync({
-                                        id: sub.id,
-                                        concluida: !!checked,
-                                      });
-                                    } catch (error) {
-                                      toast.error(getSupabaseErrorMessage(error as Error));
-                                    }
-                                  }}
-                                />
-                                <span
-                                  className={
-                                    sub.concluida
-                                      ? "flex-1 text-sm text-muted-foreground line-through"
-                                      : "flex-1 text-sm"
-                                  }
-                                >
-                                  {sub.titulo}
-                                </span>
-                                {canEdit && (
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 opacity-0 group-hover:opacity-100"
-                                    onClick={async () => {
-                                      try {
-                                        await deleteSubtarefa.mutateAsync(sub.id);
-                                      } catch (error) {
-                                        toast.error(getSupabaseErrorMessage(error as Error));
-                                      }
-                                    }}
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </Button>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                          {canEdit && (
-                            <div className="mt-3 flex gap-2">
-                              <Input
-                                placeholder="Adicionar subtarefa..."
-                                value={novaSubtarefa}
-                                onChange={(e) => setNovaSubtarefa(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") {
-                                    e.preventDefault();
-                                    handleAddSubtarefa();
-                                  }
-                                }}
-                              />
-                              <Button
-                                type="button"
-                                size="icon"
-                                onClick={handleAddSubtarefa}
-                                disabled={!novaSubtarefa.trim()}
-                              >
-                                <Plus className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </section>
+                    <TarefaSubtarefasSection
+                      tarefaId={tarefaId}
+                      subtarefas={subtarefas}
+                      canEdit={canEdit}
+                      isCreate={isCreate}
+                      pessoas={pessoasParaResponsavel}
+                      profile={profile}
+                      drafts={draftSubtarefas}
+                      onDraftsChange={setDraftSubtarefas}
+                    />
 
                     <Separator />
 
@@ -880,12 +900,23 @@ export function TarefaPanelSheet({
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>Prazo</FormLabel>
-                              <DateField
-                                label=""
-                                value={field.value}
-                                onChange={field.onChange}
-                                disabled={!canEdit}
-                              />
+                              <EditableSurface
+                                canEdit={canEdit}
+                                forceEdit={forceFieldEdit}
+                                display={
+                                  <p className="text-sm">
+                                    {dataVencimentoValue
+                                      ? format(dataVencimentoValue, "dd/MM/yyyy", { locale: ptBR })
+                                      : "Sem prazo"}
+                                  </p>
+                                }
+                              >
+                                <DateField
+                                  label=""
+                                  value={field.value}
+                                  onChange={field.onChange}
+                                />
+                              </EditableSurface>
                               <FormMessage />
                             </FormItem>
                           )}
@@ -897,26 +928,38 @@ export function TarefaPanelSheet({
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>Prioridade</FormLabel>
-                              <Select
-                                value={field.value}
-                                onValueChange={(v) => field.onChange(v as TarefaPrioridade)}
-                                disabled={!canEdit}
+                              <EditableSurface
+                                canEdit={canEdit}
+                                forceEdit={forceFieldEdit}
+                                display={
+                                  <Badge
+                                    variant="outline"
+                                    className={TAREFA_PRIORIDADE_COLORS[prioridadeValue]}
+                                  >
+                                    {TAREFA_PRIORIDADE_LABELS[prioridadeValue]}
+                                  </Badge>
+                                }
                               >
-                                <FormControl>
-                                  <SelectTrigger>
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  {(Object.keys(TAREFA_PRIORIDADE_LABELS) as TarefaPrioridade[]).map(
-                                    (p) => (
-                                      <SelectItem key={p} value={p}>
-                                        {TAREFA_PRIORIDADE_LABELS[p]}
-                                      </SelectItem>
-                                    ),
-                                  )}
-                                </SelectContent>
-                              </Select>
+                                <Select
+                                  value={field.value}
+                                  onValueChange={(v) => field.onChange(v as TarefaPrioridade)}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    {(Object.keys(TAREFA_PRIORIDADE_LABELS) as TarefaPrioridade[]).map(
+                                      (p) => (
+                                        <SelectItem key={p} value={p}>
+                                          {TAREFA_PRIORIDADE_LABELS[p]}
+                                        </SelectItem>
+                                      ),
+                                    )}
+                                  </SelectContent>
+                                </Select>
+                              </EditableSurface>
                               <FormMessage />
                             </FormItem>
                           )}
@@ -928,24 +971,36 @@ export function TarefaPanelSheet({
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>Status</FormLabel>
-                              <Select
-                                value={field.value}
-                                onValueChange={(v) => field.onChange(v as TarefaStatus)}
-                                disabled={!canEdit}
+                              <EditableSurface
+                                canEdit={canEdit}
+                                forceEdit={forceFieldEdit}
+                                display={
+                                  <Badge
+                                    variant="secondary"
+                                    className={TAREFA_STATUS_COLORS[statusValue]}
+                                  >
+                                    {TAREFA_STATUS_LABELS[statusValue]}
+                                  </Badge>
+                                }
                               >
-                                <FormControl>
-                                  <SelectTrigger>
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  {(Object.keys(TAREFA_STATUS_LABELS) as TarefaStatus[]).map((s) => (
-                                    <SelectItem key={s} value={s}>
-                                      {TAREFA_STATUS_LABELS[s]}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
+                                <Select
+                                  value={field.value}
+                                  onValueChange={(v) => field.onChange(v as TarefaStatus)}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    {(Object.keys(TAREFA_STATUS_LABELS) as TarefaStatus[]).map((s) => (
+                                      <SelectItem key={s} value={s}>
+                                        {TAREFA_STATUS_LABELS[s]}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </EditableSurface>
                               <FormMessage />
                             </FormItem>
                           )}
@@ -957,13 +1012,19 @@ export function TarefaPanelSheet({
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>Etiquetas</FormLabel>
-                              <FormControl>
-                                <Input
-                                  placeholder="urgente, cliente-x"
-                                  disabled={!canEdit}
-                                  {...field}
-                                />
-                              </FormControl>
+                              <EditableSurface
+                                canEdit={canEdit}
+                                forceEdit={forceFieldEdit}
+                                display={
+                                  <p className="text-sm text-muted-foreground">
+                                    {tagsInputValue.trim() || "Nenhuma"}
+                                  </p>
+                                }
+                              >
+                                <FormControl>
+                                  <Input placeholder="urgente, cliente-x" {...field} />
+                                </FormControl>
+                              </EditableSurface>
                               <FormMessage />
                             </FormItem>
                           )}
@@ -975,26 +1036,35 @@ export function TarefaPanelSheet({
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>Visibilidade</FormLabel>
-                              <Select
-                                value={field.value}
-                                onValueChange={(v) => field.onChange(v as TarefaVisibilidade)}
-                                disabled={!canEditVisibility}
+                              <EditableSurface
+                                canEdit={canEditVisibility}
+                                forceEdit={forceFieldEdit}
+                                display={
+                                  <p className="text-sm">
+                                    {TAREFA_VISIBILIDADE_LABELS[visibilidade]}
+                                  </p>
+                                }
                               >
-                                <FormControl>
-                                  <SelectTrigger>
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  {(
-                                    Object.keys(TAREFA_VISIBILIDADE_LABELS) as TarefaVisibilidade[]
-                                  ).map((v) => (
-                                    <SelectItem key={v} value={v}>
-                                      {TAREFA_VISIBILIDADE_LABELS[v]}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
+                                <Select
+                                  value={field.value}
+                                  onValueChange={(v) => field.onChange(v as TarefaVisibilidade)}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    {(
+                                      Object.keys(TAREFA_VISIBILIDADE_LABELS) as TarefaVisibilidade[]
+                                    ).map((v) => (
+                                      <SelectItem key={v} value={v}>
+                                        {TAREFA_VISIBILIDADE_LABELS[v]}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </EditableSurface>
                               <FormMessage />
                             </FormItem>
                           )}
@@ -1009,57 +1079,115 @@ export function TarefaPanelSheet({
                                 <Bell className="h-4 w-4" />
                                 Lembretes
                               </FormLabel>
-                              <div className="grid gap-2 rounded-lg border p-3 sm:grid-cols-2">
-                                {(Object.keys(TAREFA_LEMBRETE_LABELS) as TarefaLembreteOpcao[]).map(
-                                  (opcao) => (
-                                    <label key={opcao} className="flex items-center gap-2 text-sm">
-                                      <Checkbox
-                                        checked={field.value.includes(opcao)}
-                                        disabled={!canEdit}
-                                        onCheckedChange={(checked) =>
-                                          toggleLembrete(opcao, !!checked)
-                                        }
-                                      />
-                                      {TAREFA_LEMBRETE_LABELS[opcao]}
-                                    </label>
-                                  ),
-                                )}
-                              </div>
+                              <EditableSurface
+                                canEdit={canEdit}
+                                forceEdit={forceFieldEdit}
+                                display={
+                                  <p className="text-sm text-muted-foreground">
+                                    {lembretesValue.length === 0
+                                      ? "Nenhum lembrete"
+                                      : lembretesValue
+                                          .map((l) => TAREFA_LEMBRETE_LABELS[l])
+                                          .join(", ")}
+                                  </p>
+                                }
+                              >
+                                <div className="grid gap-2 rounded-lg border p-3 sm:grid-cols-2">
+                                  {(Object.keys(TAREFA_LEMBRETE_LABELS) as TarefaLembreteOpcao[]).map(
+                                    (opcao) => (
+                                      <label key={opcao} className="flex items-center gap-2 text-sm">
+                                        <Checkbox
+                                          checked={field.value.includes(opcao)}
+                                          onCheckedChange={(checked) =>
+                                            toggleLembrete(opcao, !!checked)
+                                          }
+                                        />
+                                        {TAREFA_LEMBRETE_LABELS[opcao]}
+                                      </label>
+                                    ),
+                                  )}
+                                </div>
+                              </EditableSurface>
                               <FormMessage />
                             </FormItem>
                           )}
                         />
                       </div>
 
-                      {visibilidade === "pessoas_especificas" && (
+                      {(visibilidade === "pessoas_especificas" ||
+                        (atribuidoIds?.length ?? 0) > 0) && (
                         <FormField
                           control={form.control}
                           name="observador_ids"
-                          render={() => (
-                            <FormItem>
-                              <FormLabel>Pessoas com acesso</FormLabel>
-                              <div className="max-h-40 space-y-2 overflow-y-auto rounded-lg border p-3">
-                                {pessoasAtivas.map((p: ProfileWithSetor) => (
-                                  <label key={p.id} className="flex items-center gap-2 text-sm">
-                                    <Checkbox
-                                      checked={form.watch("observador_ids").includes(p.id)}
-                                      disabled={!canEditVisibility}
-                                      onCheckedChange={(checked) =>
-                                        toggleObservador(p.id, !!checked)
-                                      }
+                          render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Pessoas com acesso</FormLabel>
+                                <EditableSurface
+                                  canEdit={
+                                    canEditVisibility && visibilidade === "pessoas_especificas"
+                                  }
+                                  forceEdit={
+                                    forceFieldEdit && visibilidade === "pessoas_especificas"
+                                  }
+                                  display={
+                                    <TooltipProvider delayDuration={200}>
+                                      <div className="flex flex-wrap items-center gap-1.5">
+                                        {pessoasComAcesso.length === 0 ? (
+                                          <span className="text-sm text-muted-foreground">
+                                            Nenhuma pessoa
+                                          </span>
+                                        ) : (
+                                          pessoasComAcesso.map((p) => (
+                                            <Tooltip key={p.id}>
+                                              <TooltipTrigger asChild>
+                                                <span>
+                                                  <ProfileAvatar
+                                                    name={p.nome_completo}
+                                                    avatarUrl={p.avatar_url}
+                                                    className="h-8 w-8"
+                                                  />
+                                                </span>
+                                              </TooltipTrigger>
+                                              <TooltipContent>{p.nome_completo}</TooltipContent>
+                                            </Tooltip>
+                                          ))
+                                        )}
+                                      </div>
+                                    </TooltipProvider>
+                                  }
+                                >
+                                  {visibilidade === "pessoas_especificas" ? (
+                                    <PessoasMultiSelect
+                                      pessoas={pessoasAtivas}
+                                      value={field.value}
+                                      onChange={field.onChange}
+                                      placeholder="Selecione pessoas com acesso"
+                                      emptyLabel="Nenhuma pessoa disponível"
                                     />
-                                    <ProfileAvatar
-                                      name={p.nome_completo}
-                                      avatarUrl={p.avatar_url}
-                                      className="h-6 w-6"
-                                    />
-                                    {p.nome_completo}
-                                  </label>
-                                ))}
-                              </div>
-                              <FormMessage />
-                            </FormItem>
-                          )}
+                                  ) : (
+                                    <TooltipProvider delayDuration={200}>
+                                      <div className="flex flex-wrap items-center gap-1.5">
+                                        {pessoasComAcesso.map((p) => (
+                                          <Tooltip key={p.id}>
+                                            <TooltipTrigger asChild>
+                                              <span>
+                                                <ProfileAvatar
+                                                  name={p.nome_completo}
+                                                  avatarUrl={p.avatar_url}
+                                                  className="h-8 w-8"
+                                                />
+                                              </span>
+                                            </TooltipTrigger>
+                                            <TooltipContent>{p.nome_completo}</TooltipContent>
+                                          </Tooltip>
+                                        ))}
+                                      </div>
+                                    </TooltipProvider>
+                                  )}
+                                </EditableSurface>
+                                <FormMessage />
+                              </FormItem>
+                            )}
                         />
                       )}
 
@@ -1079,8 +1207,11 @@ export function TarefaPanelSheet({
                 </ScrollArea>
 
                 <aside className="flex w-full shrink-0 flex-col border-t bg-muted/20 lg:w-96 lg:border-l lg:border-t-0">
-                  <Tabs defaultValue="comentarios" className="flex min-h-0 flex-1 flex-col">
-                    <TabsList className="mx-4 mt-4 grid w-auto grid-cols-2">
+                  <Tabs
+                    value={sideTab}
+                    onValueChange={(value) => setSideTab(value as "comentarios" | "anexos")}
+                    className="flex min-h-0 flex-1 flex-col"
+                  >                    <TabsList className="mx-4 mt-4 grid w-auto grid-cols-2">
                       <TabsTrigger value="anexos" className="gap-1.5">
                         <Paperclip className="h-3.5 w-3.5" />
                         Anexos
@@ -1138,8 +1269,15 @@ export function TarefaPanelSheet({
                                   </p>
                                 )}
                                 {comentarios.map((c) => (
-                                  <div key={c.id} className="group flex gap-3">
-                                    <ProfileAvatar
+                                  <div
+                                    key={c.id}
+                                    id={`tarefa-comentario-${c.id}`}
+                                    className={cn(
+                                      "group flex gap-3 rounded-lg p-2 transition-colors",
+                                      highlightComentarioId === c.id &&
+                                        "bg-primary/10 ring-1 ring-primary/40",
+                                    )}
+                                  >                                    <ProfileAvatar
                                       name={c.usuario?.nome_completo ?? "?"}
                                       avatarUrl={c.usuario?.avatar_url}
                                       className="h-8 w-8 shrink-0"
