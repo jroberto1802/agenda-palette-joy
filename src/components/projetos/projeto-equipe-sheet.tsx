@@ -1,10 +1,10 @@
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { ProjetoEquipeSection } from "@/components/projetos/projeto-equipe-section";
 import type { ProfileWithSetor, ProjetoMembro } from "@/types";
 
@@ -26,15 +26,15 @@ export function ProjetoEquipeSheet({
   canManage: boolean;
 }) {
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="flex w-full flex-col gap-4 sm:max-w-md">
-        <SheetHeader>
-          <SheetTitle>Equipe do projeto</SheetTitle>
-          <SheetDescription>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="flex max-h-[90vh] w-[90vw] max-w-lg flex-col gap-0 overflow-hidden rounded-xl p-0 sm:rounded-xl">
+        <DialogHeader className="shrink-0 space-y-1.5 border-b px-6 py-4 pr-12 text-left">
+          <DialogTitle>Equipe do projeto</DialogTitle>
+          <DialogDescription>
             Membros de &quot;{projetoNome}&quot;. Alterações refletem na tela em tempo real.
-          </SheetDescription>
-        </SheetHeader>
-        <div className="min-h-0 flex-1 overflow-y-auto">
+          </DialogDescription>
+        </DialogHeader>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
           <ProjetoEquipeSection
             projetoId={projetoId}
             membros={membros}
@@ -43,7 +43,7 @@ export function ProjetoEquipeSheet({
             embedded
           />
         </div>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }

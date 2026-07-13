@@ -36,18 +36,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { PessoasMultiSelect } from "@/components/common/pessoas-multi-select";
 import { usePessoas } from "@/hooks/use-pessoas";
 import { useProjetos } from "@/hooks/use-projetos";
 import { useProfile } from "@/hooks/use-profile";
+import { LARGE_MODAL_CONTENT_CLASS } from "@/lib/layout";
 import { useSetores } from "@/hooks/use-setores";
 import { listProjetoMembros } from "@/services/projetos";
 import { useQuery } from "@tanstack/react-query";
@@ -495,19 +496,19 @@ export function TarefaPanelSheet({
   const showInteractions = !isCreate && !!tarefaId;
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-5xl p-0 flex flex-col gap-0">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className={LARGE_MODAL_CONTENT_CLASS}>
         {isLoading && !isCreate ? (
-          <div className="p-6 space-y-4">
+          <div className="space-y-4 p-6">
             <Skeleton className="h-8 w-3/4" />
             <Skeleton className="h-20 w-full" />
             <Skeleton className="h-32 w-full" />
           </div>
         ) : (
           <Form {...form}>
-            <form onSubmit={handleSave} className="flex flex-col flex-1 min-h-0">
-              <SheetHeader className="px-6 py-4 border-b shrink-0">
-                <div className="flex items-center gap-1 text-xs text-muted-foreground mb-2">
+            <form onSubmit={handleSave} className="flex min-h-0 flex-1 flex-col">
+              <DialogHeader className="shrink-0 space-y-0 border-b px-6 py-4 pr-12 text-left">
+                <div className="mb-2 flex items-center gap-1 text-xs text-muted-foreground">
                   <span>Projeto</span>
                   <ChevronRight className="h-3 w-3" />
                   <span>{selectedProjeto?.nome ?? "Nenhum"}</span>
@@ -516,20 +517,20 @@ export function TarefaPanelSheet({
                   <ChevronRight className="h-3 w-3" />
                   <span>{selectedSetor?.nome ?? "Sem setor"}</span>
                   <ChevronRight className="h-3 w-3" />
-                  <span className="text-foreground font-medium">
+                  <span className="font-medium text-foreground">
                     {isCreate ? "Nova tarefa" : tarefa?.titulo ?? "Tarefa"}
                   </span>
                 </div>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="space-y-1">
-                    <SheetTitle className="text-left">
+                    <DialogTitle className="text-left">
                       {isCreate ? "Nova tarefa" : "Detalhes da tarefa"}
-                    </SheetTitle>
-                    <SheetDescription className="text-left">
+                    </DialogTitle>
+                    <DialogDescription className="text-left">
                       {isCreate
                         ? "Preencha os campos e salve para criar a tarefa."
                         : "Visualize e edite os dados da tarefa."}
-                    </SheetDescription>
+                    </DialogDescription>
                   </div>
                   {!readOnly && (
                     <div className="flex flex-wrap gap-2">
@@ -555,7 +556,7 @@ export function TarefaPanelSheet({
                     </div>
                   )}
                 </div>
-              </SheetHeader>
+              </DialogHeader>
 
               <div className="flex flex-1 min-h-0 flex-col lg:flex-row">
                 <ScrollArea className="flex-1 min-h-0">
@@ -1117,7 +1118,7 @@ export function TarefaPanelSheet({
             </form>
           </Form>
         )}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }

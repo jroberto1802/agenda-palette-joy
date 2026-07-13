@@ -7,18 +7,19 @@ import { ProfileAvatar } from "@/components/common/profile-avatar";
 import { AvisoDestinatarioDisplay } from "@/components/avisos/aviso-destinatario";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useAvisoDetail, useCreateAvisoComentario, useSetAvisoLido } from "@/hooks/use-avisos";
+import { LARGE_MODAL_CONTENT_CLASS } from "@/lib/layout";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
 import { isAvisoLido } from "@/services/avisos";
 import { cn } from "@/lib/utils";
@@ -76,10 +77,11 @@ export function AvisoDetailSheet({
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
         className={cn(
-          "flex w-full flex-col border-l-4 p-0 sm:max-w-lg",
+          LARGE_MODAL_CONTENT_CLASS,
+          "border-l-4",
           aviso ? AVISO_PRIORIDADE_BAND_CLASS[aviso.prioridade] : "border-l-transparent",
         )}
       >
@@ -90,7 +92,7 @@ export function AvisoDetailSheet({
           </div>
         ) : (
           <>
-            <SheetHeader className="border-b p-6 pb-4">
+            <DialogHeader className="shrink-0 space-y-0 border-b p-6 pb-4 pr-12 text-left">
               <div className="mb-2 flex flex-wrap items-center gap-2">
                 {aviso.fixado && <Pin className="h-4 w-4 text-amber-500" />}
                 <Badge
@@ -101,8 +103,8 @@ export function AvisoDetailSheet({
                 </Badge>
                 {finalizado && <Badge variant="secondary">Finalizado</Badge>}
               </div>
-              <SheetTitle className="text-left">{aviso.titulo}</SheetTitle>
-              <SheetDescription asChild>
+              <DialogTitle className="text-left">{aviso.titulo}</DialogTitle>
+              <DialogDescription asChild>
                 <div className="space-y-3 text-left">
                   <div className="flex items-center gap-2">
                     <ProfileAvatar
@@ -126,7 +128,7 @@ export function AvisoDetailSheet({
                     {formatAvisoExpiracao(aviso.data_expiracao)}
                   </p>
                 </div>
-              </SheetDescription>
+              </DialogDescription>
 
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <Button
@@ -161,9 +163,9 @@ export function AvisoDetailSheet({
                   </Button>
                 )}
               </div>
-            </SheetHeader>
+            </DialogHeader>
 
-            <ScrollArea className="flex-1 px-6">
+            <ScrollArea className="min-h-0 flex-1 px-6">
               <div className="space-y-6 py-4">
                 <p className="whitespace-pre-wrap text-sm leading-relaxed">{aviso.conteudo}</p>
 
@@ -221,7 +223,7 @@ export function AvisoDetailSheet({
             </ScrollArea>
           </>
         )}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
