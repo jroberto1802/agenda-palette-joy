@@ -1,8 +1,8 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Bell, CalendarIcon, ChevronRight, MessageSquare, Plus, Save, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Bell, CalendarIcon, ChevronRight, MessageSquare, Paperclip, Plus, Save, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -43,6 +43,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { PessoasMultiSelect } from "@/components/common/pessoas-multi-select";
 import { usePessoas } from "@/hooks/use-pessoas";
@@ -266,6 +267,28 @@ function DateField({
   );
 }
 
+function MetaChip({
+  label,
+  children,
+  className,
+}: {
+  label: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex min-w-0 max-w-full items-center gap-1.5 rounded-full border bg-muted/40 px-2.5 py-1 text-xs",
+        className,
+      )}
+    >
+      <span className="shrink-0 font-medium text-muted-foreground">{label}</span>
+      <div className="min-w-0">{children}</div>
+    </div>
+  );
+}
+
 function PersonRow({
   label,
   name,
@@ -276,13 +299,12 @@ function PersonRow({
   avatarUrl?: string | null;
 }) {
   return (
-    <div className="space-y-2">
-      <p className="text-xs font-medium text-muted-foreground">{label}</p>
-      <div className="flex items-center gap-2 rounded-md border px-3 py-2">
-        <ProfileAvatar name={name} avatarUrl={avatarUrl} className="h-8 w-8 shrink-0" />
-        <span className="text-sm font-medium truncate">{name}</span>
-      </div>
-    </div>
+    <MetaChip label={label}>
+      <span className="flex items-center gap-1.5">
+        <ProfileAvatar name={name} avatarUrl={avatarUrl} className="h-5 w-5" />
+        <span className="truncate font-medium text-foreground">{name}</span>
+      </span>
+    </MetaChip>
   );
 }
 
@@ -558,9 +580,9 @@ export function TarefaPanelSheet({
                 </div>
               </DialogHeader>
 
-              <div className="flex flex-1 min-h-0 flex-col lg:flex-row">
-                <ScrollArea className="flex-1 min-h-0">
-                  <div className="p-6 space-y-6">
+              <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+                <ScrollArea className="min-h-0 flex-1">
+                  <div className="space-y-6 p-6">
                     <FormField
                       control={form.control}
                       name="titulo"
@@ -569,7 +591,7 @@ export function TarefaPanelSheet({
                           <FormControl>
                             <Input
                               placeholder="Título da tarefa"
-                              className="text-lg font-semibold border-0 px-0 shadow-none focus-visible:ring-0"
+                              className="border-0 px-0 text-lg font-semibold shadow-none focus-visible:ring-0"
                               disabled={!canEdit}
                               {...field}
                             />
@@ -578,6 +600,170 @@ export function TarefaPanelSheet({
                         </FormItem>
                       )}
                     />
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <FormField
+                        control={form.control}
+                        name="projeto_id"
+                        render={({ field }) => (
+                          <FormItem className="space-y-0">
+                            <MetaChip label="Projeto">
+                              <Select
+                                value={field.value ?? "none"}
+                                onValueChange={(v) => {
+                                  const next = v === "none" ? null : v;
+                                  field.onChange(next);
+                                  if (next) form.setValue("atribuido_ids", []);
+                                }}
+                                disabled={!canEdit || lockProjeto}
+                              >
+                                <FormControl>
+                                  <SelectTrigger className="h-auto border-0 bg-transparent p-0 shadow-none focus:ring-0 [&>svg]:h-3.5 [&>svg]:w-3.5">
+                                    <SelectValue placeholder="Nenhum" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="none">Nenhum</SelectItem>
+                                  {(projetos ?? []).map((projeto) => (
+                                    <SelectItem key={projeto.id} value={projeto.id}>
+                                      {projeto.nome}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </MetaChip>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="setor_id"
+                        render={({ field }) => (
+                          <FormItem className="space-y-0">
+                            <MetaChip label="Setor">
+                              <Select
+                                value={field.value ?? "none"}
+                                onValueChange={(v) => field.onChange(v === "none" ? null : v)}
+                                disabled={!canEdit}
+                              >
+                                <FormControl>
+                                  <SelectTrigger className="h-auto border-0 bg-transparent p-0 shadow-none focus:ring-0 [&>svg]:h-3.5 [&>svg]:w-3.5">
+                                    <SelectValue placeholder="Nenhum" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="none">Nenhum</SelectItem>
+                                  {setoresPermitidos.map((s) => (
+                                    <SelectItem key={s.id} value={s.id}>
+                                      {s.nome}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </MetaChip>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {criadorDisplay && (
+                        <PersonRow
+                          label="Criado por"
+                          name={criadorDisplay.nome_completo}
+                          avatarUrl={criadorDisplay.avatar_url}
+                        />
+                      )}
+
+                      <FormField
+                        control={form.control}
+                        name="atribuido_ids"
+                        render={({ field }) => (
+                          <FormItem className="space-y-0">
+                            <MetaChip label="Responsáveis" className="max-w-full">
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button
+                                    type="button"
+                                    disabled={!canEdit}
+                                    className="flex max-w-[220px] items-center gap-1 truncate text-left font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-70"
+                                  >
+                                    {responsaveisDisplay.length === 0
+                                      ? "Nenhum"
+                                      : responsaveisDisplay.length === 1
+                                        ? responsaveisDisplay[0].nome_completo
+                                        : `${responsaveisDisplay.length} pessoas`}
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-80 p-3" align="start">
+                                  <PessoasMultiSelect
+                                    pessoas={pessoasParaResponsavel}
+                                    value={field.value}
+                                    onChange={field.onChange}
+                                    disabled={!canEdit}
+                                    placeholder="Selecione responsáveis"
+                                    emptyLabel={
+                                      projetoId
+                                        ? "Defina a equipe do projeto antes de atribuir responsáveis"
+                                        : "Nenhuma pessoa disponível"
+                                    }
+                                  />
+                                </PopoverContent>
+                              </Popover>
+                            </MetaChip>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="data_inicio"
+                        render={({ field }) => (
+                          <FormItem className="space-y-0">
+                            <MetaChip label="Data">
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button
+                                    type="button"
+                                    disabled={!canEdit}
+                                    className="font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-70"
+                                  >
+                                    {field.value
+                                      ? format(field.value, "dd/MM/yyyy", { locale: ptBR })
+                                      : "Sem data"}
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                  <Calendar
+                                    mode="single"
+                                    selected={field.value ?? undefined}
+                                    onSelect={field.onChange}
+                                    locale={ptBR}
+                                    initialFocus
+                                  />
+                                  {field.value && (
+                                    <div className="border-t p-2">
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="w-full"
+                                        onClick={() => field.onChange(null)}
+                                      >
+                                        Remover data
+                                      </Button>
+                                    </div>
+                                  )}
+                                </PopoverContent>
+                              </Popover>
+                            </MetaChip>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
 
                     <FormField
                       control={form.control}
@@ -598,7 +784,7 @@ export function TarefaPanelSheet({
                     />
 
                     <section>
-                      <div className="flex items-center justify-between mb-3">
+                      <div className="mb-3 flex items-center justify-between">
                         <h3 className="text-sm font-semibold">
                           Subtarefas{" "}
                           {subtarefas.length > 0 && `(${concluidas}/${subtarefas.length})`}
@@ -612,7 +798,7 @@ export function TarefaPanelSheet({
                         <>
                           <div className="space-y-2">
                             {subtarefas.map((sub) => (
-                              <div key={sub.id} className="flex items-center gap-2 group">
+                              <div key={sub.id} className="group flex items-center gap-2">
                                 <Checkbox
                                   checked={sub.concluida}
                                   disabled={!canEdit}
@@ -630,8 +816,8 @@ export function TarefaPanelSheet({
                                 <span
                                   className={
                                     sub.concluida
-                                      ? "line-through text-muted-foreground text-sm flex-1"
-                                      : "text-sm flex-1"
+                                      ? "flex-1 text-sm text-muted-foreground line-through"
+                                      : "flex-1 text-sm"
                                   }
                                 >
                                   {sub.titulo}
@@ -657,7 +843,7 @@ export function TarefaPanelSheet({
                             ))}
                           </div>
                           {canEdit && (
-                            <div className="flex gap-2 mt-3">
+                            <div className="mt-3 flex gap-2">
                               <Input
                                 placeholder="Adicionar subtarefa..."
                                 value={novaSubtarefa}
@@ -683,390 +869,167 @@ export function TarefaPanelSheet({
                       )}
                     </section>
 
-                    {showInteractions && (
-                      <>
-                        <Separator />
-                        <TarefaAnexosSection
-                          tarefaId={tarefaId!}
-                          anexos={anexos}
-                          canEdit={canEdit}
-                        />
-                      </>
-                    )}
-
                     <Separator />
 
-                    <section>
-                      <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
-                        <MessageSquare className="h-4 w-4" />
-                        Comentários ({comentarios.length})
-                      </h3>
-                      {!showInteractions ? (
-                        <p className="text-sm text-muted-foreground">
-                          Salve a tarefa para adicionar comentários.
-                        </p>
-                      ) : (
-                        <>
-                          <div className="space-y-4">
-                            {comentarios.map((c) => (
-                              <div key={c.id} className="flex gap-3 group">
-                                <ProfileAvatar
-                                  name={c.usuario?.nome_completo ?? "?"}
-                                  avatarUrl={c.usuario?.avatar_url}
-                                  className="h-8 w-8 shrink-0"
-                                />
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2">
-                                    <p className="text-sm font-medium">
-                                      {c.usuario?.nome_completo}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                      {formatDateTime(c.created_at)}
-                                    </p>
-                                    {c.usuario_id === profile?.id && (
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-6 w-6 ml-auto opacity-0 group-hover:opacity-100"
-                                        onClick={async () => {
-                                          try {
-                                            await deleteComentario.mutateAsync(c.id);
-                                          } catch (error) {
-                                            toast.error(getSupabaseErrorMessage(error as Error));
-                                          }
-                                        }}
-                                      >
-                                        <Trash2 className="h-3 w-3" />
-                                      </Button>
-                                    )}
-                                  </div>
-                                  <p className="text-sm text-muted-foreground mt-0.5 whitespace-pre-wrap">
-                                    {c.conteudo}
-                                  </p>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                          <div className="mt-4 space-y-2">
-                            {canEdit && (
-                              <>
-                                <Textarea
-                                  placeholder="Escreva um comentário..."
-                                  rows={3}
-                                  value={novoComentario}
-                                  onChange={(e) => setNovoComentario(e.target.value)}
-                                />
-                                <div className="flex gap-2">
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    onClick={handleAddComentario}
-                                    disabled={!novoComentario.trim() || createComentario.isPending}
-                                  >
-                                    Comentar
-                                  </Button>
-                                </div>
-                              </>
-                            )}
-                          </div>
-                        </>
-                      )}
-                    </section>
-                  </div>
-                </ScrollArea>
-
-                <aside className="w-full lg:w-80 shrink-0 border-t lg:border-t-0 lg:border-l bg-muted/20">
-                  <ScrollArea className="h-full max-h-[calc(100vh-8rem)]">
-                    <div className="p-4 space-y-5">
-                      <FormField
-                        control={form.control}
-                        name="projeto_id"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Projeto</FormLabel>
-                            <Select
-                              value={field.value ?? "none"}
-                              onValueChange={(v) => {
-                                const next = v === "none" ? null : v;
-                                field.onChange(next);
-                                if (next) {
-                                  form.setValue("atribuido_ids", []);
-                                }
-                              }}
-                              disabled={!canEdit || lockProjeto}
-                            >
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Nenhum" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="none">Nenhum</SelectItem>
-                                {(projetos ?? []).map((projeto) => (
-                                  <SelectItem key={projeto.id} value={projeto.id}>
-                                    {projeto.nome}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="setor_id"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Setor</FormLabel>
-                            <Select
-                              value={field.value ?? "none"}
-                              onValueChange={(v) => field.onChange(v === "none" ? null : v)}
-                              disabled={!canEdit}
-                            >
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Setor" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="none">Nenhum</SelectItem>
-                                {setoresPermitidos.map((s) => (
-                                  <SelectItem key={s.id} value={s.id}>
-                                    {s.nome}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      {criadorDisplay && (
-                        <PersonRow
-                          label="Criado por"
-                          name={criadorDisplay.nome_completo}
-                          avatarUrl={criadorDisplay.avatar_url}
-                        />
-                      )}
-
-                      <FormField
-                        control={form.control}
-                        name="atribuido_ids"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Responsáveis pela tarefa</FormLabel>
-                            <FormControl>
-                              <PessoasMultiSelect
-                                pessoas={pessoasParaResponsavel}
+                    <section className="space-y-5">
+                      <h3 className="text-sm font-semibold">Detalhes da tarefa</h3>
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <FormField
+                          control={form.control}
+                          name="data_vencimento"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Prazo</FormLabel>
+                              <DateField
+                                label=""
                                 value={field.value}
                                 onChange={field.onChange}
                                 disabled={!canEdit}
-                                placeholder="Selecione um ou mais responsáveis"
-                                emptyLabel={
-                                  projetoId
-                                    ? "Defina a equipe do projeto antes de atribuir responsáveis"
-                                    : "Nenhuma pessoa disponível"
-                                }
-                                error={!!form.formState.errors.atribuido_ids}
                               />
-                            </FormControl>
-                            {responsaveisDisplay.length > 0 && (
-                              <div className="flex flex-wrap gap-2 pt-1">
-                                {responsaveisDisplay.map((pessoa) => (
-                                  <div key={pessoa.id} className="flex items-center gap-1.5">
-                                    <ProfileAvatar
-                                      name={pessoa.nome_completo}
-                                      avatarUrl={pessoa.avatar_url}
-                                      className="h-6 w-6"
-                                    />
-                                    <span className="text-xs text-muted-foreground">
-                                      {pessoa.nome_completo}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
 
-                      <FormField
-                        control={form.control}
-                        name="data_inicio"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Data</FormLabel>
-                            <DateField
-                              label=""
-                              value={field.value}
-                              onChange={field.onChange}
-                              disabled={!canEdit}
-                            />
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                        <FormField
+                          control={form.control}
+                          name="prioridade"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Prioridade</FormLabel>
+                              <Select
+                                value={field.value}
+                                onValueChange={(v) => field.onChange(v as TarefaPrioridade)}
+                                disabled={!canEdit}
+                              >
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {(Object.keys(TAREFA_PRIORIDADE_LABELS) as TarefaPrioridade[]).map(
+                                    (p) => (
+                                      <SelectItem key={p} value={p}>
+                                        {TAREFA_PRIORIDADE_LABELS[p]}
+                                      </SelectItem>
+                                    ),
+                                  )}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
 
-                      <FormField
-                        control={form.control}
-                        name="data_vencimento"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Prazo</FormLabel>
-                            <DateField
-                              label=""
-                              value={field.value}
-                              onChange={field.onChange}
-                              disabled={!canEdit}
-                            />
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="prioridade"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Prioridade</FormLabel>
-                            <Select
-                              value={field.value}
-                              onValueChange={(v) => field.onChange(v as TarefaPrioridade)}
-                              disabled={!canEdit}
-                            >
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {(Object.keys(TAREFA_PRIORIDADE_LABELS) as TarefaPrioridade[]).map(
-                                  (p) => (
-                                    <SelectItem key={p} value={p}>
-                                      {TAREFA_PRIORIDADE_LABELS[p]}
+                        <FormField
+                          control={form.control}
+                          name="status"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Status</FormLabel>
+                              <Select
+                                value={field.value}
+                                onValueChange={(v) => field.onChange(v as TarefaStatus)}
+                                disabled={!canEdit}
+                              >
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {(Object.keys(TAREFA_STATUS_LABELS) as TarefaStatus[]).map((s) => (
+                                    <SelectItem key={s} value={s}>
+                                      {TAREFA_STATUS_LABELS[s]}
                                     </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="tagsInput"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Etiquetas</FormLabel>
+                              <FormControl>
+                                <Input
+                                  placeholder="urgente, cliente-x"
+                                  disabled={!canEdit}
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="visibilidade"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Visibilidade</FormLabel>
+                              <Select
+                                value={field.value}
+                                onValueChange={(v) => field.onChange(v as TarefaVisibilidade)}
+                                disabled={!canEditVisibility}
+                              >
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {(
+                                    Object.keys(TAREFA_VISIBILIDADE_LABELS) as TarefaVisibilidade[]
+                                  ).map((v) => (
+                                    <SelectItem key={v} value={v}>
+                                      {TAREFA_VISIBILIDADE_LABELS[v]}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="lembretes"
+                          render={({ field }) => (
+                            <FormItem className="sm:col-span-2">
+                              <FormLabel className="flex items-center gap-2">
+                                <Bell className="h-4 w-4" />
+                                Lembretes
+                              </FormLabel>
+                              <div className="grid gap-2 rounded-lg border p-3 sm:grid-cols-2">
+                                {(Object.keys(TAREFA_LEMBRETE_LABELS) as TarefaLembreteOpcao[]).map(
+                                  (opcao) => (
+                                    <label key={opcao} className="flex items-center gap-2 text-sm">
+                                      <Checkbox
+                                        checked={field.value.includes(opcao)}
+                                        disabled={!canEdit}
+                                        onCheckedChange={(checked) =>
+                                          toggleLembrete(opcao, !!checked)
+                                        }
+                                      />
+                                      {TAREFA_LEMBRETE_LABELS[opcao]}
+                                    </label>
                                   ),
                                 )}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="status"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Status</FormLabel>
-                            <Select
-                              value={field.value}
-                              onValueChange={(v) => field.onChange(v as TarefaStatus)}
-                              disabled={!canEdit}
-                            >
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {(Object.keys(TAREFA_STATUS_LABELS) as TarefaStatus[]).map((s) => (
-                                  <SelectItem key={s} value={s}>
-                                    {TAREFA_STATUS_LABELS[s]}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="tagsInput"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Etiquetas</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="urgente, cliente-x"
-                                disabled={!canEdit}
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="lembretes"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="flex items-center gap-2">
-                              <Bell className="h-4 w-4" />
-                              Lembretes
-                            </FormLabel>
-                            <div className="space-y-2 rounded-lg border p-3">
-                              {(Object.keys(TAREFA_LEMBRETE_LABELS) as TarefaLembreteOpcao[]).map(
-                                (opcao) => (
-                                  <label key={opcao} className="flex items-center gap-2 text-sm">
-                                    <Checkbox
-                                      checked={field.value.includes(opcao)}
-                                      disabled={!canEdit}
-                                      onCheckedChange={(checked) =>
-                                        toggleLembrete(opcao, !!checked)
-                                      }
-                                    />
-                                    {TAREFA_LEMBRETE_LABELS[opcao]}
-                                  </label>
-                                ),
-                              )}
-                            </div>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="visibilidade"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Visibilidade</FormLabel>
-                            <Select
-                              value={field.value}
-                              onValueChange={(v) => field.onChange(v as TarefaVisibilidade)}
-                              disabled={!canEditVisibility}
-                            >
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {(
-                                  Object.keys(TAREFA_VISIBILIDADE_LABELS) as TarefaVisibilidade[]
-                                ).map((v) => (
-                                  <SelectItem key={v} value={v}>
-                                    {TAREFA_VISIBILIDADE_LABELS[v]}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                              </div>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
 
                       {visibilidade === "pessoas_especificas" && (
                         <FormField
@@ -1075,7 +1038,7 @@ export function TarefaPanelSheet({
                           render={() => (
                             <FormItem>
                               <FormLabel>Pessoas com acesso</FormLabel>
-                              <div className="space-y-2 rounded-lg border p-3 max-h-40 overflow-y-auto">
+                              <div className="max-h-40 space-y-2 overflow-y-auto rounded-lg border p-3">
                                 {pessoasAtivas.map((p: ProfileWithSetor) => (
                                   <label key={p.id} className="flex items-center gap-2 text-sm">
                                     <Checkbox
@@ -1111,8 +1074,135 @@ export function TarefaPanelSheet({
                           Recorrência: {formatRecorrencia(recorrencia)}
                         </div>
                       )}
-                    </div>
-                  </ScrollArea>
+                    </section>
+                  </div>
+                </ScrollArea>
+
+                <aside className="flex w-full shrink-0 flex-col border-t bg-muted/20 lg:w-96 lg:border-l lg:border-t-0">
+                  <Tabs defaultValue="comentarios" className="flex min-h-0 flex-1 flex-col">
+                    <TabsList className="mx-4 mt-4 grid w-auto grid-cols-2">
+                      <TabsTrigger value="anexos" className="gap-1.5">
+                        <Paperclip className="h-3.5 w-3.5" />
+                        Anexos
+                        {anexos.length > 0 && (
+                          <span className="text-muted-foreground">({anexos.length})</span>
+                        )}
+                      </TabsTrigger>
+                      <TabsTrigger value="comentarios" className="gap-1.5">
+                        <MessageSquare className="h-3.5 w-3.5" />
+                        Comentários
+                        {comentarios.length > 0 && (
+                          <span className="text-muted-foreground">({comentarios.length})</span>
+                        )}
+                      </TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent
+                      value="anexos"
+                      className="mt-0 min-h-0 flex-1 data-[state=inactive]:hidden"
+                    >
+                      <ScrollArea className="h-full max-h-[calc(90vh-10rem)]">
+                        <div className="space-y-3 p-4">
+                          {!showInteractions ? (
+                            <p className="text-sm text-muted-foreground">
+                              Salve a tarefa para adicionar anexos.
+                            </p>
+                          ) : (
+                            <TarefaAnexosSection
+                              tarefaId={tarefaId!}
+                              anexos={anexos}
+                              canEdit={canEdit}
+                              hideTitle
+                            />
+                          )}
+                        </div>
+                      </ScrollArea>
+                    </TabsContent>
+
+                    <TabsContent
+                      value="comentarios"
+                      className="mt-0 min-h-0 flex-1 data-[state=inactive]:hidden"
+                    >
+                      <ScrollArea className="h-full max-h-[calc(90vh-10rem)]">
+                        <div className="space-y-4 p-4">
+                          {!showInteractions ? (
+                            <p className="text-sm text-muted-foreground">
+                              Salve a tarefa para adicionar comentários.
+                            </p>
+                          ) : (
+                            <>
+                              <div className="space-y-4">
+                                {comentarios.length === 0 && (
+                                  <p className="text-sm text-muted-foreground">
+                                    Nenhum comentário ainda.
+                                  </p>
+                                )}
+                                {comentarios.map((c) => (
+                                  <div key={c.id} className="group flex gap-3">
+                                    <ProfileAvatar
+                                      name={c.usuario?.nome_completo ?? "?"}
+                                      avatarUrl={c.usuario?.avatar_url}
+                                      className="h-8 w-8 shrink-0"
+                                    />
+                                    <div className="min-w-0 flex-1">
+                                      <div className="flex items-center gap-2">
+                                        <p className="text-sm font-medium">
+                                          {c.usuario?.nome_completo}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                          {formatDateTime(c.created_at)}
+                                        </p>
+                                        {c.usuario_id === profile?.id && (
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="ml-auto h-6 w-6 opacity-0 group-hover:opacity-100"
+                                            onClick={async () => {
+                                              try {
+                                                await deleteComentario.mutateAsync(c.id);
+                                              } catch (error) {
+                                                toast.error(
+                                                  getSupabaseErrorMessage(error as Error),
+                                                );
+                                              }
+                                            }}
+                                          >
+                                            <Trash2 className="h-3 w-3" />
+                                          </Button>
+                                        )}
+                                      </div>
+                                      <p className="mt-0.5 whitespace-pre-wrap text-sm text-muted-foreground">
+                                        {c.conteudo}
+                                      </p>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                              {canEdit && (
+                                <div className="space-y-2 border-t pt-3">
+                                  <Textarea
+                                    placeholder="Escreva um comentário..."
+                                    rows={3}
+                                    value={novoComentario}
+                                    onChange={(e) => setNovoComentario(e.target.value)}
+                                  />
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    onClick={handleAddComentario}
+                                    disabled={!novoComentario.trim() || createComentario.isPending}
+                                  >
+                                    Comentar
+                                  </Button>
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </ScrollArea>
+                    </TabsContent>
+                  </Tabs>
                 </aside>
               </div>
             </form>

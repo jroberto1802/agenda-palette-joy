@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useDeleteAnexo, useUploadAnexo } from "@/hooks/use-anexos";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
+import { cn } from "@/lib/utils";
 import { getAnexoSignedUrl } from "@/services/anexos";
 import type { TarefaAnexo } from "@/types";
 import { formatDateTime } from "@/utils/formatters";
@@ -19,10 +20,12 @@ export function TarefaAnexosSection({
   tarefaId,
   anexos,
   canEdit,
+  hideTitle = false,
 }: {
   tarefaId: string;
   anexos: TarefaAnexo[];
   canEdit: boolean;
+  hideTitle?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const uploadAnexo = useUploadAnexo();
@@ -56,11 +59,15 @@ export function TarefaAnexosSection({
 
   return (
     <section>
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold flex items-center gap-2">
-          <Paperclip className="h-4 w-4" />
-          Anexos ({anexos.length})
-        </h3>
+      <div className={cn("mb-3 flex items-center justify-between", hideTitle && "mb-2")}>
+        {!hideTitle ? (
+          <h3 className="flex items-center gap-2 text-sm font-semibold">
+            <Paperclip className="h-4 w-4" />
+            Anexos ({anexos.length})
+          </h3>
+        ) : (
+          <span className="text-xs text-muted-foreground">{anexos.length} arquivo(s)</span>
+        )}
         {canEdit && (
           <>
             <input

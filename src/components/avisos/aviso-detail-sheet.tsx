@@ -1,6 +1,6 @@
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CheckCircle2, Circle, MessageSquare, Pin, Trash2 } from "lucide-react";
+import { CheckCircle2, Circle, MessageSquare, Paperclip, Pin, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
@@ -15,8 +15,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useAvisoDetail, useCreateAvisoComentario, useSetAvisoLido } from "@/hooks/use-avisos";
 import { LARGE_MODAL_CONTENT_CLASS } from "@/lib/layout";
@@ -54,6 +54,7 @@ export function AvisoDetailSheet({
   const lido = aviso ? isAvisoLido(aviso, userId) : false;
   const finalizado = aviso ? isAvisoFinalizado(aviso) : false;
   const readOnly = finalizado;
+  const comentarios = aviso?.comentarios ?? [];
 
   const handleToggleLido = async () => {
     if (!avisoId) return;
@@ -105,7 +106,7 @@ export function AvisoDetailSheet({
               </div>
               <DialogTitle className="text-left">{aviso.titulo}</DialogTitle>
               <DialogDescription asChild>
-                <div className="space-y-3 text-left">
+                <div className="mt-3 space-y-3 text-left">
                   <div className="flex items-center gap-2">
                     <ProfileAvatar
                       name={aviso.criador?.nome_completo ?? "Sistema"}
@@ -165,62 +166,104 @@ export function AvisoDetailSheet({
               </div>
             </DialogHeader>
 
-            <ScrollArea className="min-h-0 flex-1 px-6">
-              <div className="space-y-6 py-4">
-                <p className="whitespace-pre-wrap text-sm leading-relaxed">{aviso.conteudo}</p>
+            <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+              <ScrollArea className="min-h-0 flex-1">
+                <div className="space-y-4 p-6">
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed">{aviso.conteudo}</p>
+                </div>
+              </ScrollArea>
 
-                {aviso.comentarios_permitidos && (
-                  <>
-                    <Separator />
-                    <section>
-                      <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
-                        <MessageSquare className="h-4 w-4" />
-                        Comentários ({aviso.comentarios?.length ?? 0})
-                      </h3>
-                      <div className="space-y-4">
-                        {(aviso.comentarios ?? []).map((c) => (
-                          <div key={c.id} className="flex gap-3">
-                            <ProfileAvatar
-                              name={c.usuario?.nome_completo ?? "?"}
-                              avatarUrl={c.usuario?.avatar_url}
-                              className="h-8 w-8 shrink-0"
-                            />
-                            <div>
-                              <p className="text-sm font-medium">{c.usuario?.nome_completo}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {format(new Date(c.created_at), "dd/MM/yyyy HH:mm", {
-                                  locale: ptBR,
-                                })}
-                              </p>
-                              <p className="mt-0.5 whitespace-pre-wrap text-sm text-muted-foreground">
-                                {c.conteudo}
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                      {!readOnly && (
-                        <div className="mt-4 space-y-2">
-                          <Textarea
-                            placeholder="Escreva um comentário..."
-                            rows={3}
-                            value={comentario}
-                            onChange={(e) => setComentario(e.target.value)}
-                          />
-                          <Button
-                            size="sm"
-                            onClick={handleComentar}
-                            disabled={!comentario.trim() || createComentario.isPending}
-                          >
-                            Comentar
-                          </Button>
-                        </div>
+              <aside className="flex w-full shrink-0 flex-col border-t bg-muted/20 lg:w-96 lg:border-l lg:border-t-0">
+                <Tabs defaultValue="comentarios" className="flex min-h-0 flex-1 flex-col">
+                  <TabsList className="mx-4 mt-4 grid w-auto grid-cols-2">
+                    <TabsTrigger value="anexos" className="gap-1.5">
+                      <Paperclip className="h-3.5 w-3.5" />
+                      Anexos
+                    </TabsTrigger>
+                    <TabsTrigger value="comentarios" className="gap-1.5">
+                      <MessageSquare className="h-3.5 w-3.5" />
+                      Comentários
+                      {comentarios.length > 0 && (
+                        <span className="text-muted-foreground">({comentarios.length})</span>
                       )}
-                    </section>
-                  </>
-                )}
-              </div>
-            </ScrollArea>
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent
+                    value="anexos"
+                    className="mt-0 min-h-0 flex-1 data-[state=inactive]:hidden"
+                  >
+                    <div className="p-4">
+                      <p className="text-sm text-muted-foreground">
+                        Anexos ainda não estão disponíveis para avisos.
+                      </p>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent
+                    value="comentarios"
+                    className="mt-0 min-h-0 flex-1 data-[state=inactive]:hidden"
+                  >
+                    <ScrollArea className="h-full max-h-[calc(90vh-12rem)]">
+                      <div className="space-y-4 p-4">
+                        {!aviso.comentarios_permitidos ? (
+                          <p className="text-sm text-muted-foreground">
+                            Comentários desabilitados neste aviso.
+                          </p>
+                        ) : (
+                          <>
+                            <div className="space-y-4">
+                              {comentarios.length === 0 && (
+                                <p className="text-sm text-muted-foreground">
+                                  Nenhum comentário ainda.
+                                </p>
+                              )}
+                              {comentarios.map((c) => (
+                                <div key={c.id} className="flex gap-3">
+                                  <ProfileAvatar
+                                    name={c.usuario?.nome_completo ?? "?"}
+                                    avatarUrl={c.usuario?.avatar_url}
+                                    className="h-8 w-8 shrink-0"
+                                  />
+                                  <div>
+                                    <p className="text-sm font-medium">{c.usuario?.nome_completo}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {format(new Date(c.created_at), "dd/MM/yyyy HH:mm", {
+                                        locale: ptBR,
+                                      })}
+                                    </p>
+                                    <p className="mt-0.5 whitespace-pre-wrap text-sm text-muted-foreground">
+                                      {c.conteudo}
+                                    </p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                            {!readOnly && (
+                              <div className="space-y-2 border-t pt-3">
+                                <Textarea
+                                  placeholder="Escreva um comentário..."
+                                  rows={3}
+                                  value={comentario}
+                                  onChange={(e) => setComentario(e.target.value)}
+                                />
+                                <Button
+                                  size="sm"
+                                  onClick={handleComentar}
+                                  disabled={!comentario.trim() || createComentario.isPending}
+                                >
+                                  Comentar
+                                </Button>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </ScrollArea>
+                  </TabsContent>
+                </Tabs>
+              </aside>
+            </div>
           </>
         )}
       </DialogContent>
