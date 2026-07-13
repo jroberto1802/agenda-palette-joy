@@ -93,7 +93,7 @@ import {
 } from "@/utils/tarefas";
 import type { UseFormReturn } from "react-hook-form";
 import { Bell, CalendarIcon, ChevronRight, MessageSquare, Paperclip, Save, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -421,14 +421,6 @@ export function TarefaPanelSheet({
   const setorId = form.watch("setor_id");
   const atribuidoIds = form.watch("atribuido_ids");
   const observadorIds = form.watch("observador_ids");
-  const tituloValue = form.watch("titulo");
-  const descricaoValue = form.watch("descricao");
-  const prioridadeValue = form.watch("prioridade");
-  const statusValue = form.watch("status");
-  const dataInicioValue = form.watch("data_inicio");
-  const dataVencimentoValue = form.watch("data_vencimento");
-  const tagsInputValue = form.watch("tagsInput");
-  const lembretesValue = form.watch("lembretes");
   const selectedProjeto = projetos?.find((p) => p.id === projetoId);
   const selectedSetor = setores?.find((s) => s.id === setorId);
 
@@ -446,12 +438,23 @@ export function TarefaPanelSheet({
     return pessoasAtivas.filter((p) => memberIds.has(p.id) || selected.has(p.id));
   }, [projetoId, projetoMembros, pessoasAtivas, atribuidoIds]);
 
+  const formResetKeyRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      formResetKeyRef.current = null;
+      return;
+    }
+    if (!isCreate && !tarefa) return;
+
+    const key = isCreate ? `new:${defaultProjetoId ?? ""}` : `edit:${tarefaId}`;
+    if (formResetKeyRef.current === key) return;
+    formResetKeyRef.current = key;
+
     form.reset(toFormValues(tarefa ?? null, profile?.setor_id, undefined, defaultProjetoId));
     setDraftSubtarefas([]);
     setNovoComentario("");
-  }, [open, tarefa, profile?.setor_id, defaultProjetoId, form]);
+  }, [open, isCreate, tarefaId, tarefa, profile?.setor_id, defaultProjetoId, form]);
 
   useEffect(() => {
     if (!open || !!tarefa || !isCreate) return;
@@ -615,7 +618,7 @@ export function TarefaPanelSheet({
                             forceEdit={forceFieldEdit}
                             display={
                               <p className="text-lg font-semibold leading-snug">
-                                {tituloValue || "Sem título"}
+                                {field.value || "Sem título"}
                               </p>
                             }
                           >
@@ -804,8 +807,8 @@ export function TarefaPanelSheet({
                               display={
                                 <MetaChip label="Data">
                                   <span className="font-medium text-foreground">
-                                    {dataInicioValue
-                                      ? format(dataInicioValue, "dd/MM/yyyy", { locale: ptBR })
+                                    {field.value
+                                      ? format(field.value, "dd/MM/yyyy", { locale: ptBR })
                                       : "Sem data"}
                                   </span>
                                 </MetaChip>
@@ -861,7 +864,7 @@ export function TarefaPanelSheet({
                             forceEdit={forceFieldEdit}
                             display={
                               <p className="whitespace-pre-wrap text-sm text-muted-foreground">
-                                {descricaoValue?.trim() || "Sem descrição"}
+                                {field.value?.trim() || "Sem descrição"}
                               </p>
                             }
                           >
@@ -905,8 +908,8 @@ export function TarefaPanelSheet({
                                 forceEdit={forceFieldEdit}
                                 display={
                                   <p className="text-sm">
-                                    {dataVencimentoValue
-                                      ? format(dataVencimentoValue, "dd/MM/yyyy", { locale: ptBR })
+                                    {field.value
+                                      ? format(field.value, "dd/MM/yyyy", { locale: ptBR })
                                       : "Sem prazo"}
                                   </p>
                                 }
@@ -934,9 +937,9 @@ export function TarefaPanelSheet({
                                 display={
                                   <Badge
                                     variant="outline"
-                                    className={TAREFA_PRIORIDADE_COLORS[prioridadeValue]}
+                                    className={TAREFA_PRIORIDADE_COLORS[field.value]}
                                   >
-                                    {TAREFA_PRIORIDADE_LABELS[prioridadeValue]}
+                                    {TAREFA_PRIORIDADE_LABELS[field.value]}
                                   </Badge>
                                 }
                               >
@@ -977,9 +980,9 @@ export function TarefaPanelSheet({
                                 display={
                                   <Badge
                                     variant="secondary"
-                                    className={TAREFA_STATUS_COLORS[statusValue]}
+                                    className={TAREFA_STATUS_COLORS[field.value]}
                                   >
-                                    {TAREFA_STATUS_LABELS[statusValue]}
+                                    {TAREFA_STATUS_LABELS[field.value]}
                                   </Badge>
                                 }
                               >
@@ -1017,7 +1020,7 @@ export function TarefaPanelSheet({
                                 forceEdit={forceFieldEdit}
                                 display={
                                   <p className="text-sm text-muted-foreground">
-                                    {tagsInputValue.trim() || "Nenhuma"}
+                                    {field.value.trim() || "Nenhuma"}
                                   </p>
                                 }
                               >
@@ -1084,9 +1087,9 @@ export function TarefaPanelSheet({
                                 forceEdit={forceFieldEdit}
                                 display={
                                   <p className="text-sm text-muted-foreground">
-                                    {lembretesValue.length === 0
+                                    {field.value.length === 0
                                       ? "Nenhum lembrete"
-                                      : lembretesValue
+                                      : field.value
                                           .map((l) => TAREFA_LEMBRETE_LABELS[l])
                                           .join(", ")}
                                   </p>
@@ -1298,7 +1301,10 @@ export function TarefaPanelSheet({
                                             className="ml-auto h-6 w-6 opacity-0 group-hover:opacity-100"
                                             onClick={async () => {
                                               try {
-                                                await deleteComentario.mutateAsync(c.id);
+                                                await deleteComentario.mutateAsync({
+                                                  id: c.id,
+                                                  tarefaId: tarefaId!,
+                                                });
                                               } catch (error) {
                                                 toast.error(
                                                   getSupabaseErrorMessage(error as Error),

@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 /** Exibe conteúdo em modo leitura; entra em edição só com duplo clique (exceto forceEdit). */
@@ -19,10 +19,20 @@ export function EditableSurface({
   displayClassName?: string;
 }) {
   const [editing, setEditing] = useState(forceEdit);
+  const blurTimerRef = useRef<number | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (forceEdit) setEditing(true);
   }, [forceEdit]);
+
+  useEffect(() => {
+    return () => {
+      if (blurTimerRef.current != null) {
+        window.clearTimeout(blurTimerRef.current);
+      }
+    };
+  }, []);
 
   if (!canEdit) {
     return <div className={className}>{display}</div>;
@@ -31,14 +41,22 @@ export function EditableSurface({
   if (forceEdit || editing) {
     return (
       <div
+        ref={containerRef}
         className={className}
         onBlur={(event) => {
           if (forceEdit) return;
           const next = event.relatedTarget as Node | null;
           if (next && event.currentTarget.contains(next)) return;
-          // Atraso para selects/popovers Radix
-          window.setTimeout(() => {
-            if (!document.activeElement || !event.currentTarget.contains(document.activeElement)) {
+          if (blurTimerRef.current != null) {
+            window.clearTimeout(blurTimerRef.current);
+          }
+          blurTimerRef.current = window.setTimeout(() => {
+            const root = containerRef.current;
+            if (!root) {
+              setEditing(false);
+              return;
+            }
+            if (!document.activeElement || !root.contains(document.activeElement)) {
               setEditing(false);
             }
           }, 150);
