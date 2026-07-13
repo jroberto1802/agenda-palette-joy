@@ -3,22 +3,32 @@ import type { RelatoriosData, TarefaPrioridade, TarefaStatus } from "@/types";
 import { format, subDays, startOfDay } from "date-fns";
 
 export async function getRelatoriosData(): Promise<RelatoriosData> {
-  const [tarefasRes, setoresRes, profilesRes] = await Promise.all([
+  const [tarefasRes, setoresRes, profilesRes, responsaveisRes] = await Promise.all([
     supabase
       .from("tarefas")
       .select("id, status, prioridade, setor_id, data_conclusao, created_at, atribuido_a")
       .is("deleted_at", null),
     supabase.from("setores").select("id, nome, cor"),
     supabase.from("profiles").select("id, nome_completo, setor_id, ativo").eq("ativo", true),
+    supabase.from("tarefa_responsaveis").select("tarefa_id, usuario_id"),
   ]);
 
   if (tarefasRes.error) throw tarefasRes.error;
   if (setoresRes.error) throw setoresRes.error;
   if (profilesRes.error) throw profilesRes.error;
+  if (responsaveisRes.error) throw responsaveisRes.error;
 
   const tarefas = tarefasRes.data ?? [];
   const setores = setoresRes.data ?? [];
   const profiles = profilesRes.data ?? [];
+  const responsaveis = responsaveisRes.data ?? [];
+
+  const responsaveisPorTarefa = new Map<string, string[]>();
+  for (const row of responsaveis) {
+    const current = responsaveisPorTarefa.get(row.tarefa_id) ?? [];
+    current.push(row.usuario_id);
+    responsaveisPorTarefa.set(row.tarefa_id, current);
+  }
 
   const porStatus = (["a_fazer", "em_andamento", "bloqueada", "concluida"] as TarefaStatus[]).map(
     (status) => ({
@@ -48,7 +58,11 @@ export async function getRelatoriosData(): Promise<RelatoriosData> {
     .map((p) => ({
       usuario_id: p.id,
       nome: p.nome_completo,
-      total: tarefas.filter((t) => t.atribuido_a === p.id).length,
+      total: tarefas.filter((t) => {
+        const ids = responsaveisPorTarefa.get(t.id);
+        if (ids?.includes(p.id)) return true;
+        return t.atribuido_a === p.id;
+      }).length,
     }))
     .filter((p) => p.total > 0)
     .sort((a, b) => b.total - a.total)

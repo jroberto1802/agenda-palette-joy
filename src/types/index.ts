@@ -69,7 +69,12 @@ export type TarefaWithRelations = Tarefa & {
   setor: Pick<Setor, "id" | "nome" | "cor"> | null;
   projeto: Pick<Projeto, "id" | "nome"> | null;
   criador: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
+  /** @deprecated Preferir `responsaveis` — mantido para compatibilidade com embed legado */
   responsavel: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
+  responsaveis?: {
+    usuario_id: string;
+    usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
+  }[];
   observadores?: {
     usuario_id: string;
     usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
@@ -90,7 +95,9 @@ export type TarefaFormData = {
   descricao: string;
   projeto_id: string | null;
   setor_id: string | null;
+  /** @deprecated Use `atribuido_ids` */
   atribuido_a: string | null;
+  atribuido_ids: string[];
   prioridade: TarefaPrioridade;
   status: TarefaStatus;
   data_inicio: string | null;
@@ -110,7 +117,10 @@ export type TarefaFilters = {
   prioridade?: TarefaPrioridade | "all";
   setor_id?: string | "all";
   projeto_id?: string | "all";
+  /** @deprecated Preferir `atribuido_ids` */
   atribuido_a?: string | "all";
+  /** Filtro multi: tarefa aparece se qualquer um destes for responsável */
+  atribuido_ids?: string[];
   tag?: string;
 };
 

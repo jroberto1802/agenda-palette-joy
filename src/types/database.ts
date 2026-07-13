@@ -559,6 +559,66 @@ export type Database = {
           },
         ];
       };
+      tarefa_responsaveis: {
+        Row: {
+          tarefa_id: string;
+          usuario_id: string;
+        };
+        Insert: {
+          tarefa_id: string;
+          usuario_id: string;
+        };
+        Update: {
+          tarefa_id?: string;
+          usuario_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tarefa_responsaveis_tarefa_id_fkey",
+            columns: ["tarefa_id"],
+            isOneToOne: false,
+            referencedRelation: "tarefas",
+            referencedColumns: ["id"],
+          },
+          {
+            foreignKeyName: "tarefa_responsaveis_usuario_id_fkey",
+            columns: ["usuario_id"],
+            isOneToOne: false,
+            referencedRelation: "profiles",
+            referencedColumns: ["id"],
+          },
+        ];
+      };
+      projeto_membros: {
+        Row: {
+          projeto_id: string;
+          usuario_id: string;
+        };
+        Insert: {
+          projeto_id: string;
+          usuario_id: string;
+        };
+        Update: {
+          projeto_id?: string;
+          usuario_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "projeto_membros_projeto_id_fkey",
+            columns: ["projeto_id"],
+            isOneToOne: false,
+            referencedRelation: "projetos",
+            referencedColumns: ["id"],
+          },
+          {
+            foreignKeyName: "projeto_membros_usuario_id_fkey",
+            columns: ["usuario_id"],
+            isOneToOne: false,
+            referencedRelation: "profiles",
+            referencedColumns: ["id"],
+          },
+        ];
+      };
       tarefas: {
         Row: {
           atribuido_a: string | null;

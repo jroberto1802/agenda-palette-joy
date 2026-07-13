@@ -1,6 +1,6 @@
 import { endOfDay, startOfDay } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
-import { notifyUser, notifyUsers } from "@/services/notificacoes";
+import { notifyUsers } from "@/services/notificacoes";
 import {
   calcularProximaData,
   deveGerarProximaOcorrencia,
@@ -27,6 +27,10 @@ const TAREFA_SELECT = `
   projeto:projetos(id, nome),
   criador:profiles!criado_por(id, nome_completo, avatar_url),
   responsavel:profiles!atribuido_a(id, nome_completo, avatar_url),
+  responsaveis:tarefa_responsaveis(
+    usuario_id,
+    usuario:profiles!tarefa_responsaveis_usuario_id_fkey(id, nome_completo, avatar_url)
+  ),
   observadores:tarefa_observadores(
     usuario_id,
     usuario:profiles!tarefa_observadores_usuario_id_fkey(id, nome_completo, avatar_url)
@@ -38,11 +42,26 @@ const TAREFA_SELECT_LITE = `
   setor:setores(id, nome, cor),
   projeto:projetos(id, nome),
   criador:profiles!criado_por(id, nome_completo, avatar_url),
-  responsavel:profiles!atribuido_a(id, nome_completo, avatar_url)
+  responsavel:profiles!atribuido_a(id, nome_completo, avatar_url),
+  responsaveis:tarefa_responsaveis(
+    usuario_id,
+    usuario:profiles!tarefa_responsaveis_usuario_id_fkey(id, nome_completo, avatar_url)
+  )
 `;
 
 function serializeLembretes(lembretes: TarefaLembreteOpcao[]): TarefaLembreteOpcao[] {
   return lembretes;
+}
+
+function normalizeAtribuidoIds(payload: TarefaFormData): string[] {
+  const fromList = payload.atribuido_ids?.filter(Boolean) ?? [];
+  if (fromList.length > 0) return [...new Set(fromList)];
+  if (payload.atribuido_a) return [payload.atribuido_a];
+  return [];
+}
+
+function primaryAtribuido(ids: string[]): string | null {
+  return ids[0] ?? null;
 }
 
 async function getCurrentProfile(): Promise<Profile | null> {
@@ -100,6 +119,39 @@ async function syncObservadores(tarefaId: string, usuarioIds: string[]): Promise
   if (insertError) throw insertError;
 }
 
+async function syncResponsaveis(tarefaId: string, usuarioIds: string[]): Promise<void> {
+  const unique = [...new Set(usuarioIds.filter(Boolean))];
+  if (unique.length === 0) {
+    throw new Error("Selecione ao menos um responsável.");
+  }
+
+  const { error: deleteError } = await supabase
+    .from("tarefa_responsaveis")
+    .delete()
+    .eq("tarefa_id", tarefaId);
+
+  if (deleteError) throw deleteError;
+
+  const { error: insertError } = await supabase.from("tarefa_responsaveis").insert(
+    unique.map((usuario_id) => ({
+      tarefa_id: tarefaId,
+      usuario_id,
+    })),
+  );
+
+  if (insertError) throw insertError;
+}
+
+async function listResponsavelIds(tarefaId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("tarefa_responsaveis")
+    .select("usuario_id")
+    .eq("tarefa_id", tarefaId);
+
+  if (error) throw error;
+  return (data ?? []).map((row) => row.usuario_id);
+}
+
 export async function listTarefas(filters: TarefaFilters = {}): Promise<TarefaWithRelations[]> {
   let query = supabase
     .from("tarefas")
@@ -123,8 +175,22 @@ export async function listTarefas(filters: TarefaFilters = {}): Promise<TarefaWi
     query = query.eq("projeto_id", filters.projeto_id);
   }
 
-  if (filters.atribuido_a && filters.atribuido_a !== "all") {
-    query = query.eq("atribuido_a", filters.atribuido_a);
+  const atribuidoIds = [
+    ...(filters.atribuido_ids ?? []),
+    ...(filters.atribuido_a && filters.atribuido_a !== "all" ? [filters.atribuido_a] : []),
+  ].filter(Boolean);
+
+  if (atribuidoIds.length > 0) {
+    const { data: links, error: linksError } = await supabase
+      .from("tarefa_responsaveis")
+      .select("tarefa_id")
+      .in("usuario_id", atribuidoIds);
+
+    if (linksError) throw linksError;
+
+    const tarefaIds = [...new Set((links ?? []).map((row) => row.tarefa_id))];
+    if (tarefaIds.length === 0) return [];
+    query = query.in("id", tarefaIds);
   }
 
   if (filters.search?.trim()) {
@@ -195,12 +261,19 @@ async function spawnProximaOcorrencia(tarefa: TarefaWithRelations): Promise<void
   } = await supabase.auth.getUser();
   if (!user) return;
 
+  const responsavelIds =
+    tarefa.responsaveis?.map((r) => r.usuario_id).filter(Boolean) ??
+    (tarefa.atribuido_a ? [tarefa.atribuido_a] : []);
+
+  const novaId = crypto.randomUUID();
+
   const { error } = await supabase.from("tarefas").insert({
+    id: novaId,
     titulo: tarefa.titulo,
     descricao: tarefa.descricao,
     projeto_id: tarefa.projeto_id,
     setor_id: tarefa.setor_id,
-    atribuido_a: tarefa.atribuido_a,
+    atribuido_a: primaryAtribuido(responsavelIds),
     prioridade: tarefa.prioridade,
     status: "a_fazer",
     data_inicio: tarefa.data_inicio,
@@ -213,6 +286,10 @@ async function spawnProximaOcorrencia(tarefa: TarefaWithRelations): Promise<void
   });
 
   if (error) throw error;
+
+  if (responsavelIds.length > 0) {
+    await syncResponsaveis(novaId, responsavelIds);
+  }
 }
 
 export async function createTarefa(payload: TarefaFormData): Promise<TarefaWithRelations> {
@@ -223,7 +300,12 @@ export async function createTarefa(payload: TarefaFormData): Promise<TarefaWithR
 
   const profile = await getCurrentProfile();
   const normalized = normalizeSetorForCreate(payload, profile);
+  const atribuidoIds = normalizeAtribuidoIds(normalized);
   const tarefaId = crypto.randomUUID();
+
+  if (atribuidoIds.length === 0) {
+    throw new Error("Selecione ao menos um responsável.");
+  }
 
   if (normalized.visibilidade === "todos_setor" && !normalized.setor_id) {
     throw new Error('Setor é obrigatório para visibilidade "Todos do setor".');
@@ -244,7 +326,7 @@ export async function createTarefa(payload: TarefaFormData): Promise<TarefaWithR
       descricao: normalized.descricao || null,
       projeto_id: normalized.projeto_id,
       setor_id: normalized.setor_id,
-      atribuido_a: normalized.atribuido_a,
+      atribuido_a: primaryAtribuido(atribuidoIds),
       prioridade: normalized.prioridade,
       status: normalized.status,
       data_inicio: normalized.data_inicio,
@@ -257,6 +339,8 @@ export async function createTarefa(payload: TarefaFormData): Promise<TarefaWithR
     });
 
   if (error) throw error;
+
+  await syncResponsaveis(tarefaId, atribuidoIds);
 
   if (normalized.visibilidade === "pessoas_especificas") {
     await syncObservadores(tarefaId, normalized.observador_ids);
@@ -281,28 +365,22 @@ export async function createTarefa(payload: TarefaFormData): Promise<TarefaWithR
       observadores: [],
     };
 
-    if (tarefa.atribuido_a) {
-      await notifyUser({
-        usuario_id: tarefa.atribuido_a,
-        tipo: "tarefa_atribuida",
-        referencia_tipo: "tarefa",
-        referencia_id: tarefa.id,
-      }).catch(() => undefined);
-    }
+    await notifyUsers(atribuidoIds, {
+      tipo: "tarefa_atribuida",
+      referencia_tipo: "tarefa",
+      referencia_id: tarefa.id,
+    }).catch(() => undefined);
 
     return tarefa;
   }
 
   const tarefa = data as TarefaWithRelations;
 
-  if (tarefa.atribuido_a) {
-    await notifyUser({
-      usuario_id: tarefa.atribuido_a,
-      tipo: "tarefa_atribuida",
-      referencia_tipo: "tarefa",
-      referencia_id: tarefa.id,
-    }).catch(() => undefined);
-  }
+  await notifyUsers(atribuidoIds, {
+    tipo: "tarefa_atribuida",
+    referencia_tipo: "tarefa",
+    referencia_id: tarefa.id,
+  }).catch(() => undefined);
 
   return tarefa;
 }
@@ -311,18 +389,25 @@ export async function updateTarefa(
   id: string,
   payload: TarefaFormData,
 ): Promise<TarefaWithRelations> {
+  const atribuidoIds = normalizeAtribuidoIds(payload);
+  if (atribuidoIds.length === 0) {
+    throw new Error("Selecione ao menos um responsável.");
+  }
+
   const { data: anterior } = await supabase
     .from("tarefas")
     .select("atribuido_a, status, recorrencia, data_vencimento, titulo, descricao, setor_id, prioridade, tags")
     .eq("id", id)
     .single();
 
+  const anterioresIds = await listResponsavelIds(id);
+
   const updateData: TablesUpdate<"tarefas"> = {
     titulo: payload.titulo,
     descricao: payload.descricao || null,
     projeto_id: payload.projeto_id,
     setor_id: payload.setor_id,
-    atribuido_a: payload.atribuido_a,
+    atribuido_a: primaryAtribuido(atribuidoIds),
     prioridade: payload.prioridade,
     status: payload.status,
     data_inicio: payload.data_inicio,
@@ -349,27 +434,25 @@ export async function updateTarefa(
   if (error) throw error;
   const tarefa = data as TarefaWithRelations;
 
+  await syncResponsaveis(id, atribuidoIds);
+
   if (payload.visibilidade === "pessoas_especificas") {
     await syncObservadores(id, payload.observador_ids);
   } else {
     await syncObservadores(id, []);
   }
 
-  if (
-    payload.atribuido_a &&
-    payload.atribuido_a !== anterior?.atribuido_a
-  ) {
-    await notifyUser({
-      usuario_id: payload.atribuido_a,
+  const novos = atribuidoIds.filter((uid) => !anterioresIds.includes(uid));
+  if (novos.length > 0) {
+    await notifyUsers(novos, {
       tipo: "tarefa_atribuida",
       referencia_tipo: "tarefa",
       referencia_id: tarefa.id,
     }).catch(() => undefined);
   }
 
-  if (payload.status !== anterior?.status && tarefa.atribuido_a) {
-    await notifyUser({
-      usuario_id: tarefa.atribuido_a,
+  if (payload.status !== anterior?.status) {
+    await notifyUsers(atribuidoIds, {
       tipo: "tarefa_status",
       referencia_tipo: "tarefa",
       referencia_id: tarefa.id,
@@ -411,9 +494,12 @@ export async function updateTarefaStatus(
   if (error) throw error;
   const tarefa = data as TarefaWithRelations;
 
-  if (tarefa.atribuido_a) {
-    await notifyUser({
-      usuario_id: tarefa.atribuido_a,
+  const responsavelIds =
+    tarefa.responsaveis?.map((r) => r.usuario_id) ??
+    (tarefa.atribuido_a ? [tarefa.atribuido_a] : []);
+
+  if (responsavelIds.length > 0) {
+    await notifyUsers(responsavelIds, {
       tipo: "tarefa_status",
       referencia_tipo: "tarefa",
       referencia_id: tarefa.id,
@@ -508,11 +594,12 @@ export async function createTarefaComentario(
 
   const { data: tarefa } = await supabase
     .from("tarefas")
-    .select("criado_por, atribuido_a")
+    .select("criado_por")
     .eq("id", tarefaId)
     .single();
 
-  const destinatarios = [tarefa?.criado_por, tarefa?.atribuido_a].filter(
+  const responsavelIds = await listResponsavelIds(tarefaId);
+  const destinatarios = [...new Set([tarefa?.criado_por, ...responsavelIds])].filter(
     (id): id is string => !!id && id !== user.id,
   );
 

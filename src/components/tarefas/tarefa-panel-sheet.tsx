@@ -44,10 +44,13 @@ import {
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { PessoasMultiSelect } from "@/components/common/pessoas-multi-select";
 import { usePessoas } from "@/hooks/use-pessoas";
 import { useProjetos } from "@/hooks/use-projetos";
 import { useProfile } from "@/hooks/use-profile";
 import { useSetores } from "@/hooks/use-setores";
+import { listProjetoMembros } from "@/services/projetos";
+import { useQuery } from "@tanstack/react-query";
 import {
   useCreateSubtarefa,
   useCreateTarefa,
@@ -94,7 +97,7 @@ const tarefaPanelSchema = z
     descricao: z.string(),
     projeto_id: z.string().nullable(),
     setor_id: z.string().nullable(),
-    atribuido_a: z.string().nullable(),
+    atribuido_ids: z.array(z.string()).min(1, "Selecione ao menos um responsável"),
     prioridade: z.enum(["P1", "P2", "P3", "P4"]),
     status: z.enum(["a_fazer", "em_andamento", "bloqueada", "concluida"]),
     data_inicio: z.date().nullable(),
@@ -146,14 +149,19 @@ function defaultVisibilidade(setorId?: string | null): TarefaVisibilidade {
 function toFormValues(
   tarefa?: TarefaWithRelations | null,
   defaultSetorId?: string | null,
+  defaultResponsavelId?: string | null,
 ): TarefaPanelSchema {
   const rec = parseRecorrencia(tarefa?.recorrencia);
+  const atribuidoIds =
+    tarefa?.responsaveis?.map((r) => r.usuario_id) ??
+    (tarefa?.atribuido_a ? [tarefa.atribuido_a] : defaultResponsavelId ? [defaultResponsavelId] : []);
+
   return {
     titulo: tarefa?.titulo ?? "",
     descricao: tarefa?.descricao ?? "",
     projeto_id: tarefa?.projeto_id ?? null,
     setor_id: tarefa?.setor_id ?? defaultSetorId ?? null,
-    atribuido_a: tarefa?.atribuido_a ?? null,
+    atribuido_ids: atribuidoIds,
     prioridade: tarefa?.prioridade ?? "P4",
     status: tarefa?.status ?? "a_fazer",
     data_inicio: tarefa?.data_inicio ? new Date(tarefa.data_inicio) : null,
@@ -186,7 +194,8 @@ function toPayload(values: TarefaPanelSchema): TarefaFormData {
     descricao: values.descricao,
     projeto_id: values.projeto_id,
     setor_id: values.setor_id,
-    atribuido_a: values.atribuido_a,
+    atribuido_ids: values.atribuido_ids,
+    atribuido_a: values.atribuido_ids[0] ?? null,
     prioridade: values.prioridade,
     status: values.status,
     data_inicio: values.data_inicio ? values.data_inicio.toISOString() : null,
@@ -349,19 +358,33 @@ export function TarefaPanelSheet({
 
   const form = useForm<TarefaPanelSchema>({
     resolver: zodResolver(tarefaPanelSchema),
-    defaultValues: toFormValues(null, profile?.setor_id),
+    defaultValues: toFormValues(null, profile?.setor_id, profile?.id),
   });
 
   const visibilidade = form.watch("visibilidade");
   const projetoId = form.watch("projeto_id");
   const setorId = form.watch("setor_id");
-  const atribuidoId = form.watch("atribuido_a");
+  const atribuidoIds = form.watch("atribuido_ids");
   const selectedProjeto = projetos?.find((p) => p.id === projetoId);
   const selectedSetor = setores?.find((s) => s.id === setorId);
 
+  const { data: projetoMembros } = useQuery({
+    queryKey: ["projeto-membros", projetoId],
+    queryFn: () => listProjetoMembros(projetoId!),
+    enabled: !!projetoId,
+  });
+
+  const pessoasParaResponsavel = useMemo(() => {
+    if (!projetoId) return pessoasAtivas;
+    if (!projetoMembros?.length) return pessoasAtivas;
+    const memberIds = new Set(projetoMembros.map((m) => m.id));
+    const selected = new Set(atribuidoIds ?? []);
+    return pessoasAtivas.filter((p) => memberIds.has(p.id) || selected.has(p.id));
+  }, [projetoId, projetoMembros, pessoasAtivas, atribuidoIds]);
+
   useEffect(() => {
     if (!open) return;
-    form.reset(toFormValues(tarefa ?? null, profile?.setor_id));
+    form.reset(toFormValues(tarefa ?? null, profile?.setor_id, profile?.id));
     setNovaSubtarefa("");
     setNovoComentario("");
   }, [open, tarefa, profile?.setor_id, form]);
@@ -378,14 +401,9 @@ export function TarefaPanelSheet({
     return null;
   }, [tarefa, profile]);
 
-  const responsavelDisplay = useMemo(() => {
-    if (!atribuidoId) return null;
-    return (
-      pessoasAtivas.find((p) => p.id === atribuidoId) ??
-      tarefa?.responsavel ??
-      null
-    );
-  }, [atribuidoId, pessoasAtivas, tarefa]);
+  const responsaveisDisplay = useMemo(() => {
+    return pessoasParaResponsavel.filter((p) => (atribuidoIds ?? []).includes(p.id));
+  }, [atribuidoIds, pessoasParaResponsavel]);
 
   const subtarefas = tarefa?.subtarefas ?? [];
   const comentarios = tarefa?.comentarios ?? [];
@@ -810,43 +828,39 @@ export function TarefaPanelSheet({
 
                       <FormField
                         control={form.control}
-                        name="atribuido_a"
+                        name="atribuido_ids"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Responsável pela tarefa</FormLabel>
-                            <Select
-                              value={field.value ?? "none"}
-                              onValueChange={(v) => field.onChange(v === "none" ? null : v)}
-                              disabled={!canEdit}
-                            >
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Responsável" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="none">Ninguém</SelectItem>
-                                {pessoasAtivas.map((p) => (
-                                  <SelectItem key={p.id} value={p.id}>
-                                    {p.nome_completo}
-                                  </SelectItem>
+                            <FormLabel>Responsáveis pela tarefa</FormLabel>
+                            <FormControl>
+                              <PessoasMultiSelect
+                                pessoas={pessoasParaResponsavel}
+                                value={field.value}
+                                onChange={field.onChange}
+                                disabled={!canEdit}
+                                placeholder="Selecione um ou mais responsáveis"
+                                emptyLabel={
+                                  projetoId
+                                    ? "Nenhum membro disponível neste projeto"
+                                    : "Nenhuma pessoa disponível"
+                                }
+                                error={!!form.formState.errors.atribuido_ids}
+                              />
+                            </FormControl>
+                            {responsaveisDisplay.length > 0 && (
+                              <div className="flex flex-wrap gap-2 pt-1">
+                                {responsaveisDisplay.map((pessoa) => (
+                                  <div key={pessoa.id} className="flex items-center gap-1.5">
+                                    <ProfileAvatar
+                                      name={pessoa.nome_completo}
+                                      avatarUrl={pessoa.avatar_url}
+                                      className="h-6 w-6"
+                                    />
+                                    <span className="text-xs text-muted-foreground">
+                                      {pessoa.nome_completo}
+                                    </span>
+                                  </div>
                                 ))}
-                              </SelectContent>
-                            </Select>
-                            {responsavelDisplay && (
-                              <div className="flex items-center gap-2 pt-1">
-                                <ProfileAvatar
-                                  name={responsavelDisplay.nome_completo}
-                                  avatarUrl={
-                                    "avatar_url" in responsavelDisplay
-                                      ? responsavelDisplay.avatar_url
-                                      : null
-                                  }
-                                  className="h-7 w-7"
-                                />
-                                <span className="text-xs text-muted-foreground">
-                                  {responsavelDisplay.nome_completo}
-                                </span>
                               </div>
                             )}
                             <FormMessage />

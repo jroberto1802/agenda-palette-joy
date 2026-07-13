@@ -21,6 +21,7 @@ import {
   KANBAN_COLUMNS,
   TAREFA_PRIORIDADE_COLORS,
   TAREFA_STATUS_COLORS,
+  formatResponsaveisLabel,
 } from "@/utils/tarefas";
 
 function KanbanCardContent({
@@ -64,10 +65,10 @@ function KanbanCardContent({
         </div>
       </div>
       <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground pl-6">
-        {tarefa.responsavel && (
+        {formatResponsaveisLabel(tarefa) !== "Sem responsável" && (
           <span className="flex items-center gap-1">
             <User className="h-3 w-3" />
-            {tarefa.responsavel.nome_completo.split(" ")[0]}
+            {formatResponsaveisLabel(tarefa)}
           </span>
         )}
         {tarefa.data_vencimento && (

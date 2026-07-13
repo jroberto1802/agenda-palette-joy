@@ -7,6 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { PessoasMultiSelect } from "@/components/common/pessoas-multi-select";
 import type {
   ProfileWithSetor,
   Projeto,
@@ -31,6 +32,8 @@ export function TarefaFiltersBar({
   pessoas: ProfileWithSetor[];
   hideResponsavel?: boolean;
 }) {
+  const atribuidoIds = filters.atribuido_ids ?? [];
+
   return (
     <div
       className={cn(
@@ -121,22 +124,19 @@ export function TarefaFiltersBar({
       </Select>
 
       {!hideResponsavel && (
-        <Select
-          value={filters.atribuido_a ?? "all"}
-          onValueChange={(v) => onChange({ ...filters, atribuido_a: v })}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Responsável" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos responsáveis</SelectItem>
-            {pessoas.map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                {p.nome_completo}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <PessoasMultiSelect
+          pessoas={pessoas}
+          value={atribuidoIds}
+          onChange={(ids) =>
+            onChange({
+              ...filters,
+              atribuido_ids: ids,
+              atribuido_a: "all",
+            })
+          }
+          placeholder="Todos responsáveis"
+          showSelectAll
+        />
       )}
 
       <Input

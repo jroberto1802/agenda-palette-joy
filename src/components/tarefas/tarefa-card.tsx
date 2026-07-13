@@ -16,6 +16,8 @@ import {
   TAREFA_PRIORIDADE_LABELS,
   TAREFA_STATUS_COLORS,
   TAREFA_STATUS_LABELS,
+  formatResponsaveisLabel,
+  getTarefaResponsaveis,
 } from "@/utils/tarefas";
 import { cn } from "@/lib/utils";
 import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
@@ -129,14 +131,21 @@ export function TarefaCard({
         )}
 
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground">
-          {tarefa.responsavel && (
+          {getTarefaResponsaveis(tarefa).length > 0 && (
             <span className="flex items-center gap-1.5">
-              <ProfileAvatar
-                name={tarefa.responsavel.nome_completo}
-                avatarUrl={tarefa.responsavel.avatar_url}
-                className="h-5 w-5"
-              />
-              {tarefa.responsavel.nome_completo}
+              <div className="flex -space-x-1.5">
+                {getTarefaResponsaveis(tarefa)
+                  .slice(0, 3)
+                  .map((pessoa) => (
+                    <ProfileAvatar
+                      key={pessoa.id}
+                      name={pessoa.nome_completo}
+                      avatarUrl={pessoa.avatar_url}
+                      className="h-5 w-5 ring-1 ring-background"
+                    />
+                  ))}
+              </div>
+              {formatResponsaveisLabel(tarefa)}
             </span>
           )}
           {tarefa.data_vencimento && (

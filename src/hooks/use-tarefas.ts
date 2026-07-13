@@ -30,6 +30,7 @@ export function useTarefas(filters: TarefaFilters = {}) {
     setor_id: filters.setor_id ?? "all",
     projeto_id: filters.projeto_id ?? "all",
     atribuido_a: filters.atribuido_a ?? "all",
+    atribuido_ids: [...(filters.atribuido_ids ?? [])].sort().join(","),
     tag: filters.tag ?? "",
   };
 

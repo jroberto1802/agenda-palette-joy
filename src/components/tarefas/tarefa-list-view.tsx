@@ -8,6 +8,8 @@ import {
   TAREFA_PRIORIDADE_LABELS,
   TAREFA_STATUS_COLORS,
   TAREFA_STATUS_LABELS,
+  formatResponsaveisLabel,
+  getTarefaResponsaveis,
 } from "@/utils/tarefas";
 import { cn } from "@/lib/utils";
 
@@ -67,14 +69,14 @@ function TarefaListRow({
             >
               {TAREFA_PRIORIDADE_LABELS[tarefa.prioridade]}
             </Badge>
-            {tarefa.responsavel && (
+            {getTarefaResponsaveis(tarefa).length > 0 && (
               <span className="inline-flex items-center gap-1">
                 <ProfileAvatar
-                  name={tarefa.responsavel.nome_completo}
-                  avatarUrl={tarefa.responsavel.avatar_url}
+                  name={getTarefaResponsaveis(tarefa)[0].nome_completo}
+                  avatarUrl={getTarefaResponsaveis(tarefa)[0].avatar_url}
                   className="h-4 w-4"
                 />
-                <span className="max-w-[140px] truncate">{tarefa.responsavel.nome_completo}</span>
+                <span className="max-w-[160px] truncate">{formatResponsaveisLabel(tarefa)}</span>
               </span>
             )}
             {tarefa.data_vencimento && (

@@ -78,8 +78,29 @@ export function canEditTarefa(
   if (!userId) return false;
   if (isAdminUser) return true;
   if (tarefa.criado_por === userId || tarefa.atribuido_a === userId) return true;
+  if (tarefa.responsaveis?.some((r) => r.usuario_id === userId)) return true;
   if (isGerenteUser && tarefa.setor_id && tarefa.setor_id === userSetorId) return true;
   return false;
+}
+
+export function getTarefaResponsaveis(
+  tarefa: TarefaWithRelations,
+): Pick<Profile, "id" | "nome_completo" | "avatar_url">[] {
+  if (tarefa.responsaveis?.length) {
+    return tarefa.responsaveis
+      .map((r) => r.usuario)
+      .filter((u): u is Pick<Profile, "id" | "nome_completo" | "avatar_url"> => !!u);
+  }
+  if (tarefa.responsavel) return [tarefa.responsavel];
+  return [];
+}
+
+export function formatResponsaveisLabel(tarefa: TarefaWithRelations): string {
+  const nomes = getTarefaResponsaveis(tarefa).map((r) => r.nome_completo);
+  if (nomes.length === 0) return "Sem responsável";
+  if (nomes.length === 1) return nomes[0];
+  if (nomes.length === 2) return `${nomes[0]} e ${nomes[1]}`;
+  return `${nomes[0]} +${nomes.length - 1}`;
 }
 
 export function canEditVisibilidade(

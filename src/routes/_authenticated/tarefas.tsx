@@ -41,6 +41,7 @@ const DEFAULT_FILTERS: TarefaFilters = {
   setor_id: "all",
   projeto_id: "all",
   atribuido_a: "all",
+  atribuido_ids: [],
   search: "",
   tag: "",
 };
@@ -290,7 +291,7 @@ function AgendaTabPanel({
         : debouncedFilters;
 
     if (mode === "minha" && profile?.id) {
-      return { ...base, atribuido_a: profile.id };
+      return { ...base, atribuido_ids: [profile.id], atribuido_a: "all" as const };
     }
 
     return base;

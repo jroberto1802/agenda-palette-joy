@@ -19,7 +19,7 @@ import { useProfile } from "@/hooks/use-profile";
 import { useDashboardKpis, useRecentTarefas } from "@/hooks/use-tarefas";
 import { isAvisoLido } from "@/services/avisos";
 import { isAvisoAtivo } from "@/utils/avisos";
-import { TAREFA_PRIORIDADE_COLORS, TAREFA_STATUS_LABELS } from "@/utils/tarefas";
+import { TAREFA_PRIORIDADE_COLORS, TAREFA_STATUS_LABELS, formatResponsaveisLabel } from "@/utils/tarefas";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
@@ -157,7 +157,7 @@ function Dashboard() {
                     <div className="min-w-0">
                       <p className="font-medium truncate">{tarefa.titulo}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        {tarefa.responsavel?.nome_completo ?? "Sem responsável"}
+                        {formatResponsaveisLabel(tarefa)}
                         {tarefa.data_vencimento && ` · ${formatDate(tarefa.data_vencimento)}`}
                       </p>
                     </div>

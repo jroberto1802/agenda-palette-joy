@@ -9,7 +9,7 @@ import { usePessoas } from "@/hooks/use-pessoas";
 import { useTarefas } from "@/hooks/use-tarefas";
 import type { ProfileWithSetor, TarefaWithRelations } from "@/types";
 import { formatDate } from "@/utils/formatters";
-import { TAREFA_STATUS_LABELS } from "@/utils/tarefas";
+import { TAREFA_STATUS_LABELS, getTarefaResponsaveis } from "@/utils/tarefas";
 import { CARD_GRID_CLASS } from "@/lib/layout";
 
 export const Route = createFileRoute("/_authenticated/equipe")({
@@ -110,10 +110,15 @@ function EquipePage() {
   const tarefasPorPessoa = useMemo(() => {
     const map = new Map<string, TarefaWithRelations[]>();
     for (const tarefa of tarefas ?? []) {
-      if (!tarefa.atribuido_a) continue;
-      const current = map.get(tarefa.atribuido_a) ?? [];
-      current.push(tarefa);
-      map.set(tarefa.atribuido_a, current);
+      const responsavelIds = getTarefaResponsaveis(tarefa).map((r) => r.id);
+      if (responsavelIds.length === 0 && tarefa.atribuido_a) {
+        responsavelIds.push(tarefa.atribuido_a);
+      }
+      for (const usuarioId of responsavelIds) {
+        const current = map.get(usuarioId) ?? [];
+        current.push(tarefa);
+        map.set(usuarioId, current);
+      }
     }
     return map;
   }, [tarefas]);

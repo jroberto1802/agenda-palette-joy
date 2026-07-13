@@ -21,6 +21,7 @@ import {
   TAREFA_PRIORIDADE_COLORS,
   TAREFA_STATUS_COLORS,
   TAREFA_STATUS_LABELS,
+  formatResponsaveisLabel,
 } from "@/utils/tarefas";
 
 export function TarefaCalendarioView({
@@ -162,9 +163,9 @@ function TimelineItem({
         )}
       </div>
       <p className="font-medium">{tarefa.titulo}</p>
-      {tarefa.responsavel && (
+      {formatResponsaveisLabel(tarefa) !== "Sem responsável" && (
         <p className="text-xs text-muted-foreground mt-1">
-          Responsável: {tarefa.responsavel.nome_completo}
+          Responsável: {formatResponsaveisLabel(tarefa)}
         </p>
       )}
       {tarefa.data_vencimento && (

@@ -1,10 +1,34 @@
 import { supabase } from "@/integrations/supabase/client";
-import type { ProjetoFormData, ProjetoWithResponsavel } from "@/types";
+import type { Profile, ProjetoFormData, ProjetoWithResponsavel } from "@/types";
 
 const PROJETO_SELECT = `
   *,
   responsavel:profiles!projetos_responsavel_id_fkey(id, nome_completo, avatar_url)
 `;
+
+async function ensureProjetoMembro(projetoId: string, usuarioId: string | null): Promise<void> {
+  if (!usuarioId) return;
+  const { error } = await supabase.from("projeto_membros").upsert(
+    { projeto_id: projetoId, usuario_id: usuarioId },
+    { onConflict: "projeto_id,usuario_id" },
+  );
+  if (error) throw error;
+}
+
+export async function listProjetoMembros(
+  projetoId: string,
+): Promise<Pick<Profile, "id" | "nome_completo" | "avatar_url">[]> {
+  const { data, error } = await supabase
+    .from("projeto_membros")
+    .select("usuario_id, usuario:profiles!projeto_membros_usuario_id_fkey(id, nome_completo, avatar_url)")
+    .eq("projeto_id", projetoId);
+
+  if (error) throw error;
+
+  return (data ?? [])
+    .map((row) => row.usuario)
+    .filter((u): u is Pick<Profile, "id" | "nome_completo" | "avatar_url"> => !!u);
+}
 
 export async function listProjetos(search?: string): Promise<ProjetoWithResponsavel[]> {
   let query = supabase.from("projetos").select(PROJETO_SELECT).order("nome");
@@ -45,6 +69,7 @@ export async function createProjeto(payload: ProjetoFormData): Promise<ProjetoWi
     throw error;
   }
 
+  await ensureProjetoMembro(data.id, payload.responsavel_id);
   return data as ProjetoWithResponsavel;
 }
 
@@ -73,6 +98,7 @@ export async function updateProjeto(
     throw error;
   }
 
+  await ensureProjetoMembro(id, payload.responsavel_id);
   return data as ProjetoWithResponsavel;
 }
 
