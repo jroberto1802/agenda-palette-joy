@@ -13,7 +13,7 @@ export const setorKeys = {
 export const projetoKeys = {
   all: ["projetos"] as const,
   list: (search?: string) => [...projetoKeys.all, "list", search ?? ""] as const,
-  detail: (id: string) => [...projetoKeys.all, id] as const,
+  detail: (id: string) => [...projetoKeys.all, "detail", id] as const,
 };
 
 export const tarefaKeys = {

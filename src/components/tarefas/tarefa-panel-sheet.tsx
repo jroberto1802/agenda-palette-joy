@@ -150,6 +150,7 @@ function toFormValues(
   tarefa?: TarefaWithRelations | null,
   defaultSetorId?: string | null,
   defaultResponsavelId?: string | null,
+  defaultProjetoId?: string | null,
 ): TarefaPanelSchema {
   const rec = parseRecorrencia(tarefa?.recorrencia);
   const atribuidoIds =
@@ -159,7 +160,7 @@ function toFormValues(
   return {
     titulo: tarefa?.titulo ?? "",
     descricao: tarefa?.descricao ?? "",
-    projeto_id: tarefa?.projeto_id ?? null,
+    projeto_id: tarefa?.projeto_id ?? defaultProjetoId ?? null,
     setor_id: tarefa?.setor_id ?? defaultSetorId ?? null,
     atribuido_ids: atribuidoIds,
     prioridade: tarefa?.prioridade ?? "P4",
@@ -290,12 +291,16 @@ export function TarefaPanelSheet({
   onOpenChange,
   readOnly = false,
   onSaved,
+  defaultProjetoId = null,
+  lockProjeto = false,
 }: {
   tarefaId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   readOnly?: boolean;
   onSaved?: (tarefaId: string) => void;
+  defaultProjetoId?: string | null;
+  lockProjeto?: boolean;
 }) {
   const isCreate = !tarefaId;
   const { data: profile } = useProfile();
@@ -358,7 +363,7 @@ export function TarefaPanelSheet({
 
   const form = useForm<TarefaPanelSchema>({
     resolver: zodResolver(tarefaPanelSchema),
-    defaultValues: toFormValues(null, profile?.setor_id, profile?.id),
+    defaultValues: toFormValues(null, profile?.setor_id, profile?.id, defaultProjetoId),
   });
 
   const visibilidade = form.watch("visibilidade");
@@ -376,18 +381,33 @@ export function TarefaPanelSheet({
 
   const pessoasParaResponsavel = useMemo(() => {
     if (!projetoId) return pessoasAtivas;
-    if (!projetoMembros?.length) return pessoasAtivas;
-    const memberIds = new Set(projetoMembros.map((m) => m.id));
+    const memberIds = new Set((projetoMembros ?? []).map((m) => m.id));
     const selected = new Set(atribuidoIds ?? []);
+    // Equipe do projeto + já atribuídos (mesmo se removidos da equipe)
     return pessoasAtivas.filter((p) => memberIds.has(p.id) || selected.has(p.id));
   }, [projetoId, projetoMembros, pessoasAtivas, atribuidoIds]);
 
   useEffect(() => {
     if (!open) return;
-    form.reset(toFormValues(tarefa ?? null, profile?.setor_id, profile?.id));
+    form.reset(toFormValues(tarefa ?? null, profile?.setor_id, undefined, defaultProjetoId));
     setNovaSubtarefa("");
     setNovoComentario("");
-  }, [open, tarefa, profile?.setor_id, form]);
+  }, [open, tarefa, profile?.setor_id, defaultProjetoId, form]);
+
+  useEffect(() => {
+    if (!open || !!tarefa || !isCreate) return;
+    const currentProjetoId = form.getValues("projeto_id");
+    if (!currentProjetoId) {
+      if (profile?.id) form.setValue("atribuido_ids", [profile.id]);
+      return;
+    }
+    if (!projetoMembros) return;
+    if (profile?.id && projetoMembros.some((m) => m.id === profile.id)) {
+      form.setValue("atribuido_ids", [profile.id]);
+    } else {
+      form.setValue("atribuido_ids", []);
+    }
+  }, [open, tarefa, isCreate, projetoMembros, profile?.id, form]);
 
   const criadorDisplay = useMemo(() => {
     if (tarefa?.criador) return tarefa.criador;
@@ -766,8 +786,14 @@ export function TarefaPanelSheet({
                             <FormLabel>Projeto</FormLabel>
                             <Select
                               value={field.value ?? "none"}
-                              onValueChange={(v) => field.onChange(v === "none" ? null : v)}
-                              disabled={!canEdit}
+                              onValueChange={(v) => {
+                                const next = v === "none" ? null : v;
+                                field.onChange(next);
+                                if (next) {
+                                  form.setValue("atribuido_ids", []);
+                                }
+                              }}
+                              disabled={!canEdit || lockProjeto}
                             >
                               <FormControl>
                                 <SelectTrigger>
@@ -841,7 +867,7 @@ export function TarefaPanelSheet({
                                 placeholder="Selecione um ou mais responsáveis"
                                 emptyLabel={
                                   projetoId
-                                    ? "Nenhum membro disponível neste projeto"
+                                    ? "Defina a equipe do projeto antes de atribuir responsáveis"
                                     : "Nenhuma pessoa disponível"
                                 }
                                 error={!!form.formState.errors.atribuido_ids}

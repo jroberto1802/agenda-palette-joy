@@ -1,33 +1,62 @@
 import { supabase } from "@/integrations/supabase/client";
-import type { Profile, ProjetoFormData, ProjetoWithResponsavel } from "@/types";
+import type { ProjetoFormData, ProjetoMembro, ProjetoWithResponsavel } from "@/types";
 
 const PROJETO_SELECT = `
   *,
-  responsavel:profiles!projetos_responsavel_id_fkey(id, nome_completo, avatar_url)
+  responsavel:profiles!projetos_responsavel_id_fkey(id, nome_completo, avatar_url),
+  membros:projeto_membros(
+    usuario_id,
+    usuario:profiles!projeto_membros_usuario_id_fkey(id, nome_completo, avatar_url, cargo, papel)
+  )
 `;
 
-async function ensureProjetoMembro(projetoId: string, usuarioId: string | null): Promise<void> {
-  if (!usuarioId) return;
-  const { error } = await supabase.from("projeto_membros").upsert(
-    { projeto_id: projetoId, usuario_id: usuarioId },
-    { onConflict: "projeto_id,usuario_id" },
+async function syncProjetoMembros(projetoId: string, usuarioIds: string[]): Promise<void> {
+  const unique = [...new Set(usuarioIds.filter(Boolean))];
+
+  const { error: deleteError } = await supabase
+    .from("projeto_membros")
+    .delete()
+    .eq("projeto_id", projetoId);
+
+  if (deleteError) throw deleteError;
+
+  if (unique.length === 0) return;
+
+  const { error: insertError } = await supabase.from("projeto_membros").insert(
+    unique.map((usuario_id) => ({
+      projeto_id: projetoId,
+      usuario_id,
+    })),
   );
-  if (error) throw error;
+
+  if (insertError) throw insertError;
 }
 
-export async function listProjetoMembros(
-  projetoId: string,
-): Promise<Pick<Profile, "id" | "nome_completo" | "avatar_url">[]> {
+export async function listProjetoMembros(projetoId: string): Promise<ProjetoMembro[]> {
   const { data, error } = await supabase
     .from("projeto_membros")
-    .select("usuario_id, usuario:profiles!projeto_membros_usuario_id_fkey(id, nome_completo, avatar_url)")
+    .select(
+      "usuario_id, usuario:profiles!projeto_membros_usuario_id_fkey(id, nome_completo, avatar_url, cargo, papel)",
+    )
     .eq("projeto_id", projetoId);
 
   if (error) throw error;
 
   return (data ?? [])
     .map((row) => row.usuario)
-    .filter((u): u is Pick<Profile, "id" | "nome_completo" | "avatar_url"> => !!u);
+    .filter((u): u is ProjetoMembro => !!u)
+    .sort((a, b) => a.nome_completo.localeCompare(b.nome_completo, "pt-BR"));
+}
+
+export async function getProjeto(id: string): Promise<ProjetoWithResponsavel> {
+  const { data, error } = await supabase
+    .from("projetos")
+    .select(PROJETO_SELECT)
+    .eq("id", id)
+    .single();
+
+  if (error) throw error;
+  return data as ProjetoWithResponsavel;
 }
 
 export async function listProjetos(search?: string): Promise<ProjetoWithResponsavel[]> {
@@ -69,8 +98,13 @@ export async function createProjeto(payload: ProjetoFormData): Promise<ProjetoWi
     throw error;
   }
 
-  await ensureProjetoMembro(data.id, payload.responsavel_id);
-  return data as ProjetoWithResponsavel;
+  const membroIds = [...payload.membro_ids];
+  if (payload.responsavel_id && !membroIds.includes(payload.responsavel_id)) {
+    membroIds.push(payload.responsavel_id);
+  }
+
+  await syncProjetoMembros(data.id, membroIds);
+  return getProjeto(data.id);
 }
 
 export async function updateProjeto(
@@ -88,7 +122,7 @@ export async function updateProjeto(
       status: payload.status,
     })
     .eq("id", id)
-    .select(PROJETO_SELECT)
+    .select("id")
     .single();
 
   if (error) {
@@ -98,8 +132,26 @@ export async function updateProjeto(
     throw error;
   }
 
-  await ensureProjetoMembro(id, payload.responsavel_id);
-  return data as ProjetoWithResponsavel;
+  await syncProjetoMembros(data.id, payload.membro_ids);
+  return getProjeto(id);
+}
+
+export async function addProjetoMembro(projetoId: string, usuarioId: string): Promise<void> {
+  const { error } = await supabase.from("projeto_membros").upsert(
+    { projeto_id: projetoId, usuario_id: usuarioId },
+    { onConflict: "projeto_id,usuario_id" },
+  );
+  if (error) throw error;
+}
+
+export async function removeProjetoMembro(projetoId: string, usuarioId: string): Promise<void> {
+  const { error } = await supabase
+    .from("projeto_membros")
+    .delete()
+    .eq("projeto_id", projetoId)
+    .eq("usuario_id", usuarioId);
+
+  if (error) throw error;
 }
 
 export async function countTarefasPorProjeto(projetoId: string): Promise<number> {

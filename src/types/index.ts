@@ -31,16 +31,23 @@ export type ProjetoStatus = Projeto["status"];
 
 export type ProjetoWithResponsavel = Projeto & {
   responsavel: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
+  membros?: {
+    usuario_id: string;
+    usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url" | "cargo" | "papel"> | null;
+  }[];
 };
 
 export type ProjetoFormData = {
   nome: string;
   descricao?: string;
   responsavel_id: string | null;
+  membro_ids: string[];
   data_inicio: string | null;
   data_termino_prevista: string | null;
   status: ProjetoStatus;
 };
+
+export type ProjetoMembro = Pick<Profile, "id" | "nome_completo" | "avatar_url" | "cargo" | "papel">;
 
 export type ProfileFormData = {
   nome_completo: string;

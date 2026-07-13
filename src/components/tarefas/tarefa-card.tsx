@@ -64,6 +64,11 @@ export function TarefaCard({
                   {tarefa.setor.nome}
                 </Badge>
               )}
+              {tarefa.projeto && (
+                <Badge variant="outline" className="text-xs">
+                  {tarefa.projeto.nome}
+                </Badge>
+              )}
             </div>
             <CardTitle
               className={cn(

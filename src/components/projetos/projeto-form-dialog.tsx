@@ -2,6 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { PessoasMultiSelect } from "@/components/common/pessoas-multi-select";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -35,6 +36,7 @@ const projetoSchema = z.object({
   nome: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
   descricao: z.string().optional(),
   responsavel_id: z.string().nullable(),
+  membro_ids: z.array(z.string()),
   data_inicio: z.string().optional(),
   data_termino_prevista: z.string().optional(),
   status: z.enum(["nao_iniciado", "em_andamento", "concluido", "cancelado"]),
@@ -45,6 +47,13 @@ type ProjetoSchema = z.infer<typeof projetoSchema>;
 function toDateInput(value?: string | null): string {
   if (!value) return "";
   return value.slice(0, 10);
+}
+
+function getMembroIds(projeto?: ProjetoWithResponsavel | null): string[] {
+  if (!projeto?.membros?.length) {
+    return projeto?.responsavel_id ? [projeto.responsavel_id] : [];
+  }
+  return projeto.membros.map((m) => m.usuario_id);
 }
 
 export function ProjetoFormDialog({
@@ -68,6 +77,7 @@ export function ProjetoFormDialog({
       nome: "",
       descricao: "",
       responsavel_id: null,
+      membro_ids: [],
       data_inicio: "",
       data_termino_prevista: "",
       status: "nao_iniciado",
@@ -80,6 +90,7 @@ export function ProjetoFormDialog({
         nome: projeto?.nome ?? "",
         descricao: projeto?.descricao ?? "",
         responsavel_id: projeto?.responsavel_id ?? null,
+        membro_ids: getMembroIds(projeto),
         data_inicio: toDateInput(projeto?.data_inicio),
         data_termino_prevista: toDateInput(projeto?.data_termino_prevista),
         status: projeto?.status ?? "nao_iniciado",
@@ -92,6 +103,7 @@ export function ProjetoFormDialog({
       nome: values.nome,
       descricao: values.descricao,
       responsavel_id: values.responsavel_id,
+      membro_ids: values.membro_ids,
       data_inicio: values.data_inicio ? new Date(values.data_inicio).toISOString() : null,
       data_termino_prevista: values.data_termino_prevista
         ? new Date(values.data_termino_prevista).toISOString()
@@ -107,8 +119,8 @@ export function ProjetoFormDialog({
           <DialogTitle>{projeto ? "Editar projeto" : "Novo projeto"}</DialogTitle>
           <DialogDescription>
             {projeto
-              ? "Atualize os dados do projeto."
-              : "Informe os dados para criar um novo projeto."}
+              ? "Atualize os dados e a equipe do projeto."
+              : "Informe os dados e defina a equipe do projeto."}
           </DialogDescription>
         </DialogHeader>
 
@@ -166,6 +178,26 @@ export function ProjetoFormDialog({
                       ))}
                     </SelectContent>
                   </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="membro_ids"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Equipe do projeto</FormLabel>
+                  <FormControl>
+                    <PessoasMultiSelect
+                      pessoas={pessoas}
+                      value={field.value}
+                      onChange={field.onChange}
+                      placeholder="Selecione os membros da equipe"
+                      showSelectAll
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}

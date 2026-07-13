@@ -1,5 +1,6 @@
-import { ClipboardList, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { ClipboardList, Pencil, Plus, Search, Trash2, Users } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -38,6 +39,7 @@ export function CadastroProjetosPanel({
   canManage: boolean;
   canDelete: boolean;
 }) {
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const { data: projetos, isLoading } = useProjetos(debouncedSearch);
@@ -183,8 +185,18 @@ export function CadastroProjetosPanel({
         <div className={CARD_GRID_CLASS}>
           {projetos.map((projeto) => {
             const tarefasCount = tarefasPorProjeto.get(projeto.id) ?? 0;
+            const membrosCount = projeto.membros?.length ?? 0;
             return (
-              <Card key={projeto.id}>
+              <Card
+                key={projeto.id}
+                className="cursor-pointer transition-colors hover:border-primary/40"
+                onClick={() =>
+                  navigate({
+                    to: "/projetos/$projetoId",
+                    params: { projetoId: projeto.id },
+                  })
+                }
+              >
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 space-y-2">
@@ -204,7 +216,7 @@ export function CadastroProjetosPanel({
                       )}
                     </div>
                     {canManage && (
-                      <div className="flex shrink-0 gap-1">
+                      <div className="flex shrink-0 gap-1" onClick={(e) => e.stopPropagation()}>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -233,6 +245,10 @@ export function CadastroProjetosPanel({
                 </CardHeader>
                 <CardContent className="space-y-1 text-sm text-muted-foreground">
                   <p>Responsável: {projeto.responsavel?.nome_completo ?? "Não definido"}</p>
+                  <p className="flex items-center gap-1.5">
+                    <Users className="h-3.5 w-3.5" />
+                    {membrosCount} {membrosCount === 1 ? "pessoa na equipe" : "pessoas na equipe"}
+                  </p>
                   <p className="flex items-center gap-1.5">
                     <ClipboardList className="h-3.5 w-3.5" />
                     {tarefasCount} {tarefasCount === 1 ? "tarefa vinculada" : "tarefas vinculadas"}

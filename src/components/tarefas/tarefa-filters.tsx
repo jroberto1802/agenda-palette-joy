@@ -24,6 +24,7 @@ export function TarefaFiltersBar({
   projetos,
   pessoas,
   hideResponsavel = false,
+  hideProjeto = false,
 }: {
   filters: TarefaFilters;
   onChange: (filters: TarefaFilters) => void;
@@ -31,16 +32,19 @@ export function TarefaFiltersBar({
   projetos: Pick<Projeto, "id" | "nome">[];
   pessoas: ProfileWithSetor[];
   hideResponsavel?: boolean;
+  hideProjeto?: boolean;
 }) {
   const atribuidoIds = filters.atribuido_ids ?? [];
+  const columnClass = hideResponsavel
+    ? hideProjeto
+      ? "lg:grid-cols-5"
+      : "lg:grid-cols-6"
+    : hideProjeto
+      ? "lg:grid-cols-6"
+      : "lg:grid-cols-7";
 
   return (
-    <div
-      className={cn(
-        "grid grid-cols-1 gap-3 sm:grid-cols-2",
-        hideResponsavel ? "lg:grid-cols-6" : "lg:grid-cols-7",
-      )}
-    >
+    <div className={cn("grid grid-cols-1 gap-3 sm:grid-cols-2", columnClass)}>
       <div className="relative lg:col-span-2">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -106,22 +110,24 @@ export function TarefaFiltersBar({
         </SelectContent>
       </Select>
 
-      <Select
-        value={filters.projeto_id ?? "all"}
-        onValueChange={(v) => onChange({ ...filters, projeto_id: v })}
-      >
-        <SelectTrigger>
-          <SelectValue placeholder="Projeto" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">Todos os projetos</SelectItem>
-          {projetos.map((projeto) => (
-            <SelectItem key={projeto.id} value={projeto.id}>
-              {projeto.nome}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      {!hideProjeto && (
+        <Select
+          value={filters.projeto_id ?? "all"}
+          onValueChange={(v) => onChange({ ...filters, projeto_id: v })}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Projeto" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os projetos</SelectItem>
+            {projetos.map((projeto) => (
+              <SelectItem key={projeto.id} value={projeto.id}>
+                {projeto.nome}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
 
       {!hideResponsavel && (
         <PessoasMultiSelect

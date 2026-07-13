@@ -23,6 +23,7 @@ import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authen
 import { Route as AuthenticatedCalendarioRouteImport } from './routes/_authenticated/calendario'
 import { Route as AuthenticatedAvisosRouteImport } from './routes/_authenticated/avisos'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as AuthenticatedProjetosProjetoIdRouteImport } from './routes/_authenticated/projetos.$projetoId'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -94,6 +95,12 @@ const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedProjetosProjetoIdRoute =
+  AuthenticatedProjetosProjetoIdRouteImport.update({
+    id: '/$projetoId',
+    path: '/$projetoId',
+    getParentRoute: () => AuthenticatedProjetosRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -105,10 +112,11 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/equipe': typeof AuthenticatedEquipeRoute
   '/pessoas': typeof AuthenticatedPessoasRoute
-  '/projetos': typeof AuthenticatedProjetosRoute
+  '/projetos': typeof AuthenticatedProjetosRouteWithChildren
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/setores': typeof AuthenticatedSetoresRoute
   '/tarefas': typeof AuthenticatedTarefasRoute
+  '/projetos/$projetoId': typeof AuthenticatedProjetosProjetoIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -120,10 +128,11 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/equipe': typeof AuthenticatedEquipeRoute
   '/pessoas': typeof AuthenticatedPessoasRoute
-  '/projetos': typeof AuthenticatedProjetosRoute
+  '/projetos': typeof AuthenticatedProjetosRouteWithChildren
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/setores': typeof AuthenticatedSetoresRoute
   '/tarefas': typeof AuthenticatedTarefasRoute
+  '/projetos/$projetoId': typeof AuthenticatedProjetosProjetoIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -137,10 +146,11 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/equipe': typeof AuthenticatedEquipeRoute
   '/_authenticated/pessoas': typeof AuthenticatedPessoasRoute
-  '/_authenticated/projetos': typeof AuthenticatedProjetosRoute
+  '/_authenticated/projetos': typeof AuthenticatedProjetosRouteWithChildren
   '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
   '/_authenticated/setores': typeof AuthenticatedSetoresRoute
   '/_authenticated/tarefas': typeof AuthenticatedTarefasRoute
+  '/_authenticated/projetos/$projetoId': typeof AuthenticatedProjetosProjetoIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -158,6 +168,7 @@ export interface FileRouteTypes {
     | '/relatorios'
     | '/setores'
     | '/tarefas'
+    | '/projetos/$projetoId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -173,6 +184,7 @@ export interface FileRouteTypes {
     | '/relatorios'
     | '/setores'
     | '/tarefas'
+    | '/projetos/$projetoId'
   id:
     | '__root__'
     | '/'
@@ -189,6 +201,7 @@ export interface FileRouteTypes {
     | '/_authenticated/relatorios'
     | '/_authenticated/setores'
     | '/_authenticated/tarefas'
+    | '/_authenticated/projetos/$projetoId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -297,8 +310,28 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/projetos/$projetoId': {
+      id: '/_authenticated/projetos/$projetoId'
+      path: '/$projetoId'
+      fullPath: '/projetos/$projetoId'
+      preLoaderRoute: typeof AuthenticatedProjetosProjetoIdRouteImport
+      parentRoute: typeof AuthenticatedProjetosRoute
+    }
   }
 }
+
+interface AuthenticatedProjetosRouteChildren {
+  AuthenticatedProjetosProjetoIdRoute: typeof AuthenticatedProjetosProjetoIdRoute
+}
+
+const AuthenticatedProjetosRouteChildren: AuthenticatedProjetosRouteChildren = {
+  AuthenticatedProjetosProjetoIdRoute: AuthenticatedProjetosProjetoIdRoute,
+}
+
+const AuthenticatedProjetosRouteWithChildren =
+  AuthenticatedProjetosRoute._addFileChildren(
+    AuthenticatedProjetosRouteChildren,
+  )
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
@@ -308,7 +341,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedEquipeRoute: typeof AuthenticatedEquipeRoute
   AuthenticatedPessoasRoute: typeof AuthenticatedPessoasRoute
-  AuthenticatedProjetosRoute: typeof AuthenticatedProjetosRoute
+  AuthenticatedProjetosRoute: typeof AuthenticatedProjetosRouteWithChildren
   AuthenticatedRelatoriosRoute: typeof AuthenticatedRelatoriosRoute
   AuthenticatedSetoresRoute: typeof AuthenticatedSetoresRoute
   AuthenticatedTarefasRoute: typeof AuthenticatedTarefasRoute
@@ -322,7 +355,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedEquipeRoute: AuthenticatedEquipeRoute,
   AuthenticatedPessoasRoute: AuthenticatedPessoasRoute,
-  AuthenticatedProjetosRoute: AuthenticatedProjetosRoute,
+  AuthenticatedProjetosRoute: AuthenticatedProjetosRouteWithChildren,
   AuthenticatedRelatoriosRoute: AuthenticatedRelatoriosRoute,
   AuthenticatedSetoresRoute: AuthenticatedSetoresRoute,
   AuthenticatedTarefasRoute: AuthenticatedTarefasRoute,
