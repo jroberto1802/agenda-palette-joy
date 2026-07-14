@@ -58,6 +58,9 @@ import {
   TAREFA_VISIBILIDADE_OPTIONS,
 } from "@/utils/tarefas";
 
+/** Acima de Dialog/Sheet (z-50) e do drawer de subtarefa (z-[70]). */
+const META_OVERLAY_Z = "z-[100]";
+
 export type TarefaMetaFormValues = {
   projeto_id: string | null;
   setor_id: string | null;
@@ -102,7 +105,9 @@ function MetaIconButton({
           {children}
         </Button>
       </TooltipTrigger>
-      <TooltipContent side="bottom">{label}</TooltipContent>
+      <TooltipContent side="bottom" className={META_OVERLAY_Z}>
+        {label}
+      </TooltipContent>
     </Tooltip>
   );
 }
@@ -150,6 +155,7 @@ export function TarefaMetaToolbar({
   pessoasParaResponsavel,
   pessoasAtivas,
   emptyResponsavelLabel,
+  requireResponsavel = true,
 }: {
   form: UseFormReturn<TarefaMetaFormValues & Record<string, unknown>>;
   canEdit: boolean;
@@ -160,6 +166,8 @@ export function TarefaMetaToolbar({
   pessoasParaResponsavel: ProfileWithSetor[];
   pessoasAtivas: ProfileWithSetor[];
   emptyResponsavelLabel: string;
+  /** Na tarefa principal é obrigatório; subtarefa pode ficar sem responsável. */
+  requireResponsavel?: boolean;
 }) {
   const projetoId = form.watch("projeto_id");
   const setorId = form.watch("setor_id");
@@ -195,7 +203,10 @@ export function TarefaMetaToolbar({
                     </MetaIconButton>
                   </span>
                 </PopoverTrigger>
-                <PopoverContent className="w-64 space-y-2 p-3" align="start">
+                <PopoverContent
+                  className={cn("w-64 space-y-2 p-3", META_OVERLAY_Z)}
+                  align="start"
+                >
                   <p className="text-xs font-medium text-muted-foreground">Projeto</p>
                   <Select
                     value={field.value ?? "none"}
@@ -211,7 +222,7 @@ export function TarefaMetaToolbar({
                         <SelectValue placeholder="Nenhum" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
+                    <SelectContent className={META_OVERLAY_Z}>
                       <SelectItem value="none">Nenhum</SelectItem>
                       {projetos.map((projeto) => (
                         <SelectItem key={projeto.id} value={projeto.id}>
@@ -245,7 +256,7 @@ export function TarefaMetaToolbar({
                     </MetaIconButton>
                   </span>
                 </PopoverTrigger>
-                <PopoverContent className="w-64 space-y-2 p-3" align="start">
+                <PopoverContent className={cn("w-64 space-y-2 p-3", META_OVERLAY_Z)} align="start">
                   <p className="text-xs font-medium text-muted-foreground">Setor</p>
                   <Select
                     value={field.value ?? "none"}
@@ -257,7 +268,7 @@ export function TarefaMetaToolbar({
                         <SelectValue placeholder="Nenhum" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
+                    <SelectContent className={META_OVERLAY_Z}>
                       <SelectItem value="none">Nenhum</SelectItem>
                       {setores.map((s) => (
                         <SelectItem key={s.id} value={s.id}>
@@ -286,24 +297,34 @@ export function TarefaMetaToolbar({
                       label={
                         atribuidoIds.length
                           ? `Responsáveis: ${atribuidoIds.length}`
-                          : "Responsável (obrigatório)"
+                          : requireResponsavel
+                            ? "Responsável (obrigatório)"
+                            : "Responsável"
                       }
                       active={atribuidoIds.length > 0}
                       disabled={!canEdit}
-                      className={!atribuidoIds.length ? "text-destructive" : undefined}
+                      className={
+                        requireResponsavel && !atribuidoIds.length
+                          ? "text-destructive"
+                          : undefined
+                      }
                     >
                       <UserRound className="h-4 w-4" />
                     </MetaIconButton>
                   </span>
                 </PopoverTrigger>
-                <PopoverContent className="w-80 space-y-2 p-3" align="start">
+                <PopoverContent className={cn("w-80 space-y-2 p-3", META_OVERLAY_Z)} align="start">
                   <p className="text-xs font-medium text-muted-foreground">Responsáveis</p>
                   <PessoasMultiSelect
                     pessoas={pessoasParaResponsavel}
                     value={field.value}
                     onChange={field.onChange}
                     disabled={!canEdit}
-                    placeholder="Selecione responsáveis"
+                    placeholder={
+                      requireResponsavel
+                        ? "Selecione responsáveis"
+                        : "Nenhum responsável"
+                    }
                     emptyLabel={emptyResponsavelLabel}
                   />
                   <FormMessage />
@@ -331,7 +352,7 @@ export function TarefaMetaToolbar({
                     </MetaIconButton>
                   </span>
                 </PopoverTrigger>
-                <PopoverContent className="w-80 space-y-3 p-3" align="start">
+                <PopoverContent className={cn("w-80 space-y-3 p-3", META_OVERLAY_Z)} align="start">
                   <p className="text-xs font-medium text-muted-foreground">Visibilidade</p>
                   <Select
                     value={field.value}
@@ -343,7 +364,7 @@ export function TarefaMetaToolbar({
                         <SelectValue />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
+                    <SelectContent className={META_OVERLAY_Z}>
                       {TAREFA_VISIBILIDADE_OPTIONS.map((value) => (
                         <SelectItem key={value} value={value}>
                           {TAREFA_VISIBILIDADE_LABELS[value]}
@@ -419,7 +440,7 @@ export function TarefaMetaToolbar({
                     </MetaIconButton>
                   </span>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
+                <PopoverContent className={cn("w-auto p-0", META_OVERLAY_Z)} align="start">
                   <DatePopoverBody value={field.value} onChange={field.onChange} />
                 </PopoverContent>
               </Popover>
@@ -450,7 +471,7 @@ export function TarefaMetaToolbar({
                     </MetaIconButton>
                   </span>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
+                <PopoverContent className={cn("w-auto p-0", META_OVERLAY_Z)} align="start">
                   <DatePopoverBody value={field.value} onChange={field.onChange} />
                 </PopoverContent>
               </Popover>
@@ -482,7 +503,7 @@ export function TarefaMetaToolbar({
                     </MetaIconButton>
                   </span>
                 </PopoverTrigger>
-                <PopoverContent className="w-52 space-y-2 p-3" align="start">
+                <PopoverContent className={cn("w-52 space-y-2 p-3", META_OVERLAY_Z)} align="start">
                   <p className="text-xs font-medium text-muted-foreground">Prioridade</p>
                   <Select
                     value={field.value}
@@ -494,7 +515,7 @@ export function TarefaMetaToolbar({
                         <SelectValue />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
+                    <SelectContent className={META_OVERLAY_Z}>
                       {(Object.keys(TAREFA_PRIORIDADE_LABELS) as TarefaPrioridade[]).map((p) => (
                         <SelectItem key={p} value={p}>
                           <span className="flex items-center gap-2">
@@ -533,7 +554,7 @@ export function TarefaMetaToolbar({
                     </MetaIconButton>
                   </span>
                 </PopoverTrigger>
-                <PopoverContent className="w-56 space-y-2 p-3" align="start">
+                <PopoverContent className={cn("w-56 space-y-2 p-3", META_OVERLAY_Z)} align="start">
                   <p className="text-xs font-medium text-muted-foreground">Status</p>
                   <Select
                     value={field.value}
@@ -545,7 +566,7 @@ export function TarefaMetaToolbar({
                         <SelectValue />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
+                    <SelectContent className={META_OVERLAY_Z}>
                       {(Object.keys(TAREFA_STATUS_LABELS) as TarefaStatus[]).map((s) => (
                         <SelectItem key={s} value={s}>
                           {TAREFA_STATUS_LABELS[s]}
@@ -582,7 +603,7 @@ export function TarefaMetaToolbar({
                     </MetaIconButton>
                   </span>
                 </PopoverTrigger>
-                <PopoverContent className="w-64 space-y-2 p-3" align="start">
+                <PopoverContent className={cn("w-64 space-y-2 p-3", META_OVERLAY_Z)} align="start">
                   <p className="text-xs font-medium text-muted-foreground">Lembretes</p>
                   <div className="space-y-2">
                     {(Object.keys(TAREFA_LEMBRETE_LABELS) as TarefaLembreteOpcao[]).map((opcao) => {
@@ -626,7 +647,7 @@ export function TarefaMetaToolbar({
               </MetaIconButton>
             </span>
           </PopoverTrigger>
-          <PopoverContent className="w-64 p-3" align="start">
+          <PopoverContent className={cn("w-64 p-3", META_OVERLAY_Z)} align="start">
             <p className="text-sm font-medium">Recorrência</p>
             <p className="mt-1 text-sm text-muted-foreground">
               Funcionalidade disponível em breve.

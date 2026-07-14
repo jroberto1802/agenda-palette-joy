@@ -34,6 +34,9 @@ import {
   TAREFA_VISIBILIDADE_OPTIONS,
 } from "@/utils/tarefas";
 
+/** Acima de Dialog/Sheet (z-50) e do drawer de subtarefa (z-[70]). */
+const META_OVERLAY_Z = "z-[100]";
+
 export function MinhaAgendaBadge({
   tarefa,
   className,
@@ -65,7 +68,7 @@ function AuthorAvatar({
           <ProfileAvatar name={name} avatarUrl={avatarUrl} className="h-5 w-5" />
         </span>
       </TooltipTrigger>
-      <TooltipContent side="top">
+      <TooltipContent side="top" className={META_OVERLAY_Z}>
         <p className="text-xs">
           {label}: {name}
         </p>
@@ -105,7 +108,9 @@ function MetaIconButton({
           {children}
         </Button>
       </TooltipTrigger>
-      <TooltipContent side="top">{label}</TooltipContent>
+      <TooltipContent side="top" className={META_OVERLAY_Z}>
+        {label}
+      </TooltipContent>
     </Tooltip>
   );
 }
@@ -218,7 +223,7 @@ export function SubtarefaRow({
                 </MetaIconButton>
               </span>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
+            <PopoverContent className={cn("w-auto p-0", META_OVERLAY_Z)} align="end">
               <Calendar
                 mode="single"
                 selected={prazoDate ?? undefined}
@@ -276,7 +281,7 @@ export function SubtarefaRow({
                 </MetaIconButton>
               </span>
             </PopoverTrigger>
-            <PopoverContent className="w-80 space-y-2 p-3" align="end">
+            <PopoverContent className={cn("w-80 space-y-2 p-3", META_OVERLAY_Z)} align="end">
               <p className="text-xs font-medium text-muted-foreground">Responsáveis</p>
               <PessoasMultiSelect
                 pessoas={pessoasDisponiveis}
@@ -307,7 +312,7 @@ export function SubtarefaRow({
                 </MetaIconButton>
               </span>
             </PopoverTrigger>
-            <PopoverContent className="w-64 space-y-2 p-3" align="end">
+            <PopoverContent className={cn("w-64 space-y-2 p-3", META_OVERLAY_Z)} align="end">
               <p className="text-xs font-medium text-muted-foreground">Visibilidade</p>
               <Select
                 value={subtarefa.visibilidade ?? "none"}
@@ -322,7 +327,7 @@ export function SubtarefaRow({
                 <SelectTrigger>
                   <SelectValue placeholder="Herdar da tarefa" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className={META_OVERLAY_Z}>
                   <SelectItem value="none">Herdar da tarefa</SelectItem>
                   {TAREFA_VISIBILIDADE_OPTIONS.map((value) => (
                     <SelectItem key={value} value={value}>

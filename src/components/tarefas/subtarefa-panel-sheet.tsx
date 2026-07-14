@@ -118,11 +118,17 @@ function toFormValues(
   subtarefa?: SubtarefaDetail | null,
   parentTarefa?: Pick<
     TarefaWithRelations,
-    "projeto_id" | "setor_id" | "visibilidade"
+    "projeto_id" | "setor_id" | "visibilidade" | "observadores"
   > | null,
 ): SubtarefaPanelSchema {
   const rec = parseRecorrencia(subtarefa?.recorrencia);
   const atribuidoIds = subtarefa?.responsaveis?.map((r) => r.usuario_id) ?? [];
+  const inheritedVisibilidade =
+    (subtarefa?.visibilidade as TarefaVisibilidade | null | undefined) ??
+    (parentTarefa?.visibilidade as TarefaVisibilidade | undefined) ??
+    "somente_para_mim";
+  const ownObservadores = subtarefa?.observadores?.map((o) => o.usuario_id) ?? [];
+  const parentObservadores = parentTarefa?.observadores?.map((o) => o.usuario_id) ?? [];
 
   return {
     titulo: subtarefa?.titulo ?? "",
@@ -136,11 +142,13 @@ function toFormValues(
     data_vencimento: subtarefa?.data_vencimento
       ? new Date(subtarefa.data_vencimento)
       : null,
-    visibilidade:
-      (subtarefa?.visibilidade as TarefaVisibilidade | null | undefined) ??
-      (parentTarefa?.visibilidade as TarefaVisibilidade | undefined) ??
-      "somente_para_mim",
-    observador_ids: subtarefa?.observadores?.map((o) => o.usuario_id) ?? [],
+    visibilidade: inheritedVisibilidade,
+    observador_ids:
+      ownObservadores.length > 0
+        ? ownObservadores
+        : inheritedVisibilidade === "pessoas_especificas" && !subtarefa?.visibilidade
+          ? parentObservadores
+          : ownObservadores,
     lembretes: parseLembretes(subtarefa?.lembretes),
     recorrencia_tipo: rec?.tipo ?? "nenhuma",
     recorrencia_dias_semana: rec?.dias_semana ?? [],
@@ -426,6 +434,7 @@ export function SubtarefaPanelSheet({
                       setores={setoresPermitidos}
                       pessoasParaResponsavel={pessoasParaResponsavel}
                       pessoasAtivas={pessoasAtivas}
+                      requireResponsavel={false}
                       emptyResponsavelLabel={
                         projetoId
                           ? "Defina a equipe do projeto antes de atribuir responsáveis"
