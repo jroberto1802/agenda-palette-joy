@@ -374,24 +374,43 @@ export function TarefaPanelSheet({
     comentarios,
   ]);
 
-  const handleSave = form.handleSubmit(async (values) => {
-    try {
-      const payload = toPayload(values);
-      if (isCreate) {
-        const created = await createTarefa.mutateAsync(payload);
-        toast.success("Tarefa criada");
-        onSaved?.(created.id);
-      } else if (tarefaId) {
-        await updateTarefa.mutateAsync({ id: tarefaId, data: payload });
-        toast.success("Tarefa atualizada");
-        setEditingField(null);
+  const handleSave = form.handleSubmit(
+    async (values) => {
+      try {
+        const payload = toPayload(values);
+        if (isCreate) {
+          const created = await createTarefa.mutateAsync(payload);
+          toast.success("Tarefa criada");
+          onSaved?.(created.id);
+        } else if (tarefaId) {
+          await updateTarefa.mutateAsync({ id: tarefaId, data: payload });
+          toast.success("Tarefa atualizada");
+          setEditingField(null);
+        }
+      } catch (error) {
+        toast.error("Erro ao salvar tarefa", {
+          description: getSupabaseErrorMessage(error as Error),
+        });
       }
-    } catch (error) {
-      toast.error("Erro ao salvar tarefa", {
-        description: getSupabaseErrorMessage(error as Error),
+    },
+    (errors) => {
+      const messages = Object.values(errors)
+        .map((error) =>
+          error && typeof error === "object" && "message" in error
+            ? String(error.message ?? "")
+            : "",
+        )
+        .filter(Boolean);
+
+      toast.error(isCreate ? "Não foi possível criar a tarefa" : "Não foi possível salvar a tarefa", {
+        description:
+          messages[0] ??
+          "Preencha os campos obrigatórios (título e responsável) e tente novamente.",
       });
-    }
-  });
+
+      if (errors.titulo) setEditingField("titulo");
+    },
+  );
 
   const handleAddSubtarefa = async () => {
     if (!tarefaId || !novaSubtarefa.trim()) return;
@@ -407,6 +426,9 @@ export function TarefaPanelSheet({
 
   const saving = createTarefa.isPending || updateTarefa.isPending;
   const showInteractions = !isCreate && !!tarefaId;
+  const {
+    formState: { errors: formErrors },
+  } = form;
 
   const startFieldEdit = (field: EditableTarefaField) => {
     if (!canEdit) return;
@@ -448,8 +470,8 @@ export function TarefaPanelSheet({
                     </DialogTitle>
                     <DialogDescription className="text-left">
                       {isCreate
-                        ? "Defina os metadados pelos ícones e dê duplo clique no título ou descrição para editar."
-                        : "Clique nos ícones para alterar metadados. Duplo clique no título ou descrição para editar."}
+                        ? "Preencha o título, selecione ao menos um responsável pelos ícones e salve."
+                        : "Clique nos ícones para alterar metadados. Duplo clique na descrição para editar."}
                     </DialogDescription>
                   </div>
                   {!readOnly && (
@@ -468,7 +490,18 @@ export function TarefaPanelSheet({
                         </>
                       )}
                       {canEdit && (
-                        <Button type="submit" size="sm" className="gap-2" disabled={saving}>
+                        <Button
+                          type="submit"
+                          size="sm"
+                          className="gap-2"
+                          disabled={saving}
+                          onClick={(event) => {
+                            // Garante feedback mesmo se o submit nativo falhar silenciosamente.
+                            if (event.currentTarget.form) return;
+                            event.preventDefault();
+                            void handleSave();
+                          }}
+                        >
                           <Save className="h-4 w-4" />
                           {saving ? "Salvando..." : isCreate ? "Criar tarefa" : "Salvar"}
                         </Button>
@@ -497,6 +530,24 @@ export function TarefaPanelSheet({
                       }
                     />
 
+                    {(formErrors.atribuido_ids ||
+                      formErrors.visibilidade ||
+                      formErrors.setor_id ||
+                      formErrors.projeto_id ||
+                      formErrors.observador_ids) && (
+                      <div
+                        role="alert"
+                        className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                      >
+                        {formErrors.atribuido_ids?.message ||
+                          formErrors.observador_ids?.message ||
+                          formErrors.setor_id?.message ||
+                          formErrors.projeto_id?.message ||
+                          formErrors.visibilidade?.message ||
+                          "Verifique os campos obrigatórios dos metadados."}
+                      </div>
+                    )}
+
                     <FormField
                       control={form.control}
                       name="titulo"
@@ -504,7 +555,7 @@ export function TarefaPanelSheet({
                         <FormItem>
                           <EditableOnDoubleClick
                             locked={!canEdit}
-                            forceEditable={false}
+                            forceEditable={isCreate}
                             editing={editingField === "titulo"}
                             onStartEdit={() => startFieldEdit("titulo")}
                             onEndEdit={endFieldEdit}
