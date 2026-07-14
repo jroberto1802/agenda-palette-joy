@@ -198,6 +198,74 @@ export type Database = {
           },
         ];
       };
+      equipe_grupos: {
+        Row: {
+          created_at: string;
+          criado_por: string | null;
+          id: string;
+          nome: string;
+          ordem: number;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          criado_por?: string | null;
+          id?: string;
+          nome: string;
+          ordem?: number;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          criado_por?: string | null;
+          id?: string;
+          nome?: string;
+          ordem?: number;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "equipe_grupos_criado_por_fkey",
+            columns: ["criado_por"],
+            isOneToOne: false,
+            referencedRelation: "profiles",
+            referencedColumns: ["id"],
+          },
+        ];
+      };
+      equipe_grupo_membros: {
+        Row: {
+          created_at: string;
+          grupo_id: string;
+          usuario_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          grupo_id: string;
+          usuario_id: string;
+        };
+        Update: {
+          created_at?: string;
+          grupo_id?: string;
+          usuario_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "equipe_grupo_membros_grupo_id_fkey",
+            columns: ["grupo_id"],
+            isOneToOne: false,
+            referencedRelation: "equipe_grupos",
+            referencedColumns: ["id"],
+          },
+          {
+            foreignKeyName: "equipe_grupo_membros_usuario_id_fkey",
+            columns: ["usuario_id"],
+            isOneToOne: false,
+            referencedRelation: "profiles",
+            referencedColumns: ["id"],
+          },
+        ];
+      };
       notificacoes: {
         Row: {
           created_at: string;

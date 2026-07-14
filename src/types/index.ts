@@ -49,6 +49,13 @@ export type ProjetoFormData = {
 
 export type ProjetoMembro = Pick<Profile, "id" | "nome_completo" | "avatar_url" | "cargo" | "papel">;
 
+export type EquipeGrupo = Tables<"equipe_grupos">;
+export type EquipeGrupoMembro = Tables<"equipe_grupo_membros">;
+
+export type EquipeGrupoWithMembros = EquipeGrupo & {
+  membros: EquipeGrupoMembro[];
+};
+
 export type ProfileFormData = {
   nome_completo: string;
   email?: string;

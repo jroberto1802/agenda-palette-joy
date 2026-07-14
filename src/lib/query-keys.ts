@@ -16,6 +16,11 @@ export const projetoKeys = {
   detail: (id: string) => [...projetoKeys.all, "detail", id] as const,
 };
 
+export const equipeGrupoKeys = {
+  all: ["equipe-grupos"] as const,
+  list: () => [...equipeGrupoKeys.all, "list"] as const,
+};
+
 export const tarefaKeys = {
   all: ["tarefas"] as const,
   list: (filters?: Record<string, string>) => [...tarefaKeys.all, "list", filters ?? {}] as const,
