@@ -19,6 +19,7 @@ import { useProfile } from "@/hooks/use-profile";
 import { useDashboardKpis, useRecentTarefas } from "@/hooks/use-tarefas";
 import { isAvisoLido } from "@/services/avisos";
 import { isAvisoAtivo } from "@/utils/avisos";
+import { formatDate } from "@/utils/formatters";
 import { TAREFA_PRIORIDADE_COLORS, TAREFA_STATUS_LABELS, formatResponsaveisLabel } from "@/utils/tarefas";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -28,12 +29,16 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 function Dashboard() {
   const { data: profile } = useProfile();
   const { data: kpis, isLoading, isError } = useDashboardKpis();
-  const { data: recentTarefas, isLoading: loadingRecent } = useRecentTarefas(5);
-  const { data: avisos } = useAvisos();
+  const {
+    data: recentTarefas,
+    isLoading: loadingRecent,
+    isError: errorRecent,
+  } = useRecentTarefas(5);
+  const { data: avisos, isError: errorAvisos } = useAvisos();
 
-  const avisosNaoLidos = (avisos ?? []).filter(
-    (a) => isAvisoAtivo(a) && !isAvisoLido(a, profile?.id),
-  ).length;
+  const avisosNaoLidos = errorAvisos
+    ? 0
+    : (avisos ?? []).filter((a) => isAvisoAtivo(a) && !isAvisoLido(a, profile?.id)).length;
 
   return (
     <div className="space-y-6">
@@ -140,6 +145,10 @@ function Dashboard() {
                   <Skeleton key={i} className="h-14 rounded-lg" />
                 ))}
               </div>
+            ) : errorRecent ? (
+              <p className="py-4 text-sm text-destructive">
+                Não foi possível carregar as próximas tarefas.
+              </p>
             ) : !recentTarefas?.length ? (
               <div className="text-center py-8 text-sm text-muted-foreground">
                 <p>Nenhuma tarefa pendente.</p>
@@ -158,18 +167,22 @@ function Dashboard() {
                       <p className="font-medium truncate">{tarefa.titulo}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">
                         {formatResponsaveisLabel(tarefa)}
-                        {tarefa.data_vencimento && ` · ${formatDate(tarefa.data_vencimento)}`}
+                        {tarefa.data_vencimento
+                          ? ` · ${formatDate(tarefa.data_vencimento)}`
+                          : ""}
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       <Badge
                         variant="outline"
-                        className={TAREFA_PRIORIDADE_COLORS[tarefa.prioridade]}
+                        className={
+                          TAREFA_PRIORIDADE_COLORS[tarefa.prioridade] ?? undefined
+                        }
                       >
                         {tarefa.prioridade}
                       </Badge>
                       <Badge variant="secondary" className="hidden sm:inline-flex">
-                        {TAREFA_STATUS_LABELS[tarefa.status]}
+                        {TAREFA_STATUS_LABELS[tarefa.status] ?? tarefa.status}
                       </Badge>
                     </div>
                   </div>
