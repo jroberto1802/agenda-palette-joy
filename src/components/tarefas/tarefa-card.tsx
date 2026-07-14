@@ -128,9 +128,9 @@ export function TarefaCard({
                         Concluir
                       </DropdownMenuItem>
                     )}
-                    {tarefa.status !== "bloqueada" && tarefa.status !== "concluida" && (
-                      <DropdownMenuItem onClick={() => onStatusChange("bloqueada")}>
-                        Bloquear
+                    {tarefa.status !== "cancelada" && tarefa.status !== "concluida" && (
+                      <DropdownMenuItem onClick={() => onStatusChange("cancelada")}>
+                        Cancelar
                       </DropdownMenuItem>
                     )}
                     {tarefa.status !== "a_fazer" && tarefa.status !== "concluida" && (

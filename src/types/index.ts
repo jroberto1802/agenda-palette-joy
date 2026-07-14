@@ -81,7 +81,7 @@ export type DashboardKpis = {
   tarefasAFazer: number;
   tarefasEmAndamento: number;
   tarefasConcluidas: number;
-  tarefasBloqueadas: number;
+  tarefasCanceladas: number;
   tarefasVencendoHoje: number;
   totalSetores: number;
   totalPessoas: number;

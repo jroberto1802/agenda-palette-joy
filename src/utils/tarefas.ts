@@ -11,22 +11,22 @@ import type {
 export const KANBAN_COLUMNS: { id: TarefaStatus; label: string }[] = [
   { id: "a_fazer", label: "A fazer" },
   { id: "em_andamento", label: "Em andamento" },
-  { id: "bloqueada", label: "Bloqueada" },
+  { id: "cancelada", label: "Cancelada" },
   { id: "concluida", label: "Concluída" },
 ];
 
 export const TAREFA_STATUS_LABELS: Record<TarefaStatus, string> = {
   a_fazer: "A fazer",
   em_andamento: "Em andamento",
-  bloqueada: "Bloqueada",
+  cancelada: "Cancelada",
   concluida: "Concluída",
 };
 
 export const TAREFA_PRIORIDADE_LABELS: Record<TarefaPrioridade, string> = {
-  P1: "P1 — Urgente",
-  P2: "P2 — Alta",
-  P3: "P3 — Média",
-  P4: "P4 — Baixa",
+  P1: "P1",
+  P2: "P2",
+  P3: "P3",
+  P4: "P4",
 };
 
 export const TAREFA_PRIORIDADE_COLORS: Record<TarefaPrioridade, string> = {
@@ -36,19 +36,31 @@ export const TAREFA_PRIORIDADE_COLORS: Record<TarefaPrioridade, string> = {
   P4: "bg-slate-500/15 text-slate-700 dark:text-slate-400 border-slate-500/30",
 };
 
+export const TAREFA_PRIORIDADE_DOT: Record<TarefaPrioridade, string> = {
+  P1: "bg-red-500",
+  P2: "bg-orange-500",
+  P3: "bg-amber-500",
+  P4: "bg-slate-400",
+};
+
 export const TAREFA_STATUS_COLORS: Record<TarefaStatus, string> = {
   a_fazer: "bg-slate-500/15 text-slate-700 dark:text-slate-300",
   em_andamento: "bg-blue-500/15 text-blue-700 dark:text-blue-400",
-  bloqueada: "bg-red-500/15 text-red-700 dark:text-red-400",
+  cancelada: "bg-red-500/15 text-red-700 dark:text-red-400",
   concluida: "bg-green-500/15 text-green-700 dark:text-green-400",
 };
 
 export const TAREFA_VISIBILIDADE_LABELS: Record<TarefaVisibilidade, string> = {
-  todos_empresa: "Todos da empresa",
-  todos_setor: "Todos do setor",
   somente_para_mim: "Somente para mim",
-  pessoas_especificas: "Selecionar pessoas específicas",
+  todos_empresa: "Todos",
+  todos_setor: "Todos do setor",
+  todos_projeto: "Todos do projeto",
+  pessoas_especificas: "Pessoas específicas",
 };
+
+export const TAREFA_VISIBILIDADE_OPTIONS = Object.keys(
+  TAREFA_VISIBILIDADE_LABELS,
+) as TarefaVisibilidade[];
 
 export const TAREFA_LEMBRETE_LABELS: Record<TarefaLembreteOpcao, string> = {
   no_prazo: "No prazo",

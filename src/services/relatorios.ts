@@ -30,7 +30,7 @@ export async function getRelatoriosData(): Promise<RelatoriosData> {
     responsaveisPorTarefa.set(row.tarefa_id, current);
   }
 
-  const porStatus = (["a_fazer", "em_andamento", "bloqueada", "concluida"] as TarefaStatus[]).map(
+  const porStatus = (["a_fazer", "em_andamento", "cancelada", "concluida"] as TarefaStatus[]).map(
     (status) => ({
       status,
       total: tarefas.filter((t) => t.status === status).length,

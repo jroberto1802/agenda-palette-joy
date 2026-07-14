@@ -1,42 +1,25 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
-import { Bell, CalendarIcon, ChevronRight, MessageSquare, Paperclip, Plus, Save, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { ChevronRight, MessageSquare, Paperclip, Plus, Save, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
-import { ProfileAvatar } from "@/components/common/profile-avatar";
 import { CommentsThread } from "@/components/common/comments-thread";
 import { EditableOnDoubleClick } from "@/components/common/editable-on-double-click";
 import { TarefaAnexosSection } from "@/components/tarefas/tarefa-anexos-section";
-import {
-  TarefaRecorrenciaFields,
-  type RecorrenciaFormValues,
-} from "@/components/tarefas/tarefa-recorrencia-fields";
+import { TarefaMetaToolbar } from "@/components/tarefas/tarefa-meta-toolbar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Form,
   FormControl,
   FormField,
   FormItem,
-  FormLabel,
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -47,7 +30,6 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { PessoasMultiSelect } from "@/components/common/pessoas-multi-select";
 import { usePessoas } from "@/hooks/use-pessoas";
 import { useProjetos } from "@/hooks/use-projetos";
 import { useProfile } from "@/hooks/use-profile";
@@ -66,33 +48,24 @@ import {
   useUpdateTarefa,
 } from "@/hooks/use-tarefas";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
-import { cn } from "@/lib/utils";
 import type {
-  ProfileWithSetor,
   RecorrenciaConfig,
   RecorrenciaTipo,
   TarefaFormData,
-  TarefaLembreteOpcao,
-  TarefaPrioridade,
-  TarefaStatus,
   TarefaVisibilidade,
   TarefaWithRelations,
 } from "@/types";
-import { formatRecorrencia, parseRecorrencia } from "@/utils/recorrencia";
+import { parseRecorrencia } from "@/utils/recorrencia";
 import { isAdmin, isGerente } from "@/utils/permissions";
 import {
-  TAREFA_LEMBRETE_LABELS,
   TAREFA_PRIORIDADE_COLORS,
-  TAREFA_PRIORIDADE_LABELS,
   TAREFA_STATUS_COLORS,
   TAREFA_STATUS_LABELS,
-  TAREFA_VISIBILIDADE_LABELS,
   canEditTarefa,
   canEditVisibilidade,
   getSetoresPermitidos,
   parseLembretes,
 } from "@/utils/tarefas";
-import type { UseFormReturn } from "react-hook-form";
 
 const tarefaPanelSchema = z
   .object({
@@ -102,13 +75,14 @@ const tarefaPanelSchema = z
     setor_id: z.string().nullable(),
     atribuido_ids: z.array(z.string()).min(1, "Selecione ao menos um responsável"),
     prioridade: z.enum(["P1", "P2", "P3", "P4"]),
-    status: z.enum(["a_fazer", "em_andamento", "bloqueada", "concluida"]),
+    status: z.enum(["a_fazer", "em_andamento", "cancelada", "concluida"]),
     data_inicio: z.date().nullable(),
     data_vencimento: z.date().nullable(),
     tagsInput: z.string(),
     visibilidade: z.enum([
       "todos_empresa",
       "todos_setor",
+      "todos_projeto",
       "somente_para_mim",
       "pessoas_especificas",
     ]),
@@ -127,6 +101,13 @@ const tarefaPanelSchema = z
         path: ["setor_id"],
       });
     }
+    if (data.visibilidade === "todos_projeto" && !data.projeto_id) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Projeto é obrigatório para visibilidade "Todos do projeto".',
+        path: ["projeto_id"],
+      });
+    }
     if (data.visibilidade === "pessoas_especificas" && data.observador_ids.length === 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -138,21 +119,7 @@ const tarefaPanelSchema = z
 
 type TarefaPanelSchema = z.infer<typeof tarefaPanelSchema>;
 
-type EditableTarefaField =
-  | "titulo"
-  | "projeto_id"
-  | "setor_id"
-  | "atribuido_ids"
-  | "data_inicio"
-  | "descricao"
-  | "data_vencimento"
-  | "prioridade"
-  | "status"
-  | "tagsInput"
-  | "visibilidade"
-  | "lembretes"
-  | "observador_ids"
-  | "recorrencia";
+type EditableTarefaField = "titulo" | "descricao";
 
 function parseTags(input: string): string[] {
   return input
@@ -161,33 +128,30 @@ function parseTags(input: string): string[] {
     .filter(Boolean);
 }
 
-function defaultVisibilidade(setorId?: string | null): TarefaVisibilidade {
-  return setorId ? "todos_setor" : "todos_empresa";
-}
-
 function toFormValues(
   tarefa?: TarefaWithRelations | null,
-  defaultSetorId?: string | null,
-  defaultResponsavelId?: string | null,
   defaultProjetoId?: string | null,
 ): TarefaPanelSchema {
   const rec = parseRecorrencia(tarefa?.recorrencia);
   const atribuidoIds =
     tarefa?.responsaveis?.map((r) => r.usuario_id) ??
-    (tarefa?.atribuido_a ? [tarefa.atribuido_a] : defaultResponsavelId ? [defaultResponsavelId] : []);
+    (tarefa?.atribuido_a ? [tarefa.atribuido_a] : []);
 
   return {
     titulo: tarefa?.titulo ?? "",
     descricao: tarefa?.descricao ?? "",
     projeto_id: tarefa?.projeto_id ?? defaultProjetoId ?? null,
-    setor_id: tarefa?.setor_id ?? defaultSetorId ?? null,
+    setor_id: tarefa?.setor_id ?? null,
     atribuido_ids: atribuidoIds,
     prioridade: tarefa?.prioridade ?? "P4",
-    status: tarefa?.status ?? "a_fazer",
+    status:
+      (tarefa?.status as string | undefined) === "bloqueada"
+        ? "cancelada"
+        : (tarefa?.status ?? "a_fazer"),
     data_inicio: tarefa?.data_inicio ? new Date(tarefa.data_inicio) : null,
     data_vencimento: tarefa?.data_vencimento ? new Date(tarefa.data_vencimento) : null,
     tagsInput: tarefa?.tags?.join(", ") ?? "",
-    visibilidade: tarefa?.visibilidade ?? defaultVisibilidade(defaultSetorId),
+    visibilidade: (tarefa?.visibilidade as TarefaVisibilidade | undefined) ?? "somente_para_mim",
     observador_ids: tarefa?.observadores?.map((o) => o.usuario_id) ?? [],
     lembretes: parseLembretes(tarefa?.lembretes),
     recorrencia_tipo: rec?.tipo ?? "nenhuma",
@@ -226,103 +190,6 @@ function toPayload(values: TarefaPanelSchema): TarefaFormData {
     observador_ids: values.observador_ids,
     lembretes: values.lembretes,
   };
-}
-
-function DateField({
-  label,
-  value,
-  onChange,
-  disabled,
-}: {
-  label: string;
-  value: Date | null;
-  onChange: (date: Date | null) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <div className="space-y-2">
-      <p className="text-xs font-medium text-muted-foreground">{label}</p>
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={disabled}
-            className={cn(
-              "w-full justify-start pl-3 text-left font-normal",
-              !value && "text-muted-foreground",
-            )}
-          >
-            {value ? format(value, "dd/MM/yyyy", { locale: ptBR }) : "Sem data"}
-            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
-          <Calendar
-            mode="single"
-            selected={value ?? undefined}
-            onSelect={onChange}
-            locale={ptBR}
-            initialFocus
-          />
-          {value && (
-            <div className="p-2 border-t">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="w-full"
-                onClick={() => onChange(null)}
-              >
-                Remover data
-              </Button>
-            </div>
-          )}
-        </PopoverContent>
-      </Popover>
-    </div>
-  );
-}
-
-function MetaChip({
-  label,
-  children,
-  className,
-}: {
-  label: string;
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <div
-      className={cn(
-        "flex min-w-0 max-w-full items-center gap-1.5 rounded-full border bg-muted/40 px-2.5 py-1 text-xs",
-        className,
-      )}
-    >
-      <span className="shrink-0 font-medium text-muted-foreground">{label}</span>
-      <div className="min-w-0">{children}</div>
-    </div>
-  );
-}
-
-function PersonRow({
-  label,
-  name,
-  avatarUrl,
-}: {
-  label: string;
-  name: string;
-  avatarUrl?: string | null;
-}) {
-  return (
-    <MetaChip label={label}>
-      <span className="flex items-center gap-1.5">
-        <ProfileAvatar name={name} avatarUrl={avatarUrl} className="h-5 w-5" />
-        <span className="truncate font-medium text-foreground">{name}</span>
-      </span>
-    </MetaChip>
-  );
 }
 
 export function TarefaPanelSheet({
@@ -434,10 +301,9 @@ export function TarefaPanelSheet({
 
   const form = useForm<TarefaPanelSchema>({
     resolver: zodResolver(tarefaPanelSchema),
-    defaultValues: toFormValues(null, profile?.setor_id, profile?.id, defaultProjetoId),
+    defaultValues: toFormValues(null, defaultProjetoId),
   });
 
-  const visibilidade = form.watch("visibilidade");
   const projetoId = form.watch("projeto_id");
   const setorId = form.watch("setor_id");
   const atribuidoIds = form.watch("atribuido_ids");
@@ -460,24 +326,9 @@ export function TarefaPanelSheet({
 
   useEffect(() => {
     if (!open) return;
-    form.reset(toFormValues(tarefa ?? null, profile?.setor_id, undefined, defaultProjetoId));
+    form.reset(toFormValues(tarefa ?? null, defaultProjetoId));
     setNovaSubtarefa("");
-  }, [open, tarefa, profile?.setor_id, defaultProjetoId, form]);
-
-  useEffect(() => {
-    if (!open || !!tarefa || !isCreate) return;
-    const currentProjetoId = form.getValues("projeto_id");
-    if (!currentProjetoId) {
-      if (profile?.id) form.setValue("atribuido_ids", [profile.id]);
-      return;
-    }
-    if (!projetoMembros) return;
-    if (profile?.id && projetoMembros.some((m) => m.id === profile.id)) {
-      form.setValue("atribuido_ids", [profile.id]);
-    } else {
-      form.setValue("atribuido_ids", []);
-    }
-  }, [open, tarefa, isCreate, projetoMembros, profile?.id, form]);
+  }, [open, tarefa, defaultProjetoId, form]);
 
   const criadorDisplay = useMemo(() => {
     if (tarefa?.criador) return tarefa.criador;
@@ -491,15 +342,10 @@ export function TarefaPanelSheet({
     return null;
   }, [tarefa, profile]);
 
-  const responsaveisDisplay = useMemo(() => {
-    return pessoasParaResponsavel.filter((p) => (atribuidoIds ?? []).includes(p.id));
-  }, [atribuidoIds, pessoasParaResponsavel]);
-
   const subtarefas = tarefa?.subtarefas ?? [];
   const comentarios = tarefa?.comentarios ?? [];
   const anexos = tarefa?.anexos ?? [];
   const concluidas = subtarefas.filter((s) => s.concluida).length;
-  const recorrencia = tarefa ? parseRecorrencia(tarefa.recorrencia) : null;
 
   const observadorIds = form.watch("observador_ids");
 
@@ -559,34 +405,11 @@ export function TarefaPanelSheet({
     }
   };
 
-  const toggleObservador = (pessoaId: string, checked: boolean) => {
-    const current = form.getValues("observador_ids");
-    form.setValue(
-      "observador_ids",
-      checked ? [...current, pessoaId] : current.filter((id) => id !== pessoaId),
-      { shouldValidate: true },
-    );
-  };
-
-  const toggleLembrete = (opcao: TarefaLembreteOpcao, checked: boolean) => {
-    const current = form.getValues("lembretes");
-    form.setValue(
-      "lembretes",
-      checked ? [...current, opcao] : current.filter((item) => item !== opcao),
-      { shouldValidate: true },
-    );
-  };
-
   const saving = createTarefa.isPending || updateTarefa.isPending;
   const showInteractions = !isCreate && !!tarefaId;
-  const forceFieldEditable = isCreate;
 
   const startFieldEdit = (field: EditableTarefaField) => {
-    if (field === "visibilidade" || field === "observador_ids") {
-      if (!canEditVisibility) return;
-    } else if (!canEdit) {
-      return;
-    }
+    if (!canEdit) return;
     setEditingField(field);
   };
 
@@ -621,12 +444,12 @@ export function TarefaPanelSheet({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="space-y-1">
                     <DialogTitle className="text-left">
-                      {isCreate ? "Nova tarefa" : "Detalhes da tarefa"}
+                      {isCreate ? "Nova tarefa" : "Editar tarefa"}
                     </DialogTitle>
                     <DialogDescription className="text-left">
                       {isCreate
-                        ? "Preencha os campos e salve para criar a tarefa."
-                        : "Visualize a tarefa. Dê um duplo clique em um campo para editá-lo."}
+                        ? "Defina os metadados pelos ícones e dê duplo clique no título ou descrição para editar."
+                        : "Clique nos ícones para alterar metadados. Duplo clique no título ou descrição para editar."}
                     </DialogDescription>
                   </div>
                   {!readOnly && (
@@ -657,7 +480,23 @@ export function TarefaPanelSheet({
 
               <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
                 <ScrollArea className="min-h-0 flex-1">
-                  <div className="space-y-6 p-6">
+                  <div className="space-y-4 p-6">
+                    <TarefaMetaToolbar
+                      form={form as never}
+                      canEdit={canEdit}
+                      canEditVisibility={canEditVisibility}
+                      lockProjeto={lockProjeto}
+                      projetos={projetos ?? []}
+                      setores={setoresPermitidos}
+                      pessoasParaResponsavel={pessoasParaResponsavel}
+                      pessoasAtivas={pessoasAtivas}
+                      emptyResponsavelLabel={
+                        projetoId
+                          ? "Defina a equipe do projeto antes de atribuir responsáveis"
+                          : "Nenhuma pessoa disponível"
+                      }
+                    />
+
                     <FormField
                       control={form.control}
                       name="titulo"
@@ -665,7 +504,7 @@ export function TarefaPanelSheet({
                         <FormItem>
                           <EditableOnDoubleClick
                             locked={!canEdit}
-                            forceEditable={forceFieldEditable}
+                            forceEditable={false}
                             editing={editingField === "titulo"}
                             onStartEdit={() => startFieldEdit("titulo")}
                             onEndEdit={endFieldEdit}
@@ -674,7 +513,7 @@ export function TarefaPanelSheet({
                               <FormControl>
                                 <Input
                                   placeholder="Título da tarefa"
-                                  className="border-0 px-0 text-lg font-semibold shadow-none focus-visible:ring-0"
+                                  className="rounded-xl border bg-card px-3 py-2 text-lg font-semibold shadow-sm focus-visible:ring-1"
                                   readOnly={!editable}
                                   disabled={!canEdit}
                                   {...field}
@@ -687,210 +526,6 @@ export function TarefaPanelSheet({
                       )}
                     />
 
-                    <div className="flex flex-wrap items-center gap-2">
-                      <FormField
-                        control={form.control}
-                        name="projeto_id"
-                        render={({ field }) => (
-                          <FormItem className="space-y-0">
-                            <EditableOnDoubleClick
-                              locked={!canEdit || lockProjeto}
-                              forceEditable={forceFieldEditable}
-                              editing={editingField === "projeto_id"}
-                              onStartEdit={() => startFieldEdit("projeto_id")}
-                              onEndEdit={endFieldEdit}
-                            >
-                              {(editable) => (
-                                <MetaChip label="Projeto">
-                                  <Select
-                                    value={field.value ?? "none"}
-                                    onValueChange={(v) => {
-                                      const next = v === "none" ? null : v;
-                                      field.onChange(next);
-                                      if (next) form.setValue("atribuido_ids", []);
-                                    }}
-                                    disabled={!editable}
-                                  >
-                                    <FormControl>
-                                      <SelectTrigger className="h-auto border-0 bg-transparent p-0 shadow-none focus:ring-0 [&>svg]:h-3.5 [&>svg]:w-3.5">
-                                        <SelectValue placeholder="Nenhum" />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      <SelectItem value="none">Nenhum</SelectItem>
-                                      {(projetos ?? []).map((projeto) => (
-                                        <SelectItem key={projeto.id} value={projeto.id}>
-                                          {projeto.nome}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </MetaChip>
-                              )}
-                            </EditableOnDoubleClick>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="setor_id"
-                        render={({ field }) => (
-                          <FormItem className="space-y-0">
-                            <EditableOnDoubleClick
-                              locked={!canEdit}
-                              forceEditable={forceFieldEditable}
-                              editing={editingField === "setor_id"}
-                              onStartEdit={() => startFieldEdit("setor_id")}
-                              onEndEdit={endFieldEdit}
-                            >
-                              {(editable) => (
-                                <MetaChip label="Setor">
-                                  <Select
-                                    value={field.value ?? "none"}
-                                    onValueChange={(v) => field.onChange(v === "none" ? null : v)}
-                                    disabled={!editable}
-                                  >
-                                    <FormControl>
-                                      <SelectTrigger className="h-auto border-0 bg-transparent p-0 shadow-none focus:ring-0 [&>svg]:h-3.5 [&>svg]:w-3.5">
-                                        <SelectValue placeholder="Nenhum" />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      <SelectItem value="none">Nenhum</SelectItem>
-                                      {setoresPermitidos.map((s) => (
-                                        <SelectItem key={s.id} value={s.id}>
-                                          {s.nome}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </MetaChip>
-                              )}
-                            </EditableOnDoubleClick>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      {criadorDisplay && (
-                        <PersonRow
-                          label="Criado por"
-                          name={criadorDisplay.nome_completo}
-                          avatarUrl={criadorDisplay.avatar_url}
-                        />
-                      )}
-
-                      <FormField
-                        control={form.control}
-                        name="atribuido_ids"
-                        render={({ field }) => (
-                          <FormItem className="space-y-0">
-                            <EditableOnDoubleClick
-                              locked={!canEdit}
-                              forceEditable={forceFieldEditable}
-                              editing={editingField === "atribuido_ids"}
-                              onStartEdit={() => startFieldEdit("atribuido_ids")}
-                              onEndEdit={endFieldEdit}
-                            >
-                              {(editable) => (
-                                <MetaChip label="Responsáveis" className="max-w-full">
-                                  <Popover>
-                                    <PopoverTrigger asChild>
-                                      <button
-                                        type="button"
-                                        disabled={!editable}
-                                        className="flex max-w-[220px] items-center gap-1 truncate text-left font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-70"
-                                      >
-                                        {responsaveisDisplay.length === 0
-                                          ? "Nenhum"
-                                          : responsaveisDisplay.length === 1
-                                            ? responsaveisDisplay[0].nome_completo
-                                            : `${responsaveisDisplay.length} pessoas`}
-                                      </button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-80 p-3" align="start">
-                                      <PessoasMultiSelect
-                                        pessoas={pessoasParaResponsavel}
-                                        value={field.value}
-                                        onChange={field.onChange}
-                                        disabled={!editable}
-                                        placeholder="Selecione responsáveis"
-                                        emptyLabel={
-                                          projetoId
-                                            ? "Defina a equipe do projeto antes de atribuir responsáveis"
-                                            : "Nenhuma pessoa disponível"
-                                        }
-                                      />
-                                    </PopoverContent>
-                                  </Popover>
-                                </MetaChip>
-                              )}
-                            </EditableOnDoubleClick>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="data_inicio"
-                        render={({ field }) => (
-                          <FormItem className="space-y-0">
-                            <EditableOnDoubleClick
-                              locked={!canEdit}
-                              forceEditable={forceFieldEditable}
-                              editing={editingField === "data_inicio"}
-                              onStartEdit={() => startFieldEdit("data_inicio")}
-                              onEndEdit={endFieldEdit}
-                            >
-                              {(editable) => (
-                                <MetaChip label="Data">
-                                  <Popover>
-                                    <PopoverTrigger asChild>
-                                      <button
-                                        type="button"
-                                        disabled={!editable}
-                                        className="font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-70"
-                                      >
-                                        {field.value
-                                          ? format(field.value, "dd/MM/yyyy", { locale: ptBR })
-                                          : "Sem data"}
-                                      </button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0" align="start">
-                                      <Calendar
-                                        mode="single"
-                                        selected={field.value ?? undefined}
-                                        onSelect={field.onChange}
-                                        locale={ptBR}
-                                        initialFocus
-                                      />
-                                      {field.value && (
-                                        <div className="border-t p-2">
-                                          <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            className="w-full"
-                                            onClick={() => field.onChange(null)}
-                                          >
-                                            Remover data
-                                          </Button>
-                                        </div>
-                                      )}
-                                    </PopoverContent>
-                                  </Popover>
-                                </MetaChip>
-                              )}
-                            </EditableOnDoubleClick>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-
                     <FormField
                       control={form.control}
                       name="descricao"
@@ -898,7 +533,7 @@ export function TarefaPanelSheet({
                         <FormItem>
                           <EditableOnDoubleClick
                             locked={!canEdit}
-                            forceEditable={forceFieldEditable}
+                            forceEditable={false}
                             editing={editingField === "descricao"}
                             onStartEdit={() => startFieldEdit("descricao")}
                             onEndEdit={endFieldEdit}
@@ -906,8 +541,9 @@ export function TarefaPanelSheet({
                             {(editable) => (
                               <FormControl>
                                 <Textarea
-                                  placeholder="Adicione uma descrição..."
+                                  placeholder="Adicione uma descrição... (duplo clique para editar)"
                                   rows={4}
+                                  className="rounded-xl border bg-card shadow-sm"
                                   readOnly={!editable}
                                   disabled={!canEdit}
                                   {...field}
@@ -982,7 +618,7 @@ export function TarefaPanelSheet({
                           {canEdit && (
                             <div className="mt-3 flex gap-2">
                               <Input
-                                placeholder="Adicionar subtarefa..."
+                                placeholder="Nova subtarefa"
                                 value={novaSubtarefa}
                                 onChange={(e) => setNovaSubtarefa(e.target.value)}
                                 onKeyDown={(e) => {
@@ -1003,304 +639,6 @@ export function TarefaPanelSheet({
                             </div>
                           )}
                         </>
-                      )}
-                    </section>
-
-                    <Separator />
-
-                    <section className="space-y-5">
-                      <h3 className="text-sm font-semibold">Detalhes da tarefa</h3>
-                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <FormField
-                          control={form.control}
-                          name="data_vencimento"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Prazo</FormLabel>
-                              <EditableOnDoubleClick
-                                locked={!canEdit}
-                                forceEditable={forceFieldEditable}
-                                editing={editingField === "data_vencimento"}
-                                onStartEdit={() => startFieldEdit("data_vencimento")}
-                                onEndEdit={endFieldEdit}
-                              >
-                                {(editable) => (
-                                  <DateField
-                                    label=""
-                                    value={field.value}
-                                    onChange={field.onChange}
-                                    disabled={!editable}
-                                  />
-                                )}
-                              </EditableOnDoubleClick>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        <FormField
-                          control={form.control}
-                          name="prioridade"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Prioridade</FormLabel>
-                              <EditableOnDoubleClick
-                                locked={!canEdit}
-                                forceEditable={forceFieldEditable}
-                                editing={editingField === "prioridade"}
-                                onStartEdit={() => startFieldEdit("prioridade")}
-                                onEndEdit={endFieldEdit}
-                              >
-                                {(editable) => (
-                                  <Select
-                                    value={field.value}
-                                    onValueChange={(v) => field.onChange(v as TarefaPrioridade)}
-                                    disabled={!editable}
-                                  >
-                                    <FormControl>
-                                      <SelectTrigger>
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      {(Object.keys(TAREFA_PRIORIDADE_LABELS) as TarefaPrioridade[]).map(
-                                        (p) => (
-                                          <SelectItem key={p} value={p}>
-                                            {TAREFA_PRIORIDADE_LABELS[p]}
-                                          </SelectItem>
-                                        ),
-                                      )}
-                                    </SelectContent>
-                                  </Select>
-                                )}
-                              </EditableOnDoubleClick>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        <FormField
-                          control={form.control}
-                          name="status"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Status</FormLabel>
-                              <EditableOnDoubleClick
-                                locked={!canEdit}
-                                forceEditable={forceFieldEditable}
-                                editing={editingField === "status"}
-                                onStartEdit={() => startFieldEdit("status")}
-                                onEndEdit={endFieldEdit}
-                              >
-                                {(editable) => (
-                                  <Select
-                                    value={field.value}
-                                    onValueChange={(v) => field.onChange(v as TarefaStatus)}
-                                    disabled={!editable}
-                                  >
-                                    <FormControl>
-                                      <SelectTrigger>
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      {(Object.keys(TAREFA_STATUS_LABELS) as TarefaStatus[]).map((s) => (
-                                        <SelectItem key={s} value={s}>
-                                          {TAREFA_STATUS_LABELS[s]}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                )}
-                              </EditableOnDoubleClick>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        <FormField
-                          control={form.control}
-                          name="tagsInput"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Etiquetas</FormLabel>
-                              <EditableOnDoubleClick
-                                locked={!canEdit}
-                                forceEditable={forceFieldEditable}
-                                editing={editingField === "tagsInput"}
-                                onStartEdit={() => startFieldEdit("tagsInput")}
-                                onEndEdit={endFieldEdit}
-                              >
-                                {(editable) => (
-                                  <FormControl>
-                                    <Input
-                                      placeholder="urgente, cliente-x"
-                                      readOnly={!editable}
-                                      disabled={!canEdit}
-                                      {...field}
-                                    />
-                                  </FormControl>
-                                )}
-                              </EditableOnDoubleClick>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        <FormField
-                          control={form.control}
-                          name="visibilidade"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Visibilidade</FormLabel>
-                              <EditableOnDoubleClick
-                                locked={!canEditVisibility}
-                                forceEditable={forceFieldEditable}
-                                editing={editingField === "visibilidade"}
-                                onStartEdit={() => startFieldEdit("visibilidade")}
-                                onEndEdit={endFieldEdit}
-                              >
-                                {(editable) => (
-                                  <Select
-                                    value={field.value}
-                                    onValueChange={(v) => field.onChange(v as TarefaVisibilidade)}
-                                    disabled={!editable}
-                                  >
-                                    <FormControl>
-                                      <SelectTrigger>
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      {(
-                                        Object.keys(TAREFA_VISIBILIDADE_LABELS) as TarefaVisibilidade[]
-                                      ).map((v) => (
-                                        <SelectItem key={v} value={v}>
-                                          {TAREFA_VISIBILIDADE_LABELS[v]}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                )}
-                              </EditableOnDoubleClick>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        <FormField
-                          control={form.control}
-                          name="lembretes"
-                          render={({ field }) => (
-                            <FormItem className="sm:col-span-2">
-                              <FormLabel className="flex items-center gap-2">
-                                <Bell className="h-4 w-4" />
-                                Lembretes
-                              </FormLabel>
-                              <EditableOnDoubleClick
-                                locked={!canEdit}
-                                forceEditable={forceFieldEditable}
-                                editing={editingField === "lembretes"}
-                                onStartEdit={() => startFieldEdit("lembretes")}
-                                onEndEdit={endFieldEdit}
-                              >
-                                {(editable) => (
-                                  <div className="grid gap-2 rounded-lg border p-3 sm:grid-cols-2">
-                                    {(Object.keys(TAREFA_LEMBRETE_LABELS) as TarefaLembreteOpcao[]).map(
-                                      (opcao) => (
-                                        <label key={opcao} className="flex items-center gap-2 text-sm">
-                                          <Checkbox
-                                            checked={field.value.includes(opcao)}
-                                            disabled={!editable}
-                                            onCheckedChange={(checked) =>
-                                              toggleLembrete(opcao, !!checked)
-                                            }
-                                          />
-                                          {TAREFA_LEMBRETE_LABELS[opcao]}
-                                        </label>
-                                      ),
-                                    )}
-                                  </div>
-                                )}
-                              </EditableOnDoubleClick>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-
-                      {visibilidade === "pessoas_especificas" && (
-                        <FormField
-                          control={form.control}
-                          name="observador_ids"
-                          render={() => (
-                            <FormItem>
-                              <FormLabel>Pessoas com acesso</FormLabel>
-                              <EditableOnDoubleClick
-                                locked={!canEditVisibility}
-                                forceEditable={forceFieldEditable}
-                                editing={editingField === "observador_ids"}
-                                onStartEdit={() => startFieldEdit("observador_ids")}
-                                onEndEdit={endFieldEdit}
-                              >
-                                {(editable) => (
-                                  <div className="max-h-40 space-y-2 overflow-y-auto rounded-lg border p-3">
-                                    {pessoasAtivas.map((p: ProfileWithSetor) => (
-                                      <label key={p.id} className="flex items-center gap-2 text-sm">
-                                        <Checkbox
-                                          checked={form.watch("observador_ids").includes(p.id)}
-                                          disabled={!editable}
-                                          onCheckedChange={(checked) =>
-                                            toggleObservador(p.id, !!checked)
-                                          }
-                                        />
-                                        <ProfileAvatar
-                                          name={p.nome_completo}
-                                          avatarUrl={p.avatar_url}
-                                          className="h-6 w-6"
-                                        />
-                                        {p.nome_completo}
-                                      </label>
-                                    ))}
-                                  </div>
-                                )}
-                              </EditableOnDoubleClick>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      )}
-
-                      {canEdit && (
-                        <EditableOnDoubleClick
-                          locked={false}
-                          forceEditable={forceFieldEditable}
-                          editing={editingField === "recorrencia"}
-                          onStartEdit={() => startFieldEdit("recorrencia")}
-                          onEndEdit={endFieldEdit}
-                        >
-                          {(editable) =>
-                            editable ? (
-                              <TarefaRecorrenciaFields
-                                form={form as unknown as UseFormReturn<RecorrenciaFormValues>}
-                              />
-                            ) : (
-                              <div className="rounded-lg border p-3 text-sm text-muted-foreground">
-                                Recorrência:{" "}
-                                <span className="font-medium text-foreground">
-                                  {formatRecorrencia(toRecorrenciaPayload(form.getValues()))}
-                                </span>
-                                <span className="mt-1 block text-xs">Duplo clique para editar</span>
-                              </div>
-                            )
-                          }
-                        </EditableOnDoubleClick>
-                      )}
-
-                      {!canEdit && recorrencia && (
-                        <div className="text-xs text-muted-foreground">
-                          Recorrência: {formatRecorrencia(recorrencia)}
-                        </div>
                       )}
                     </section>
                   </div>

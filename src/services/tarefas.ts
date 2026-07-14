@@ -320,6 +320,10 @@ export async function createTarefa(payload: TarefaFormData): Promise<TarefaWithR
     throw new Error('Setor é obrigatório para visibilidade "Todos do setor".');
   }
 
+  if (normalized.visibilidade === "todos_projeto" && !normalized.projeto_id) {
+    throw new Error('Projeto é obrigatório para visibilidade "Todos do projeto".');
+  }
+
   if (
     normalized.visibilidade === "pessoas_especificas" &&
     normalized.observador_ids.length === 0
@@ -401,6 +405,18 @@ export async function updateTarefa(
   const atribuidoIds = normalizeAtribuidoIds(payload);
   if (atribuidoIds.length === 0) {
     throw new Error("Selecione ao menos um responsável.");
+  }
+
+  if (payload.visibilidade === "todos_setor" && !payload.setor_id) {
+    throw new Error('Setor é obrigatório para visibilidade "Todos do setor".');
+  }
+
+  if (payload.visibilidade === "todos_projeto" && !payload.projeto_id) {
+    throw new Error('Projeto é obrigatório para visibilidade "Todos do projeto".');
+  }
+
+  if (payload.visibilidade === "pessoas_especificas" && payload.observador_ids.length === 0) {
+    throw new Error("Selecione ao menos uma pessoa para visibilidade específica.");
   }
 
   const { data: anterior } = await supabase
@@ -715,7 +731,7 @@ export async function getDashboardKpis(): Promise<DashboardKpis> {
     tarefasAFazer: tarefas.filter((t) => t.status === "a_fazer").length,
     tarefasEmAndamento: tarefas.filter((t) => t.status === "em_andamento").length,
     tarefasConcluidas: tarefas.filter((t) => t.status === "concluida").length,
-    tarefasBloqueadas: tarefas.filter((t) => t.status === "bloqueada").length,
+    tarefasCanceladas: tarefas.filter((t) => t.status === "cancelada").length,
     tarefasVencendoHoje: tarefas.filter(
       (t) =>
         t.data_vencimento &&

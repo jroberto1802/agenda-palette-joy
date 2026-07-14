@@ -179,7 +179,7 @@ export function TarefaKanban({
     const map: Record<TarefaStatus, TarefaWithRelations[]> = {
       a_fazer: [],
       em_andamento: [],
-      bloqueada: [],
+      cancelada: [],
       concluida: [],
     };
     for (const t of tarefas) {

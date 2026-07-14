@@ -755,13 +755,14 @@ export type Database = {
           projeto_id: string | null;
           recorrencia: Json | null;
           setor_id: string | null;
-          status: "a_fazer" | "em_andamento" | "bloqueada" | "concluida";
+          status: "a_fazer" | "em_andamento" | "cancelada" | "concluida";
           tags: string[];
           titulo: string;
           updated_at: string;
           visibilidade:
             | "todos_empresa"
             | "todos_setor"
+            | "todos_projeto"
             | "somente_para_mim"
             | "pessoas_especificas";
         };
@@ -780,13 +781,14 @@ export type Database = {
           projeto_id?: string | null;
           recorrencia?: Json | null;
           setor_id?: string | null;
-          status?: "a_fazer" | "em_andamento" | "bloqueada" | "concluida";
+          status?: "a_fazer" | "em_andamento" | "cancelada" | "concluida";
           tags?: string[];
           titulo: string;
           updated_at?: string;
           visibilidade?:
             | "todos_empresa"
             | "todos_setor"
+            | "todos_projeto"
             | "somente_para_mim"
             | "pessoas_especificas";
         };
@@ -805,13 +807,14 @@ export type Database = {
           projeto_id?: string | null;
           recorrencia?: Json | null;
           setor_id?: string | null;
-          status?: "a_fazer" | "em_andamento" | "bloqueada" | "concluida";
+          status?: "a_fazer" | "em_andamento" | "cancelada" | "concluida";
           tags?: string[];
           titulo?: string;
           updated_at?: string;
           visibilidade?:
             | "todos_empresa"
             | "todos_setor"
+            | "todos_projeto"
             | "somente_para_mim"
             | "pessoas_especificas";
         };
