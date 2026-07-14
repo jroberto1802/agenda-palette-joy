@@ -21,8 +21,8 @@ export function TarefaListView({
   onOpenTarefa: (tarefa: TarefaWithRelations) => void;
 }) {
   return (
-    <div className="max-h-[min(70vh,720px)] overflow-y-auto rounded-xl border">
-      <ul className="divide-y">
+    <div className="max-h-[min(70vh,720px)] space-y-2 overflow-y-auto pr-1">
+      <ul className="space-y-2">
         {tarefas.map((tarefa) => (
           <TarefaListRow key={tarefa.id} tarefa={tarefa} onOpen={() => onOpenTarefa(tarefa)} />
         ))}
@@ -45,7 +45,7 @@ function TarefaListRow({
       <button
         type="button"
         onClick={onOpen}
-        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50"
+        className="flex w-full items-center gap-3 rounded-xl border bg-card px-4 py-3 text-left shadow-sm transition-colors hover:bg-muted/40"
       >
         <div className="min-w-0 flex-1 space-y-1">
           <p
