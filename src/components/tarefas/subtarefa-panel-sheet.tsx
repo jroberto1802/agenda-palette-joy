@@ -280,8 +280,13 @@ export function SubtarefaPanelSheet({
       return;
     }
     form.reset(toFormValues(subtarefa ?? null, parentTarefa));
-    setSideTab("comentarios");
   }, [open, subtarefa, parentTarefa, form]);
+
+  useEffect(() => {
+    if (!open) return;
+    setSideTab("comentarios");
+    setEditingField(null);
+  }, [open, subtarefaId]);
 
   const comentarios = subtarefa?.comentarios ?? [];
   const anexos = subtarefa?.anexos ?? [];
@@ -368,9 +373,14 @@ export function SubtarefaPanelSheet({
         side="right"
         className="flex w-full flex-col gap-0 p-0 sm:max-w-xl md:max-w-2xl lg:max-w-3xl z-[70]"
         onInteractOutside={(event) => {
-          // Evita fechar o dialog da tarefa principal junto com o drawer
+          // Mantém o drawer aberto ao usar seletor de arquivos / cliques no overlay do dialog pai
           event.preventDefault();
-          void handleOpenChange(false);
+        }}
+        onFocusOutside={(event) => {
+          event.preventDefault();
+        }}
+        onPointerDownOutside={(event) => {
+          event.preventDefault();
         }}
       >
         {isLoading || !subtarefa ? (

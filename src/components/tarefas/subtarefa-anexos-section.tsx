@@ -81,6 +81,7 @@ export function SubtarefaAnexosSection({
               onChange={(e) => handleUpload(e.target.files)}
             />
             <Button
+              type="button"
               variant="outline"
               size="sm"
               className="gap-2"
@@ -111,6 +112,7 @@ export function SubtarefaAnexosSection({
                 </p>
               </div>
               <Button
+                type="button"
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7"
@@ -120,6 +122,7 @@ export function SubtarefaAnexosSection({
               </Button>
               {canEdit && (
                 <Button
+                  type="button"
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7 opacity-0 group-hover:opacity-100"

@@ -8,6 +8,22 @@ import type { SubtarefaAnexo, TarefaAnexo } from "@/types";
 
 const BUCKET = "tarefa-anexos";
 
+/** Gera nome seguro para a key do Storage; o nome original fica só no campo `nome`. */
+function normalizeStorageFileName(fileName: string): string {
+  const base = fileName.trim() || "arquivo";
+  const sanitized = base
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\w.-]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^[._]+|[._]+$/g, "");
+  return sanitized || "arquivo";
+}
+
+function buildStoragePath(prefix: string, fileName: string): string {
+  return `${prefix}/${crypto.randomUUID()}_${normalizeStorageFileName(fileName)}`;
+}
+
 export async function listAnexos(tarefaId: string): Promise<TarefaAnexo[]> {
   const { data, error } = await supabase
     .from("tarefa_anexos")
@@ -20,11 +36,12 @@ export async function listAnexos(tarefaId: string): Promise<TarefaAnexo[]> {
 }
 
 export async function uploadAnexo(tarefaId: string, file: File): Promise<TarefaAnexo> {
-  const storagePath = `${tarefaId}/${crypto.randomUUID()}_${file.name}`;
+  const storagePath = buildStoragePath(tarefaId, file.name);
 
   const { error: uploadError } = await supabase.storage.from(BUCKET).upload(storagePath, file, {
     cacheControl: "3600",
     upsert: false,
+    contentType: file.type || undefined,
   });
   if (uploadError) throw uploadError;
 
@@ -92,11 +109,15 @@ export async function uploadSubtarefaAnexo(
   if (subtarefaError) throw subtarefaError;
 
   // Pasta raiz = tarefa_id para reutilizar as policies do bucket tarefa-anexos
-  const storagePath = `${subtarefa.tarefa_id}/sub/${subtarefaId}/${crypto.randomUUID()}_${file.name}`;
+  const storagePath = buildStoragePath(
+    `${subtarefa.tarefa_id}/sub/${subtarefaId}`,
+    file.name,
+  );
 
   const { error: uploadError } = await supabase.storage.from(BUCKET).upload(storagePath, file, {
     cacheControl: "3600",
     upsert: false,
+    contentType: file.type || undefined,
   });
   if (uploadError) throw uploadError;
 
