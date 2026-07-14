@@ -8,14 +8,16 @@ import {
   LogOut,
   Megaphone,
   Moon,
+  Plus,
   Settings,
   Shield,
   Sun,
   Users,
 } from "lucide-react";
-import { useMemo, type ComponentType, type ReactNode } from "react";
+import { useMemo, useState, type ComponentType, type ReactNode } from "react";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
 import { NotificationBell } from "@/components/notifications/notification-bell";
+import { TarefaPanelSheet } from "@/components/tarefas/tarefa-panel-sheet";
 import {
   Sidebar,
   SidebarContent,
@@ -32,6 +34,7 @@ import {
   SidebarRail,
   SidebarSeparator,
   SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
@@ -58,12 +61,64 @@ const BASE_NAV: NavItem[] = [
   { to: "/configuracoes", label: "Configurações", icon: Settings },
 ];
 
+function SidebarNavItems({
+  navItems,
+  isActive,
+  onNovaTarefa,
+}: {
+  navItems: NavItem[];
+  isActive: (to: string) => boolean;
+  onNovaTarefa: () => void;
+}) {
+  const { isMobile, setOpenMobile } = useSidebar();
+
+  const handleNovaTarefa = () => {
+    if (isMobile) setOpenMobile(false);
+    onNovaTarefa();
+  };
+
+  return (
+    <>
+      {navItems.map((item) => {
+        const { to, label, icon: Icon } = item;
+        return (
+          <div key={to} className="contents">
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild isActive={isActive(to)} tooltip={label}>
+                <Link to={to as LinkProps["to"]}>
+                  <Icon />
+                  <span>{label}</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            {to === "/avisos" && (
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  type="button"
+                  tooltip="Nova tarefa"
+                  onClick={handleNovaTarefa}
+                >
+                  <Plus />
+                  <span>Nova tarefa</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   const { user, signOut } = useAuth();
   const { data: profile } = useProfile();
   const { data: empresa } = useEmpresaConfig();
   const { mode, toggleMode } = useTheme();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  const [novaTarefaOpen, setNovaTarefaOpen] = useState(false);
+  const [novaTarefaId, setNovaTarefaId] = useState<string | null>(null);
 
   const displayName = profile?.nome_completo ?? user?.email ?? "Usuário";
   const empresaNome = empresa?.nome?.trim() || EMPRESA_NOME_PADRAO;
@@ -77,6 +132,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [profile]);
 
   const isActive = (to: string) => pathname === to || pathname.startsWith(`${to}/`);
+
+  const openNovaTarefa = () => {
+    setNovaTarefaId(null);
+    setNovaTarefaOpen(true);
+  };
 
   return (
     <SidebarProvider>
@@ -120,16 +180,11 @@ export function AppShell({ children }: { children: ReactNode }) {
             <SidebarGroupLabel>Menu</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {navItems.map(({ to, label, icon: Icon }) => (
-                  <SidebarMenuItem key={to}>
-                    <SidebarMenuButton asChild isActive={isActive(to)} tooltip={label}>
-                      <Link to={to as LinkProps["to"]}>
-                        <Icon />
-                        <span>{label}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
+                <SidebarNavItems
+                  navItems={navItems}
+                  isActive={isActive}
+                  onNovaTarefa={openNovaTarefa}
+                />
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
@@ -177,6 +232,16 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <main className="flex-1 p-4 sm:p-6">{children}</main>
       </SidebarInset>
+
+      <TarefaPanelSheet
+        tarefaId={novaTarefaId}
+        open={novaTarefaOpen}
+        onOpenChange={(open) => {
+          setNovaTarefaOpen(open);
+          if (!open) setNovaTarefaId(null);
+        }}
+        onSaved={(id) => setNovaTarefaId(id)}
+      />
     </SidebarProvider>
   );
 }
