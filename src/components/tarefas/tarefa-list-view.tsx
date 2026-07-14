@@ -1,5 +1,6 @@
 import { CalendarIcon, ChevronRight } from "lucide-react";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
+import { MinhaAgendaBadge } from "@/components/tarefas/subtarefa-row";
 import { Badge } from "@/components/ui/badge";
 import type { TarefaWithRelations } from "@/types";
 import { formatDate, getVencimentoVariant } from "@/utils/formatters";
@@ -69,6 +70,7 @@ function TarefaListRow({
             >
               {TAREFA_PRIORIDADE_LABELS[tarefa.prioridade]}
             </Badge>
+            <MinhaAgendaBadge tarefa={tarefa} className="px-1.5 py-0 text-[10px]" />
             {getTarefaResponsaveis(tarefa).length > 0 && (
               <span className="inline-flex items-center gap-1">
                 <ProfileAvatar

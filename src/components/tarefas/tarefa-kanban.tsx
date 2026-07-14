@@ -12,6 +12,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { CalendarIcon, GripVertical, User } from "lucide-react";
 import { useMemo, useState } from "react";
+import { MinhaAgendaBadge } from "@/components/tarefas/subtarefa-row";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
@@ -61,6 +62,7 @@ function KanbanCardContent({
                 {tarefa.setor.nome}
               </Badge>
             )}
+            <MinhaAgendaBadge tarefa={tarefa} />
           </div>
         </div>
       </div>

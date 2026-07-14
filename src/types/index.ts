@@ -148,12 +148,27 @@ export type TarefaFilters = {
 
 export type Subtarefa = Tables<"subtarefas">;
 
+export type SubtarefaWithAuthors = Subtarefa & {
+  criador: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
+  concluido_por_usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
+  responsaveis?: {
+    usuario_id: string;
+    usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
+  }[];
+};
+
+export type SubtarefaMetaUpdate = {
+  data_vencimento?: string | null;
+  atribuido_ids?: string[];
+  visibilidade?: Subtarefa["visibilidade"];
+};
+
 export type TarefaComentario = Tables<"tarefa_comentarios"> & {
   usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
 };
 
 export type TarefaDetail = TarefaWithRelations & {
-  subtarefas: Subtarefa[];
+  subtarefas: SubtarefaWithAuthors[];
   comentarios: TarefaComentario[];
   anexos: TarefaAnexo[];
 };

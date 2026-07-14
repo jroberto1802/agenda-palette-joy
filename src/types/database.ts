@@ -488,31 +488,108 @@ export type Database = {
       subtarefas: {
         Row: {
           concluida: boolean;
+          concluido_por: string | null;
           created_at: string;
+          criado_por: string | null;
+          data_vencimento: string | null;
           id: string;
           tarefa_id: string;
           titulo: string;
+          visibilidade:
+            | "todos_empresa"
+            | "todos_setor"
+            | "todos_projeto"
+            | "somente_para_mim"
+            | "pessoas_especificas"
+            | null;
         };
         Insert: {
           concluida?: boolean;
+          concluido_por?: string | null;
           created_at?: string;
+          criado_por?: string | null;
+          data_vencimento?: string | null;
           id?: string;
           tarefa_id: string;
           titulo: string;
+          visibilidade?:
+            | "todos_empresa"
+            | "todos_setor"
+            | "todos_projeto"
+            | "somente_para_mim"
+            | "pessoas_especificas"
+            | null;
         };
         Update: {
           concluida?: boolean;
+          concluido_por?: string | null;
           created_at?: string;
+          criado_por?: string | null;
+          data_vencimento?: string | null;
           id?: string;
           tarefa_id?: string;
           titulo?: string;
+          visibilidade?:
+            | "todos_empresa"
+            | "todos_setor"
+            | "todos_projeto"
+            | "somente_para_mim"
+            | "pessoas_especificas"
+            | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "subtarefas_concluido_por_fkey",
+            columns: ["concluido_por"],
+            isOneToOne: false,
+            referencedRelation: "profiles",
+            referencedColumns: ["id"],
+          },
+          {
+            foreignKeyName: "subtarefas_criado_por_fkey",
+            columns: ["criado_por"],
+            isOneToOne: false,
+            referencedRelation: "profiles",
+            referencedColumns: ["id"],
+          },
           {
             foreignKeyName: "subtarefas_tarefa_id_fkey",
             columns: ["tarefa_id"],
             isOneToOne: false,
             referencedRelation: "tarefas",
+            referencedColumns: ["id"],
+          },
+        ];
+      };
+      subtarefa_responsaveis: {
+        Row: {
+          created_at: string;
+          subtarefa_id: string;
+          usuario_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          subtarefa_id: string;
+          usuario_id: string;
+        };
+        Update: {
+          created_at?: string;
+          subtarefa_id?: string;
+          usuario_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "subtarefa_responsaveis_subtarefa_id_fkey",
+            columns: ["subtarefa_id"],
+            isOneToOne: false,
+            referencedRelation: "subtarefas",
+            referencedColumns: ["id"],
+          },
+          {
+            foreignKeyName: "subtarefa_responsaveis_usuario_id_fkey",
+            columns: ["usuario_id"],
+            isOneToOne: false,
+            referencedRelation: "profiles",
             referencedColumns: ["id"],
           },
         ];

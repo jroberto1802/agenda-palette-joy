@@ -1,5 +1,6 @@
 import { CalendarIcon } from "lucide-react";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
+import { MinhaAgendaBadge } from "@/components/tarefas/subtarefa-row";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,7 +14,6 @@ import type { TarefaStatus, TarefaWithRelations } from "@/types";
 import { formatDate, getVencimentoVariant } from "@/utils/formatters";
 import {
   TAREFA_PRIORIDADE_COLORS,
-  TAREFA_PRIORIDADE_LABELS,
   TAREFA_STATUS_COLORS,
   TAREFA_STATUS_LABELS,
   formatResponsaveisLabel,
@@ -82,6 +82,7 @@ export function TarefaCard({
                   {tarefa.setor.nome}
                 </Badge>
               )}
+              <MinhaAgendaBadge tarefa={tarefa} />
               {tarefa.projeto && (
                 <Badge variant="outline" className="text-xs">
                   {tarefa.projeto.nome}

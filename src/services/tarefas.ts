@@ -19,7 +19,7 @@ import {
 import type {
   DashboardKpis,
   Profile,
-  Subtarefa,
+  SubtarefaWithAuthors,
   TarefaComentario,
   TarefaDetail,
   TarefaFilters,
@@ -557,7 +557,16 @@ export async function getTarefaDetail(id: string): Promise<TarefaDetail> {
     .from("tarefas")
     .select(
       `${TAREFA_SELECT},
-      subtarefas(id, tarefa_id, titulo, concluida, created_at),
+      subtarefas(
+        id, tarefa_id, titulo, concluida, created_at, criado_por, concluido_por,
+        data_vencimento, visibilidade,
+        criador:profiles!subtarefas_criado_por_fkey(id, nome_completo, avatar_url),
+        concluido_por_usuario:profiles!subtarefas_concluido_por_fkey(id, nome_completo, avatar_url),
+        responsaveis:subtarefa_responsaveis(
+          usuario_id,
+          usuario:profiles!subtarefa_responsaveis_usuario_id_fkey(id, nome_completo, avatar_url)
+        )
+      ),
       comentarios:tarefa_comentarios(${COMENTARIO_SELECT}),
       anexos:tarefa_anexos(id, tarefa_id, storage_path, nome, tipo, tamanho, created_at)`,
     )
@@ -571,27 +580,138 @@ export async function getTarefaDetail(id: string): Promise<TarefaDetail> {
   return data as unknown as TarefaDetail;
 }
 
-export async function createSubtarefa(tarefaId: string, titulo: string): Promise<Subtarefa> {
-  const { data, error } = await supabase
-    .from("subtarefas")
-    .insert({ tarefa_id: tarefaId, titulo })
-    .select()
-    .single();
+const SUBTAREFA_SELECT = `
+  id, tarefa_id, titulo, concluida, created_at, criado_por, concluido_por,
+  data_vencimento, visibilidade,
+  criador:profiles!subtarefas_criado_por_fkey(id, nome_completo, avatar_url),
+  concluido_por_usuario:profiles!subtarefas_concluido_por_fkey(id, nome_completo, avatar_url),
+  responsaveis:subtarefa_responsaveis(
+    usuario_id,
+    usuario:profiles!subtarefa_responsaveis_usuario_id_fkey(id, nome_completo, avatar_url)
+  )
+`;
 
-  if (error) throw error;
-  return data;
+async function syncSubtarefaResponsaveis(
+  subtarefaId: string,
+  usuarioIds: string[],
+): Promise<void> {
+  const unique = [...new Set(usuarioIds.filter(Boolean))];
+
+  const { error: deleteError } = await supabase
+    .from("subtarefa_responsaveis")
+    .delete()
+    .eq("subtarefa_id", subtarefaId);
+  if (deleteError) throw deleteError;
+
+  if (unique.length === 0) return;
+
+  const { error: insertError } = await supabase.from("subtarefa_responsaveis").insert(
+    unique.map((usuario_id) => ({
+      subtarefa_id: subtarefaId,
+      usuario_id,
+    })),
+  );
+  if (insertError) throw insertError;
 }
 
-export async function toggleSubtarefa(id: string, concluida: boolean): Promise<Subtarefa> {
+async function getSubtarefaDetail(id: string): Promise<SubtarefaWithAuthors> {
   const { data, error } = await supabase
     .from("subtarefas")
-    .update({ concluida })
+    .select(SUBTAREFA_SELECT)
     .eq("id", id)
-    .select()
+    .single();
+  if (error) throw error;
+  return data as unknown as SubtarefaWithAuthors;
+}
+
+export async function createSubtarefa(
+  tarefaId: string,
+  titulo: string,
+): Promise<SubtarefaWithAuthors> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Usuário não autenticado");
+
+  const { data, error } = await supabase
+    .from("subtarefas")
+    .insert({ tarefa_id: tarefaId, titulo, criado_por: user.id })
+    .select(SUBTAREFA_SELECT)
     .single();
 
   if (error) throw error;
-  return data;
+  return data as unknown as SubtarefaWithAuthors;
+}
+
+export async function toggleSubtarefa(
+  id: string,
+  concluida: boolean,
+): Promise<SubtarefaWithAuthors> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Usuário não autenticado");
+
+  const { data, error } = await supabase
+    .from("subtarefas")
+    .update({
+      concluida,
+      concluido_por: concluida ? user.id : null,
+    })
+    .eq("id", id)
+    .select(SUBTAREFA_SELECT)
+    .single();
+
+  if (error) throw error;
+  return data as unknown as SubtarefaWithAuthors;
+}
+
+export async function updateSubtarefaTitulo(
+  id: string,
+  titulo: string,
+): Promise<SubtarefaWithAuthors> {
+  const trimmed = titulo.trim();
+  if (!trimmed) throw new Error("Informe o texto da subtarefa.");
+
+  const { error } = await supabase
+    .from("subtarefas")
+    .update({ titulo: trimmed })
+    .eq("id", id);
+
+  if (error) throw error;
+  return getSubtarefaDetail(id);
+}
+
+export async function updateSubtarefaMeta(
+  id: string,
+  meta: {
+    data_vencimento?: string | null;
+    atribuido_ids?: string[];
+    visibilidade?: SubtarefaWithAuthors["visibilidade"];
+  },
+): Promise<SubtarefaWithAuthors> {
+  const patch: {
+    data_vencimento?: string | null;
+    visibilidade?: SubtarefaWithAuthors["visibilidade"];
+  } = {};
+
+  if (meta.data_vencimento !== undefined) {
+    patch.data_vencimento = meta.data_vencimento;
+  }
+  if (meta.visibilidade !== undefined) {
+    patch.visibilidade = meta.visibilidade;
+  }
+
+  if (Object.keys(patch).length > 0) {
+    const { error } = await supabase.from("subtarefas").update(patch).eq("id", id);
+    if (error) throw error;
+  }
+
+  if (meta.atribuido_ids !== undefined) {
+    await syncSubtarefaResponsaveis(id, meta.atribuido_ids);
+  }
+
+  return getSubtarefaDetail(id);
 }
 
 export async function deleteSubtarefa(id: string): Promise<void> {

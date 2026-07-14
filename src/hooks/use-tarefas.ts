@@ -13,6 +13,8 @@ import {
   listTarefasCalendario,
   softDeleteTarefa,
   toggleSubtarefa,
+  updateSubtarefaMeta,
+  updateSubtarefaTitulo,
   updateTarefa,
   updateTarefaStatus,
 } from "@/services/tarefas";
@@ -120,6 +122,33 @@ export function useToggleSubtarefa() {
   return useMutation({
     mutationFn: ({ id, concluida }: { id: string; concluida: boolean }) =>
       toggleSubtarefa(id, concluida),
+    onSuccess: () => invalidateTarefas(queryClient),
+  });
+}
+
+export function useUpdateSubtarefaTitulo() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, titulo }: { id: string; titulo: string }) =>
+      updateSubtarefaTitulo(id, titulo),
+    onSuccess: () => invalidateTarefas(queryClient),
+  });
+}
+
+export function useUpdateSubtarefaMeta() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: {
+        data_vencimento?: string | null;
+        atribuido_ids?: string[];
+        visibilidade?: import("@/types").Subtarefa["visibilidade"];
+      };
+    }) => updateSubtarefaMeta(id, data),
     onSuccess: () => invalidateTarefas(queryClient),
   });
 }

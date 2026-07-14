@@ -1,16 +1,16 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ChevronRight, MessageSquare, Paperclip, Plus, Save, Trash2 } from "lucide-react";
+import { ChevronRight, MessageSquare, Paperclip, Plus, Save } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 import { CommentsThread } from "@/components/common/comments-thread";
 import { EditableOnDoubleClick } from "@/components/common/editable-on-double-click";
+import { SubtarefaRow } from "@/components/tarefas/subtarefa-row";
 import { TarefaAnexosSection } from "@/components/tarefas/tarefa-anexos-section";
 import { TarefaMetaToolbar } from "@/components/tarefas/tarefa-meta-toolbar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Form,
   FormControl,
@@ -45,6 +45,8 @@ import {
   useDeleteTarefaComentario,
   useTarefaDetail,
   useToggleSubtarefa,
+  useUpdateSubtarefaMeta,
+  useUpdateSubtarefaTitulo,
   useUpdateTarefa,
 } from "@/hooks/use-tarefas";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
@@ -224,6 +226,8 @@ export function TarefaPanelSheet({
   const updateTarefa = useUpdateTarefa();
   const createSubtarefa = useCreateSubtarefa();
   const toggleSubtarefa = useToggleSubtarefa();
+  const updateSubtarefaTitulo = useUpdateSubtarefaTitulo();
+  const updateSubtarefaMeta = useUpdateSubtarefaMeta();
   const deleteSubtarefa = useDeleteSubtarefa();
   const createComentario = useCreateTarefaComentario();
   const deleteComentario = useDeleteTarefaComentario();
@@ -622,48 +626,51 @@ export function TarefaPanelSheet({
                         <>
                           <div className="space-y-2">
                             {subtarefas.map((sub) => (
-                              <div key={sub.id} className="group flex items-center gap-2">
-                                <Checkbox
-                                  checked={sub.concluida}
-                                  disabled={!canEdit}
-                                  onCheckedChange={async (checked) => {
-                                    try {
-                                      await toggleSubtarefa.mutateAsync({
-                                        id: sub.id,
-                                        concluida: !!checked,
-                                      });
-                                    } catch (error) {
-                                      toast.error(getSupabaseErrorMessage(error as Error));
-                                    }
-                                  }}
-                                />
-                                <span
-                                  className={
-                                    sub.concluida
-                                      ? "flex-1 text-sm text-muted-foreground line-through"
-                                      : "flex-1 text-sm"
+                              <SubtarefaRow
+                                key={sub.id}
+                                subtarefa={sub}
+                                canEdit={canEdit}
+                                pessoasDisponiveis={pessoasMencionaveis}
+                                onToggle={async (concluida) => {
+                                  try {
+                                    await toggleSubtarefa.mutateAsync({
+                                      id: sub.id,
+                                      concluida,
+                                    });
+                                  } catch (error) {
+                                    toast.error(getSupabaseErrorMessage(error as Error));
                                   }
-                                >
-                                  {sub.titulo}
-                                </span>
-                                {canEdit && (
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 opacity-0 group-hover:opacity-100"
-                                    onClick={async () => {
-                                      try {
-                                        await deleteSubtarefa.mutateAsync(sub.id);
-                                      } catch (error) {
-                                        toast.error(getSupabaseErrorMessage(error as Error));
-                                      }
-                                    }}
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </Button>
-                                )}
-                              </div>
+                                }}
+                                onRename={async (titulo) => {
+                                  try {
+                                    await updateSubtarefaTitulo.mutateAsync({
+                                      id: sub.id,
+                                      titulo,
+                                    });
+                                  } catch (error) {
+                                    toast.error(getSupabaseErrorMessage(error as Error));
+                                    throw error;
+                                  }
+                                }}
+                                onUpdateMeta={async (meta) => {
+                                  try {
+                                    await updateSubtarefaMeta.mutateAsync({
+                                      id: sub.id,
+                                      data: meta,
+                                    });
+                                  } catch (error) {
+                                    toast.error(getSupabaseErrorMessage(error as Error));
+                                    throw error;
+                                  }
+                                }}
+                                onDelete={async () => {
+                                  try {
+                                    await deleteSubtarefa.mutateAsync(sub.id);
+                                  } catch (error) {
+                                    toast.error(getSupabaseErrorMessage(error as Error));
+                                  }
+                                }}
+                              />
                             ))}
                           </div>
                           {canEdit && (
