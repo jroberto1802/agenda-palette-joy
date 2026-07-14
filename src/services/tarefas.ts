@@ -19,6 +19,9 @@ import {
 import type {
   DashboardKpis,
   Profile,
+  SubtarefaComentario,
+  SubtarefaDetail,
+  SubtarefaFormData,
   SubtarefaWithAuthors,
   TarefaComentario,
   TarefaDetail,
@@ -28,7 +31,7 @@ import type {
   TarefaStatus,
   TarefaWithRelations,
 } from "@/types";
-import type { TablesUpdate } from "@/types/database";
+import type { Json, TablesUpdate } from "@/types/database";
 
 const TAREFA_SELECT = `
   *,
@@ -559,7 +562,8 @@ export async function getTarefaDetail(id: string): Promise<TarefaDetail> {
       `${TAREFA_SELECT},
       subtarefas(
         id, tarefa_id, titulo, concluida, created_at, criado_por, concluido_por,
-        data_vencimento, visibilidade,
+        data_inicio, data_vencimento, descricao, prioridade, status, lembretes,
+        recorrencia, projeto_id, setor_id, visibilidade, updated_at,
         criador:profiles!subtarefas_criado_por_fkey(id, nome_completo, avatar_url),
         concluido_por_usuario:profiles!subtarefas_concluido_por_fkey(id, nome_completo, avatar_url),
         responsaveis:subtarefa_responsaveis(
@@ -582,13 +586,25 @@ export async function getTarefaDetail(id: string): Promise<TarefaDetail> {
 
 const SUBTAREFA_SELECT = `
   id, tarefa_id, titulo, concluida, created_at, criado_por, concluido_por,
-  data_vencimento, visibilidade,
+  data_inicio, data_vencimento, descricao, prioridade, status, lembretes,
+  recorrencia, projeto_id, setor_id, visibilidade, updated_at,
   criador:profiles!subtarefas_criado_por_fkey(id, nome_completo, avatar_url),
   concluido_por_usuario:profiles!subtarefas_concluido_por_fkey(id, nome_completo, avatar_url),
   responsaveis:subtarefa_responsaveis(
     usuario_id,
     usuario:profiles!subtarefa_responsaveis_usuario_id_fkey(id, nome_completo, avatar_url)
   )
+`;
+
+const SUBTAREFA_DETAIL_SELECT = `
+  ${SUBTAREFA_SELECT},
+  observadores:subtarefa_observadores(
+    usuario_id,
+    usuario:profiles!subtarefa_observadores_usuario_id_fkey(id, nome_completo, avatar_url)
+  ),
+  comentarios:subtarefa_comentarios(${COMENTARIO_SELECT}),
+  anexos:subtarefa_anexos(id, subtarefa_id, storage_path, nome, tipo, tamanho, created_at),
+  tarefa:tarefas!subtarefas_tarefa_id_fkey(id, titulo)
 `;
 
 async function syncSubtarefaResponsaveis(
@@ -614,7 +630,41 @@ async function syncSubtarefaResponsaveis(
   if (insertError) throw insertError;
 }
 
-async function getSubtarefaDetail(id: string): Promise<SubtarefaWithAuthors> {
+async function syncSubtarefaObservadores(
+  subtarefaId: string,
+  usuarioIds: string[],
+): Promise<void> {
+  const unique = [...new Set(usuarioIds.filter(Boolean))];
+
+  const { error: deleteError } = await supabase
+    .from("subtarefa_observadores")
+    .delete()
+    .eq("subtarefa_id", subtarefaId);
+  if (deleteError) throw deleteError;
+
+  if (unique.length === 0) return;
+
+  const { error: insertError } = await supabase.from("subtarefa_observadores").insert(
+    unique.map((usuario_id) => ({
+      subtarefa_id: subtarefaId,
+      usuario_id,
+    })),
+  );
+  if (insertError) throw insertError;
+}
+
+export async function getSubtarefaDetail(id: string): Promise<SubtarefaDetail> {
+  const { data, error } = await supabase
+    .from("subtarefas")
+    .select(SUBTAREFA_DETAIL_SELECT)
+    .eq("id", id)
+    .order("created_at", { referencedTable: "subtarefa_comentarios", ascending: true })
+    .single();
+  if (error) throw error;
+  return data as unknown as SubtarefaDetail;
+}
+
+async function getSubtarefaRow(id: string): Promise<SubtarefaWithAuthors> {
   const { data, error } = await supabase
     .from("subtarefas")
     .select(SUBTAREFA_SELECT)
@@ -652,11 +702,26 @@ export async function toggleSubtarefa(
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Usuário não autenticado");
 
+  const { data: current, error: currentError } = await supabase
+    .from("subtarefas")
+    .select("status")
+    .eq("id", id)
+    .single();
+  if (currentError) throw currentError;
+
+  const nextStatus: TarefaStatus = concluida
+    ? "concluida"
+    : current.status === "concluida"
+      ? "a_fazer"
+      : current.status;
+
   const { data, error } = await supabase
     .from("subtarefas")
     .update({
       concluida,
       concluido_por: concluida ? user.id : null,
+      status: nextStatus,
+      updated_at: new Date().toISOString(),
     })
     .eq("id", id)
     .select(SUBTAREFA_SELECT)
@@ -675,11 +740,11 @@ export async function updateSubtarefaTitulo(
 
   const { error } = await supabase
     .from("subtarefas")
-    .update({ titulo: trimmed })
+    .update({ titulo: trimmed, updated_at: new Date().toISOString() })
     .eq("id", id);
 
   if (error) throw error;
-  return getSubtarefaDetail(id);
+  return getSubtarefaRow(id);
 }
 
 export async function updateSubtarefaMeta(
@@ -693,6 +758,7 @@ export async function updateSubtarefaMeta(
   const patch: {
     data_vencimento?: string | null;
     visibilidade?: SubtarefaWithAuthors["visibilidade"];
+    updated_at?: string;
   } = {};
 
   if (meta.data_vencimento !== undefined) {
@@ -703,6 +769,7 @@ export async function updateSubtarefaMeta(
   }
 
   if (Object.keys(patch).length > 0) {
+    patch.updated_at = new Date().toISOString();
     const { error } = await supabase.from("subtarefas").update(patch).eq("id", id);
     if (error) throw error;
   }
@@ -711,11 +778,103 @@ export async function updateSubtarefaMeta(
     await syncSubtarefaResponsaveis(id, meta.atribuido_ids);
   }
 
+  return getSubtarefaRow(id);
+}
+
+export async function updateSubtarefa(
+  id: string,
+  payload: SubtarefaFormData,
+): Promise<SubtarefaDetail> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Usuário não autenticado");
+
+  const concluida = payload.status === "concluida";
+  const { data: current, error: currentError } = await supabase
+    .from("subtarefas")
+    .select("concluida, concluido_por")
+    .eq("id", id)
+    .single();
+  if (currentError) throw currentError;
+
+  const patch = {
+    titulo: payload.titulo.trim(),
+    descricao: payload.descricao || null,
+    projeto_id: payload.projeto_id,
+    setor_id: payload.setor_id,
+    prioridade: payload.prioridade,
+    status: payload.status,
+    data_inicio: payload.data_inicio,
+    data_vencimento: payload.data_vencimento,
+    visibilidade: payload.visibilidade,
+    lembretes: payload.lembretes as unknown as Json,
+    recorrencia: serializeRecorrencia(payload.recorrencia) as Json | null,
+    concluida,
+    concluido_por: concluida
+      ? (current.concluido_por ?? user.id)
+      : null,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { error } = await supabase.from("subtarefas").update(patch).eq("id", id);
+  if (error) throw error;
+
+  await syncSubtarefaResponsaveis(id, payload.atribuido_ids);
+  if (payload.visibilidade === "pessoas_especificas") {
+    await syncSubtarefaObservadores(id, payload.observador_ids);
+  } else {
+    await syncSubtarefaObservadores(id, []);
+  }
+
   return getSubtarefaDetail(id);
 }
 
 export async function deleteSubtarefa(id: string): Promise<void> {
   const { error } = await supabase.from("subtarefas").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function createSubtarefaComentario(
+  subtarefaId: string,
+  conteudo: string,
+  parentId: string | null = null,
+): Promise<SubtarefaComentario> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Usuário não autenticado");
+
+  if (parentId) {
+    const { data: parent, error: parentError } = await supabase
+      .from("subtarefa_comentarios")
+      .select("id, parent_id, subtarefa_id")
+      .eq("id", parentId)
+      .single();
+    if (parentError || !parent) throw new Error("Comentário original não encontrado.");
+    if (parent.subtarefa_id !== subtarefaId) {
+      throw new Error("Comentário inválido para esta subtarefa.");
+    }
+    if (parent.parent_id) throw new Error("Apenas um nível de resposta é permitido.");
+  }
+
+  const { data, error } = await supabase
+    .from("subtarefa_comentarios")
+    .insert({
+      subtarefa_id: subtarefaId,
+      usuario_id: user.id,
+      conteudo,
+      parent_id: parentId,
+    })
+    .select(COMENTARIO_SELECT)
+    .single();
+
+  if (error) throw error;
+  return data as SubtarefaComentario;
+}
+
+export async function deleteSubtarefaComentario(id: string): Promise<void> {
+  const { error } = await supabase.from("subtarefa_comentarios").delete().eq("id", id);
   if (error) throw error;
 }
 

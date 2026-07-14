@@ -1,15 +1,13 @@
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { CalendarClock, Eye, Trash2, UserRound } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { PessoasMultiSelect } from "@/components/common/pessoas-multi-select";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
-import { EditableOnDoubleClick } from "@/components/common/editable-on-double-click";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
@@ -116,30 +114,24 @@ export function SubtarefaRow({
   subtarefa,
   canEdit,
   pessoasDisponiveis,
+  onOpen,
   onToggle,
   onDelete,
-  onRename,
   onUpdateMeta,
 }: {
   subtarefa: SubtarefaWithAuthors;
   canEdit: boolean;
   pessoasDisponiveis: ProfileWithSetor[];
+  onOpen: () => void;
   onToggle: (concluida: boolean) => Promise<void>;
   onDelete: () => Promise<void>;
-  onRename: (titulo: string) => Promise<void>;
   onUpdateMeta: (meta: {
     data_vencimento?: string | null;
     atribuido_ids?: string[];
     visibilidade?: SubtarefaWithAuthors["visibilidade"];
   }) => Promise<void>;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(subtarefa.titulo);
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    setDraft(subtarefa.titulo);
-  }, [subtarefa.titulo]);
 
   const criadorNome = subtarefa.criador?.nome_completo ?? "Desconhecido";
   const concluidoNome = subtarefa.concluido_por_usuario?.nome_completo;
@@ -160,22 +152,6 @@ export function SubtarefaRow({
   const prazoDate = subtarefa.data_vencimento
     ? new Date(subtarefa.data_vencimento)
     : null;
-
-  const commitRename = async () => {
-    const next = draft.trim();
-    if (!next || next === subtarefa.titulo) {
-      setDraft(subtarefa.titulo);
-      setEditing(false);
-      return;
-    }
-    setSaving(true);
-    try {
-      await onRename(next);
-      setEditing(false);
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const runMeta = async (
     meta: {
@@ -202,53 +178,23 @@ export function SubtarefaRow({
         }}
       />
 
-      <div className="min-w-0 flex-1">
-        <EditableOnDoubleClick
-          locked={!canEdit}
-          forceEditable={false}
-          editing={editing}
-          onStartEdit={() => setEditing(true)}
-          onEndEdit={() => {
-            setDraft(subtarefa.titulo);
-            setEditing(false);
-          }}
-        >
-          {(editable) =>
-            editable ? (
-              <Input
-                value={draft}
-                disabled={saving}
-                className="h-8 border-0 bg-transparent px-1 shadow-none focus-visible:ring-1"
-                onChange={(event) => setDraft(event.target.value)}
-                onBlur={() => void commitRename()}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    void commitRename();
-                  }
-                  if (event.key === "Escape") {
-                    event.preventDefault();
-                    setDraft(subtarefa.titulo);
-                    setEditing(false);
-                  }
-                }}
-              />
-            ) : (
-              <span
-                className={cn(
-                  "block truncate px-1 text-sm",
-                  subtarefa.concluida && "text-muted-foreground line-through",
-                )}
-              >
-                {subtarefa.titulo}
-              </span>
-            )
-          }
-        </EditableOnDoubleClick>
-      </div>
+      <button
+        type="button"
+        className={cn(
+          "min-w-0 flex-1 rounded-md px-1 text-left text-sm outline-none transition-colors hover:bg-muted/40 focus-visible:ring-1 focus-visible:ring-ring",
+          subtarefa.concluida && "text-muted-foreground line-through",
+        )}
+        onClick={onOpen}
+        title="Abrir detalhes da subtarefa"
+      >
+        <span className="block truncate">{subtarefa.titulo}</span>
+      </button>
 
       <TooltipProvider delayDuration={200}>
-        <div className="flex shrink-0 items-center gap-0.5">
+        <div
+          className="flex shrink-0 items-center gap-0.5"
+          onClick={(event) => event.stopPropagation()}
+        >
           {/* Prazo */}
           <Popover>
             <PopoverTrigger asChild>

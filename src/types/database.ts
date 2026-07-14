@@ -491,10 +491,19 @@ export type Database = {
           concluido_por: string | null;
           created_at: string;
           criado_por: string | null;
+          data_inicio: string | null;
           data_vencimento: string | null;
+          descricao: string | null;
           id: string;
+          lembretes: Json;
+          prioridade: "P1" | "P2" | "P3" | "P4";
+          projeto_id: string | null;
+          recorrencia: Json | null;
+          setor_id: string | null;
+          status: "a_fazer" | "em_andamento" | "cancelada" | "concluida";
           tarefa_id: string;
           titulo: string;
+          updated_at: string;
           visibilidade:
             | "todos_empresa"
             | "todos_setor"
@@ -508,10 +517,19 @@ export type Database = {
           concluido_por?: string | null;
           created_at?: string;
           criado_por?: string | null;
+          data_inicio?: string | null;
           data_vencimento?: string | null;
+          descricao?: string | null;
           id?: string;
+          lembretes?: Json;
+          prioridade?: "P1" | "P2" | "P3" | "P4";
+          projeto_id?: string | null;
+          recorrencia?: Json | null;
+          setor_id?: string | null;
+          status?: "a_fazer" | "em_andamento" | "cancelada" | "concluida";
           tarefa_id: string;
           titulo: string;
+          updated_at?: string;
           visibilidade?:
             | "todos_empresa"
             | "todos_setor"
@@ -525,10 +543,19 @@ export type Database = {
           concluido_por?: string | null;
           created_at?: string;
           criado_por?: string | null;
+          data_inicio?: string | null;
           data_vencimento?: string | null;
+          descricao?: string | null;
           id?: string;
+          lembretes?: Json;
+          prioridade?: "P1" | "P2" | "P3" | "P4";
+          projeto_id?: string | null;
+          recorrencia?: Json | null;
+          setor_id?: string | null;
+          status?: "a_fazer" | "em_andamento" | "cancelada" | "concluida";
           tarefa_id?: string;
           titulo?: string;
+          updated_at?: string;
           visibilidade?:
             | "todos_empresa"
             | "todos_setor"
@@ -550,6 +577,20 @@ export type Database = {
             columns: ["criado_por"],
             isOneToOne: false,
             referencedRelation: "profiles",
+            referencedColumns: ["id"],
+          },
+          {
+            foreignKeyName: "subtarefas_projeto_id_fkey",
+            columns: ["projeto_id"],
+            isOneToOne: false,
+            referencedRelation: "projetos",
+            referencedColumns: ["id"],
+          },
+          {
+            foreignKeyName: "subtarefas_setor_id_fkey",
+            columns: ["setor_id"],
+            isOneToOne: false,
+            referencedRelation: "setores",
             referencedColumns: ["id"],
           },
           {
@@ -590,6 +631,126 @@ export type Database = {
             columns: ["usuario_id"],
             isOneToOne: false,
             referencedRelation: "profiles",
+            referencedColumns: ["id"],
+          },
+        ];
+      };
+      subtarefa_observadores: {
+        Row: {
+          created_at: string;
+          subtarefa_id: string;
+          usuario_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          subtarefa_id: string;
+          usuario_id: string;
+        };
+        Update: {
+          created_at?: string;
+          subtarefa_id?: string;
+          usuario_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "subtarefa_observadores_subtarefa_id_fkey",
+            columns: ["subtarefa_id"],
+            isOneToOne: false,
+            referencedRelation: "subtarefas",
+            referencedColumns: ["id"],
+          },
+          {
+            foreignKeyName: "subtarefa_observadores_usuario_id_fkey",
+            columns: ["usuario_id"],
+            isOneToOne: false,
+            referencedRelation: "profiles",
+            referencedColumns: ["id"],
+          },
+        ];
+      };
+      subtarefa_comentarios: {
+        Row: {
+          conteudo: string;
+          created_at: string;
+          id: string;
+          parent_id: string | null;
+          subtarefa_id: string;
+          usuario_id: string | null;
+        };
+        Insert: {
+          conteudo: string;
+          created_at?: string;
+          id?: string;
+          parent_id?: string | null;
+          subtarefa_id: string;
+          usuario_id?: string | null;
+        };
+        Update: {
+          conteudo?: string;
+          created_at?: string;
+          id?: string;
+          parent_id?: string | null;
+          subtarefa_id?: string;
+          usuario_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "subtarefa_comentarios_parent_id_fkey",
+            columns: ["parent_id"],
+            isOneToOne: false,
+            referencedRelation: "subtarefa_comentarios",
+            referencedColumns: ["id"],
+          },
+          {
+            foreignKeyName: "subtarefa_comentarios_subtarefa_id_fkey",
+            columns: ["subtarefa_id"],
+            isOneToOne: false,
+            referencedRelation: "subtarefas",
+            referencedColumns: ["id"],
+          },
+          {
+            foreignKeyName: "subtarefa_comentarios_usuario_id_fkey",
+            columns: ["usuario_id"],
+            isOneToOne: false,
+            referencedRelation: "profiles",
+            referencedColumns: ["id"],
+          },
+        ];
+      };
+      subtarefa_anexos: {
+        Row: {
+          created_at: string;
+          id: string;
+          nome: string;
+          storage_path: string;
+          subtarefa_id: string;
+          tamanho: number | null;
+          tipo: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          nome: string;
+          storage_path: string;
+          subtarefa_id: string;
+          tamanho?: number | null;
+          tipo?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          nome?: string;
+          storage_path?: string;
+          subtarefa_id?: string;
+          tamanho?: number | null;
+          tipo?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "subtarefa_anexos_subtarefa_id_fkey",
+            columns: ["subtarefa_id"],
+            isOneToOne: false,
+            referencedRelation: "subtarefas",
             referencedColumns: ["id"],
           },
         ];

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { CommentsThread } from "@/components/common/comments-thread";
 import { EditableOnDoubleClick } from "@/components/common/editable-on-double-click";
+import { SubtarefaPanelSheet } from "@/components/tarefas/subtarefa-panel-sheet";
 import { SubtarefaRow } from "@/components/tarefas/subtarefa-row";
 import { TarefaAnexosSection } from "@/components/tarefas/tarefa-anexos-section";
 import { TarefaMetaToolbar } from "@/components/tarefas/tarefa-meta-toolbar";
@@ -46,7 +47,6 @@ import {
   useTarefaDetail,
   useToggleSubtarefa,
   useUpdateSubtarefaMeta,
-  useUpdateSubtarefaTitulo,
   useUpdateTarefa,
 } from "@/hooks/use-tarefas";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
@@ -226,13 +226,13 @@ export function TarefaPanelSheet({
   const updateTarefa = useUpdateTarefa();
   const createSubtarefa = useCreateSubtarefa();
   const toggleSubtarefa = useToggleSubtarefa();
-  const updateSubtarefaTitulo = useUpdateSubtarefaTitulo();
   const updateSubtarefaMeta = useUpdateSubtarefaMeta();
   const deleteSubtarefa = useDeleteSubtarefa();
   const createComentario = useCreateTarefaComentario();
   const deleteComentario = useDeleteTarefaComentario();
 
   const [novaSubtarefa, setNovaSubtarefa] = useState("");
+  const [subtarefaDrawerId, setSubtarefaDrawerId] = useState<string | null>(null);
   const [sideTab, setSideTab] = useState<"comentarios" | "anexos">(
     initialAba ?? "comentarios",
   );
@@ -241,6 +241,7 @@ export function TarefaPanelSheet({
   useEffect(() => {
     if (!open) {
       setEditingField(null);
+      setSubtarefaDrawerId(null);
       return;
     }
     setEditingField(null);
@@ -442,8 +443,23 @@ export function TarefaPanelSheet({
   const endFieldEdit = () => setEditingField(null);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={LARGE_MODAL_CONTENT_CLASS}>
+    <>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next && subtarefaDrawerId) return;
+        onOpenChange(next);
+      }}
+    >
+      <DialogContent
+        className={LARGE_MODAL_CONTENT_CLASS}
+        onInteractOutside={(event) => {
+          if (subtarefaDrawerId) event.preventDefault();
+        }}
+        onEscapeKeyDown={(event) => {
+          if (subtarefaDrawerId) event.preventDefault();
+        }}
+      >
         {isLoading && !isCreate ? (
           <div className="space-y-4 p-6">
             <Skeleton className="h-8 w-3/4" />
@@ -631,6 +647,7 @@ export function TarefaPanelSheet({
                                 subtarefa={sub}
                                 canEdit={canEdit}
                                 pessoasDisponiveis={pessoasMencionaveis}
+                                onOpen={() => setSubtarefaDrawerId(sub.id)}
                                 onToggle={async (concluida) => {
                                   try {
                                     await toggleSubtarefa.mutateAsync({
@@ -639,17 +656,6 @@ export function TarefaPanelSheet({
                                     });
                                   } catch (error) {
                                     toast.error(getSupabaseErrorMessage(error as Error));
-                                  }
-                                }}
-                                onRename={async (titulo) => {
-                                  try {
-                                    await updateSubtarefaTitulo.mutateAsync({
-                                      id: sub.id,
-                                      titulo,
-                                    });
-                                  } catch (error) {
-                                    toast.error(getSupabaseErrorMessage(error as Error));
-                                    throw error;
                                   }
                                 }}
                                 onUpdateMeta={async (meta) => {
@@ -801,5 +807,16 @@ export function TarefaPanelSheet({
         )}
       </DialogContent>
     </Dialog>
+
+    <SubtarefaPanelSheet
+      subtarefaId={subtarefaDrawerId}
+      open={!!subtarefaDrawerId}
+      onOpenChange={(next) => {
+        if (!next) setSubtarefaDrawerId(null);
+      }}
+      parentTarefa={tarefa ?? null}
+      readOnly={readOnly}
+    />
+    </>
   );
 }

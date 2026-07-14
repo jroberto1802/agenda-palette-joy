@@ -38,6 +38,12 @@ export const tarefaKeys = {
 export const anexoKeys = {
   all: ["anexos"] as const,
   list: (tarefaId: string) => [...anexoKeys.all, tarefaId] as const,
+  subtarefa: (subtarefaId: string) => [...anexoKeys.all, "subtarefa", subtarefaId] as const,
+};
+
+export const subtarefaKeys = {
+  all: ["subtarefas"] as const,
+  detail: (id: string) => [...subtarefaKeys.all, "detail", id] as const,
 };
 
 export const avisoKeys = {

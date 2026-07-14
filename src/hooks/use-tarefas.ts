@@ -1,27 +1,32 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { tarefaKeys } from "@/lib/query-keys";
+import { subtarefaKeys, tarefaKeys } from "@/lib/query-keys";
 import {
   createSubtarefa,
+  createSubtarefaComentario,
   createTarefa,
   createTarefaComentario,
   deleteSubtarefa,
+  deleteSubtarefaComentario,
   deleteTarefaComentario,
   getDashboardKpis,
+  getSubtarefaDetail,
   getTarefaDetail,
   listRecentTarefas,
   listTarefas,
   listTarefasCalendario,
   softDeleteTarefa,
   toggleSubtarefa,
+  updateSubtarefa,
   updateSubtarefaMeta,
   updateSubtarefaTitulo,
   updateTarefa,
   updateTarefaStatus,
 } from "@/services/tarefas";
-import type { TarefaFilters, TarefaFormData, TarefaStatus } from "@/types";
+import type { SubtarefaFormData, TarefaFilters, TarefaFormData, TarefaStatus } from "@/types";
 
 function invalidateTarefas(queryClient: ReturnType<typeof useQueryClient>) {
   queryClient.invalidateQueries({ queryKey: tarefaKeys.all });
+  queryClient.invalidateQueries({ queryKey: subtarefaKeys.all });
 }
 
 export function useTarefas(
@@ -158,6 +163,57 @@ export function useDeleteSubtarefa() {
   return useMutation({
     mutationFn: (id: string) => deleteSubtarefa(id),
     onSuccess: () => invalidateTarefas(queryClient),
+  });
+}
+
+export function useSubtarefaDetail(id: string | null) {
+  return useQuery({
+    queryKey: subtarefaKeys.detail(id ?? ""),
+    queryFn: () => getSubtarefaDetail(id!),
+    enabled: !!id,
+  });
+}
+
+export function useUpdateSubtarefa() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: SubtarefaFormData }) =>
+      updateSubtarefa(id, data),
+    onSuccess: (_data, { id }) => {
+      invalidateTarefas(queryClient);
+      queryClient.invalidateQueries({ queryKey: subtarefaKeys.detail(id) });
+    },
+  });
+}
+
+export function useCreateSubtarefaComentario() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      subtarefaId,
+      conteudo,
+      parentId = null,
+    }: {
+      subtarefaId: string;
+      conteudo: string;
+      parentId?: string | null;
+    }) => createSubtarefaComentario(subtarefaId, conteudo, parentId),
+    onSuccess: (_data, { subtarefaId }) => {
+      invalidateTarefas(queryClient);
+      queryClient.invalidateQueries({ queryKey: subtarefaKeys.detail(subtarefaId) });
+    },
+  });
+}
+
+export function useDeleteSubtarefaComentario() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, subtarefaId }: { id: string; subtarefaId: string }) =>
+      deleteSubtarefaComentario(id).then(() => subtarefaId),
+    onSuccess: (_data, { subtarefaId }) => {
+      invalidateTarefas(queryClient);
+      queryClient.invalidateQueries({ queryKey: subtarefaKeys.detail(subtarefaId) });
+    },
   });
 }
 
