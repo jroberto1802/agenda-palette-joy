@@ -266,6 +266,38 @@ export type Database = {
           },
         ];
       };
+      empresa_config: {
+        Row: {
+          id: string;
+          logo_url: string | null;
+          nome: string;
+          updated_at: string;
+          updated_por: string | null;
+        };
+        Insert: {
+          id?: string;
+          logo_url?: string | null;
+          nome?: string;
+          updated_at?: string;
+          updated_por?: string | null;
+        };
+        Update: {
+          id?: string;
+          logo_url?: string | null;
+          nome?: string;
+          updated_at?: string;
+          updated_por?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "empresa_config_updated_por_fkey",
+            columns: ["updated_por"],
+            isOneToOne: false,
+            referencedRelation: "profiles",
+            referencedColumns: ["id"],
+          },
+        ];
+      };
       notificacoes: {
         Row: {
           created_at: string;

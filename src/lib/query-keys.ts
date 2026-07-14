@@ -21,6 +21,11 @@ export const equipeGrupoKeys = {
   list: () => [...equipeGrupoKeys.all, "list"] as const,
 };
 
+export const empresaKeys = {
+  all: ["empresa"] as const,
+  config: () => [...empresaKeys.all, "config"] as const,
+};
+
 export const tarefaKeys = {
   all: ["tarefas"] as const,
   list: (filters?: Record<string, string>) => [...tarefaKeys.all, "list", filters ?? {}] as const,

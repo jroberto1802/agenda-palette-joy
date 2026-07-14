@@ -56,6 +56,14 @@ export type EquipeGrupoWithMembros = EquipeGrupo & {
   membros: EquipeGrupoMembro[];
 };
 
+export type EmpresaConfig = Tables<"empresa_config">;
+
+export type EmpresaConfigFormData = {
+  nome: string;
+  logo_file?: File | null;
+  remove_logo?: boolean;
+};
+
 export type ProfileFormData = {
   nome_completo: string;
   email?: string;

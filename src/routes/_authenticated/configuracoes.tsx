@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { CadastroPessoasPanel } from "@/components/settings/cadastro-pessoas-panel";
 import { CadastroSetoresPanel } from "@/components/settings/cadastro-setores-panel";
+import { EmpresaSettingsCard } from "@/components/settings/empresa-settings-card";
 import { ThemeSettingsCard } from "@/components/settings/theme-settings-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -134,6 +135,8 @@ function ConfiguracoesPage() {
         )}
 
         <TabsContent value="conta" className="space-y-6 mt-6 max-w-2xl">
+          <EmpresaSettingsCard canEdit={isAdmin(profile)} />
+
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Perfil</CardTitle>

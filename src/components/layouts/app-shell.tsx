@@ -35,8 +35,10 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
+import { useEmpresaConfig } from "@/hooks/use-empresa";
 import { useProfile } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
+import { EMPRESA_NOME_PADRAO } from "@/services/empresa";
 import { isAdmin } from "@/utils/permissions";
 
 type NavItem = {
@@ -59,10 +61,12 @@ const BASE_NAV: NavItem[] = [
 export function AppShell({ children }: { children: ReactNode }) {
   const { user, signOut } = useAuth();
   const { data: profile } = useProfile();
+  const { data: empresa } = useEmpresaConfig();
   const { mode, toggleMode } = useTheme();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   const displayName = profile?.nome_completo ?? user?.email ?? "Usuário";
+  const empresaNome = empresa?.nome?.trim() || EMPRESA_NOME_PADRAO;
 
   const navItems = useMemo((): NavItem[] => {
     const items: NavItem[] = [...BASE_NAV];
@@ -82,12 +86,28 @@ export function AppShell({ children }: { children: ReactNode }) {
             <SidebarMenuItem>
               <SidebarMenuButton size="lg" asChild>
                 <Link to="/dashboard">
-                  <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                    <ClipboardList className="size-4" />
+                  <div
+                    className={
+                      empresa?.logo_url
+                        ? "flex aspect-square size-8 items-center justify-center overflow-hidden rounded-lg border bg-background"
+                        : "flex aspect-square size-8 items-center justify-center overflow-hidden rounded-lg bg-primary text-primary-foreground"
+                    }
+                  >
+                    {empresa?.logo_url ? (
+                      <img
+                        src={empresa.logo_url}
+                        alt={empresaNome}
+                        className="size-full object-contain p-0.5"
+                      />
+                    ) : (
+                      <ClipboardList className="size-4" />
+                    )}
                   </div>
                   <div className="grid flex-1 text-left text-sm leading-tight">
                     <span className="truncate font-semibold">CoreGestor</span>
-                    <span className="truncate text-xs text-sidebar-foreground/70">Gestão</span>
+                    <span className="truncate text-xs text-sidebar-foreground/70">
+                      {empresaNome}
+                    </span>
                   </div>
                 </Link>
               </SidebarMenuButton>
