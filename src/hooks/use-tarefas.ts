@@ -22,7 +22,10 @@ function invalidateTarefas(queryClient: ReturnType<typeof useQueryClient>) {
   queryClient.invalidateQueries({ queryKey: tarefaKeys.all });
 }
 
-export function useTarefas(filters: TarefaFilters = {}) {
+export function useTarefas(
+  filters: TarefaFilters = {},
+  options?: { enabled?: boolean },
+) {
   const filterKey = {
     search: filters.search ?? "",
     status: filters.status ?? "all",
@@ -37,6 +40,7 @@ export function useTarefas(filters: TarefaFilters = {}) {
   return useQuery({
     queryKey: tarefaKeys.list(filterKey),
     queryFn: () => listTarefas(filters),
+    enabled: options?.enabled ?? true,
   });
 }
 

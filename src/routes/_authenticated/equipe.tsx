@@ -100,11 +100,13 @@ function PessoaCardContent({
   pessoa,
   totalTarefas,
   showContador,
+  interactive,
   isDragging,
 }: {
   pessoa: ProfileWithSetor;
   totalTarefas: number;
   showContador: boolean;
+  interactive?: boolean;
   isDragging?: boolean;
 }) {
   const cargoSetor = [pessoa.cargo, pessoa.setor?.nome].filter(Boolean).join(" · ");
@@ -113,6 +115,7 @@ function PessoaCardContent({
     <Card
       className={cn(
         "transition-colors",
+        interactive && "hover:border-primary/40 hover:bg-muted/30",
         isDragging && "opacity-50 ring-2 ring-primary",
       )}
     >
@@ -176,17 +179,21 @@ function EquipePessoaCard({
       className={cn(
         canOpenAgenda && "cursor-pointer",
         canDrag && "cursor-grab active:cursor-grabbing",
+        !canOpenAgenda && !canDrag && "cursor-default",
       )}
-      onClick={handleClick}
+      onClick={canOpenAgenda ? handleClick : undefined}
       role={canOpenAgenda ? "button" : undefined}
       tabIndex={canOpenAgenda ? 0 : undefined}
-      onKeyDown={(event) => {
-        if (!canOpenAgenda) return;
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          handleClick();
-        }
-      }}
+      onKeyDown={
+        canOpenAgenda
+          ? (event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                handleClick();
+              }
+            }
+          : undefined
+      }
       aria-label={
         canOpenAgenda ? `Ver agenda de ${pessoa.nome_completo}` : pessoa.nome_completo
       }
@@ -195,6 +202,7 @@ function EquipePessoaCard({
         pessoa={pessoa}
         totalTarefas={totalTarefas}
         showContador={showContador}
+        interactive={canOpenAgenda}
         isDragging={isDragging}
       />
     </div>
@@ -297,8 +305,12 @@ function EquipePage() {
   const { data: profile, isLoading: loadingProfile } = useProfile();
   const { data: pessoas, isLoading: loadingPessoas } = usePessoas();
   const { data: grupos, isLoading: loadingGrupos } = useEquipeGrupos();
-  const { data: tarefas, isLoading: loadingTarefas } = useTarefas();
   const canManage = isAdminOrGerente(profile);
+  // Contador e agenda de terceiros: só Admin/Gestor — não buscar tarefas para colaborador.
+  const { data: tarefas, isLoading: loadingTarefas } = useTarefas(
+    {},
+    { enabled: !loadingProfile && canManage },
+  );
 
   const createGrupo = useCreateEquipeGrupo();
   const renameGrupo = useRenameEquipeGrupo();
@@ -445,7 +457,7 @@ function EquipePage() {
           <p className="mt-1 text-sm text-muted-foreground">
             {canManage
               ? "Organize colaboradores em grupos e arraste os cards entre seções. Clique no card para abrir a agenda."
-              : "Colaboradores organizados em grupos. A agenda de terceiros é restrita a Administrador e Gestor."}
+              : "Visualize os grupos e pessoas da equipe. Contador de tarefas e agenda detalhada ficam restritos a Administrador e Gestor."}
           </p>
         </div>
         {canManage && (
@@ -509,6 +521,7 @@ function EquipePage() {
                 pessoa={activePessoa}
                 totalTarefas={countTarefasDaPessoa(activePessoa.id, tarefas)}
                 showContador={canManage}
+                interactive
                 isDragging
               />
             ) : null}
