@@ -13,7 +13,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   createAgendaBoardState,
   TarefaAgendaBoard,
@@ -26,11 +25,9 @@ import { useProfile } from "@/hooks/use-profile";
 import { useSetores } from "@/hooks/use-setores";
 import { useSoftDeleteTarefa, useUpdateTarefaStatus } from "@/hooks/use-tarefas";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
-import type { Profile, TarefaStatus, TarefaWithRelations } from "@/types";
+import type { TarefaStatus, TarefaWithRelations } from "@/types";
 import { isAdmin, isGerente } from "@/utils/permissions";
 import { canEditTarefa, TAREFA_STATUS_LABELS } from "@/utils/tarefas";
-
-type AgendaTab = "minha" | "geral";
 
 type AgendaSearch = {
   tarefaId?: string;
@@ -47,7 +44,7 @@ export const Route = createFileRoute("/_authenticated/tarefas")({
   head: () => ({
     meta: [
       { title: "Agenda — CoreGestor" },
-      { name: "description", content: "Minha agenda e visão geral de tarefas da empresa." },
+      { name: "description", content: "Sua agenda pessoal de tarefas." },
     ],
   }),
   component: AgendaPage,
@@ -61,10 +58,7 @@ function AgendaPage() {
   const { data: projetos } = useProjetos();
   const { data: pessoas } = usePessoas();
 
-  const [agendaTab, setAgendaTab] = useState<AgendaTab>("minha");
-  const [minhaTab, setMinhaTab] = useState<AgendaBoardState>(createAgendaBoardState);
-  const [geralTab, setGeralTab] = useState<AgendaBoardState>(createAgendaBoardState);
-
+  const [boardState, setBoardState] = useState<AgendaBoardState>(createAgendaBoardState);
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelId, setPanelId] = useState<string | null>(null);
   const [panelAba, setPanelAba] = useState<"comentarios" | "anexos" | undefined>();
@@ -137,13 +131,31 @@ function AgendaPage() {
     }
   };
 
+  /** Escopo fixo: apenas tarefas do usuário logado como responsável. */
+  const scopedBoardState = useMemo(() => {
+    if (!profile?.id) return boardState;
+    return {
+      ...boardState,
+      filters: {
+        ...boardState.filters,
+        atribuido_ids: [profile.id],
+        atribuido_a: "all" as const,
+      },
+      debouncedFilters: {
+        ...boardState.debouncedFilters,
+        atribuido_ids: [profile.id],
+        atribuido_a: "all" as const,
+      },
+    };
+  }, [boardState, profile?.id]);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Agenda</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Suas tarefas e a visão geral da empresa em cards, lista ou Kanban.
+            Suas tarefas atribuídas em cards, lista ou Kanban.
           </p>
         </div>
         <Button onClick={openCreate} className="shrink-0 gap-2">
@@ -152,48 +164,35 @@ function AgendaPage() {
         </Button>
       </div>
 
-      <Tabs value={agendaTab} onValueChange={(value) => setAgendaTab(value as AgendaTab)}>
-        <TabsList>
-          <TabsTrigger value="minha">Minha agenda</TabsTrigger>
-          <TabsTrigger value="geral">Agenda Geral</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="minha" className="mt-4">
-          <AgendaTabPanel
-            mode="minha"
-            profile={profile}
-            tabState={minhaTab}
-            onTabStateChange={setMinhaTab}
-            setores={setores ?? []}
-            projetos={projetos ?? []}
-            pessoas={pessoasAtivas}
-            canEdit={canEdit}
-            canDeleteTarefa={canDeleteTarefa}
-            onOpenTarefa={openTarefa}
-            onCreate={openCreate}
-            onStatusChange={handleStatusChange}
-            onDelete={setDeleting}
-          />
-        </TabsContent>
-
-        <TabsContent value="geral" className="mt-4">
-          <AgendaTabPanel
-            mode="geral"
-            profile={profile}
-            tabState={geralTab}
-            onTabStateChange={setGeralTab}
-            setores={setores ?? []}
-            projetos={projetos ?? []}
-            pessoas={pessoasAtivas}
-            canEdit={canEdit}
-            canDeleteTarefa={canDeleteTarefa}
-            onOpenTarefa={openTarefa}
-            onCreate={openCreate}
-            onStatusChange={handleStatusChange}
-            onDelete={setDeleting}
-          />
-        </TabsContent>
-      </Tabs>
+      <TarefaAgendaBoard
+        state={scopedBoardState}
+        onStateChange={(next) => {
+          setBoardState({
+            ...next,
+            filters: {
+              ...next.filters,
+              atribuido_ids: [],
+              atribuido_a: "all",
+            },
+            debouncedFilters: {
+              ...next.debouncedFilters,
+              atribuido_ids: [],
+              atribuido_a: "all",
+            },
+          });
+        }}
+        setores={setores ?? []}
+        projetos={projetos ?? []}
+        pessoas={pessoasAtivas}
+        hideResponsavel
+        emptyMessage="Nenhuma tarefa atribuída a você."
+        canEdit={canEdit}
+        canDeleteTarefa={canDeleteTarefa}
+        onOpenTarefa={openTarefa}
+        onCreate={openCreate}
+        onStatusChange={handleStatusChange}
+        onDelete={setDeleting}
+      />
 
       <TarefaPanelSheet
         tarefaId={panelId}
@@ -238,94 +237,5 @@ function AgendaPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  );
-}
-
-function AgendaTabPanel({
-  mode,
-  profile,
-  tabState,
-  onTabStateChange,
-  setores,
-  projetos,
-  pessoas,
-  canEdit,
-  canDeleteTarefa,
-  onOpenTarefa,
-  onCreate,
-  onStatusChange,
-  onDelete,
-}: {
-  mode: AgendaTab;
-  profile: Profile | null | undefined;
-  tabState: AgendaBoardState;
-  onTabStateChange: (state: AgendaBoardState) => void;
-  setores: Parameters<typeof TarefaAgendaBoard>[0]["setores"];
-  projetos: Parameters<typeof TarefaAgendaBoard>[0]["projetos"];
-  pessoas: Parameters<typeof TarefaAgendaBoard>[0]["pessoas"];
-  canEdit: (tarefa: TarefaWithRelations) => boolean;
-  canDeleteTarefa: (tarefa: TarefaWithRelations) => boolean;
-  onOpenTarefa: (tarefa: TarefaWithRelations) => void;
-  onCreate: () => void;
-  onStatusChange: (tarefa: TarefaWithRelations, status: TarefaStatus) => void;
-  onDelete: (tarefa: TarefaWithRelations) => void;
-}) {
-  const boardState = useMemo(() => {
-    if (mode === "minha" && profile?.id) {
-      return {
-        ...tabState,
-        filters: {
-          ...tabState.filters,
-          atribuido_ids: [profile.id],
-          atribuido_a: "all" as const,
-        },
-        debouncedFilters: {
-          ...tabState.debouncedFilters,
-          atribuido_ids: [profile.id],
-          atribuido_a: "all" as const,
-        },
-      };
-    }
-    return tabState;
-  }, [mode, profile?.id, tabState]);
-
-  return (
-    <TarefaAgendaBoard
-      state={boardState}
-      onStateChange={(next) => {
-        if (mode === "minha") {
-          onTabStateChange({
-            ...next,
-            filters: {
-              ...next.filters,
-              atribuido_ids: [],
-              atribuido_a: "all",
-            },
-            debouncedFilters: {
-              ...next.debouncedFilters,
-              atribuido_ids: [],
-              atribuido_a: "all",
-            },
-          });
-          return;
-        }
-        onTabStateChange(next);
-      }}
-      setores={setores}
-      projetos={projetos}
-      pessoas={pessoas}
-      hideResponsavel={mode === "minha"}
-      emptyMessage={
-        mode === "minha"
-          ? "Nenhuma tarefa atribuída a você."
-          : "Nenhuma tarefa encontrada."
-      }
-      canEdit={canEdit}
-      canDeleteTarefa={canDeleteTarefa}
-      onOpenTarefa={onOpenTarefa}
-      onCreate={onCreate}
-      onStatusChange={onStatusChange}
-      onDelete={onDelete}
-    />
   );
 }
