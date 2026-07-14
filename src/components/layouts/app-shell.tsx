@@ -37,7 +37,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { useProfile } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
-import { isAdmin } from "@/utils/permissions";
+import { isAdmin, isAdminOrGerente } from "@/utils/permissions";
 
 type NavItem = {
   to: string;
@@ -51,7 +51,6 @@ const BASE_NAV: NavItem[] = [
   { to: "/calendario", label: "Calendário", icon: CalendarDays },
   { to: "/tarefas", label: "Agenda", icon: ClipboardList },
   { to: "/projetos", label: "Projetos", icon: FolderKanban },
-  { to: "/equipe", label: "Equipe", icon: Users },
   { to: "/relatorios", label: "Relatórios", icon: BarChart3 },
   { to: "/configuracoes", label: "Configurações", icon: Settings },
 ];
@@ -66,6 +65,9 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const navItems = useMemo((): NavItem[] => {
     const items: NavItem[] = [...BASE_NAV];
+    if (isAdminOrGerente(profile)) {
+      items.splice(5, 0, { to: "/equipe", label: "Equipe", icon: Users });
+    }
     if (isAdmin(profile)) {
       items.push({ to: "/admin", label: "Admin", icon: Shield });
     }

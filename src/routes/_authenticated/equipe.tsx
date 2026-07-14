@@ -1,22 +1,23 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useMemo } from "react";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
-import { TarefaDetailSheet } from "@/components/tarefas/tarefa-detail-sheet";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePessoas } from "@/hooks/use-pessoas";
+import { useProfile } from "@/hooks/use-profile";
 import { useTarefas } from "@/hooks/use-tarefas";
-import type { ProfileWithSetor, TarefaWithRelations } from "@/types";
-import { formatDate } from "@/utils/formatters";
-import { TAREFA_STATUS_LABELS, getTarefaResponsaveis } from "@/utils/tarefas";
 import { CARD_GRID_CLASS } from "@/lib/layout";
+import { cn } from "@/lib/utils";
+import type { ProfileWithSetor, TarefaWithRelations } from "@/types";
+import { isAdminOrGerente } from "@/utils/permissions";
+import { getTarefaResponsaveis } from "@/utils/tarefas";
 
 export const Route = createFileRoute("/_authenticated/equipe")({
   head: () => ({
     meta: [
       { title: "Equipe — CoreGestor" },
-      { name: "description", content: "Visão por pessoa das atividades visíveis da equipe." },
+      { name: "description", content: "Visão da equipe por setor e acesso às agendas." },
     ],
   }),
   component: EquipePage,
@@ -28,100 +29,83 @@ type SetorGrupo = {
   pessoas: ProfileWithSetor[];
 };
 
+function countTarefasDaPessoa(
+  pessoaId: string,
+  tarefas: TarefaWithRelations[] | undefined,
+): number {
+  let total = 0;
+  for (const tarefa of tarefas ?? []) {
+    const responsavelIds = getTarefaResponsaveis(tarefa).map((r) => r.id);
+    if (responsavelIds.length === 0 && tarefa.atribuido_a) {
+      responsavelIds.push(tarefa.atribuido_a);
+    }
+    if (responsavelIds.includes(pessoaId)) total += 1;
+  }
+  return total;
+}
+
 function EquipePessoaCard({
   pessoa,
-  tarefasDaPessoa,
-  onSelectTask,
+  totalTarefas,
+  showContador,
+  canOpenAgenda,
 }: {
   pessoa: ProfileWithSetor;
-  tarefasDaPessoa: TarefaWithRelations[];
-  onSelectTask: (taskId: string) => void;
+  totalTarefas: number;
+  showContador: boolean;
+  canOpenAgenda: boolean;
 }) {
-  return (
-    <Card className="overflow-hidden">
-      <CardHeader className="border-b bg-muted/30">
-        <div className="flex items-center gap-3">
-          <ProfileAvatar
-            name={pessoa.nome_completo}
-            avatarUrl={pessoa.avatar_url}
-            className="h-14 w-14"
-            fallbackClassName="text-base"
-          />
-          <div className="min-w-0">
-            <p className="truncate font-semibold">{pessoa.nome_completo}</p>
-            <p className="truncate text-sm text-muted-foreground">
-              {pessoa.setor?.nome ?? "Sem setor"}
-            </p>
-          </div>
-        </div>
-      </CardHeader>
+  const cargoSetor = [pessoa.cargo, pessoa.setor?.nome].filter(Boolean).join(" · ");
 
-      <CardContent className="space-y-3 p-4">
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-medium">Atividades</p>
-          <Badge variant="outline">
-            {tarefasDaPessoa.length} {tarefasDaPessoa.length === 1 ? "tarefa" : "tarefas"}
-          </Badge>
-        </div>
-
-        {!tarefasDaPessoa.length ? (
-          <p className="text-sm text-muted-foreground">
-            Nenhuma atividade visível para esta pessoa.
+  const content = (
+    <Card
+      className={cn(
+        "transition-colors",
+        canOpenAgenda && "cursor-pointer hover:border-primary/40 hover:bg-muted/30",
+      )}
+    >
+      <CardContent className="flex items-center gap-3 p-4">
+        <ProfileAvatar
+          name={pessoa.nome_completo}
+          avatarUrl={pessoa.avatar_url}
+          className="h-12 w-12 shrink-0"
+          fallbackClassName="text-sm"
+        />
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-semibold leading-tight">{pessoa.nome_completo}</p>
+          <p className="mt-0.5 truncate text-sm text-muted-foreground">
+            {cargoSetor || "Sem cargo/setor"}
           </p>
-        ) : (
-          <div className="space-y-2">
-            {tarefasDaPessoa.slice(0, 6).map((tarefa) => (
-              <button
-                key={tarefa.id}
-                type="button"
-                onClick={() => onSelectTask(tarefa.id)}
-                className="w-full rounded-lg border p-3 text-left transition-colors hover:bg-muted/50"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <p className="line-clamp-1 text-sm font-medium">{tarefa.titulo}</p>
-                  <Badge variant="secondary" className="shrink-0">
-                    {TAREFA_STATUS_LABELS[tarefa.status]}
-                  </Badge>
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {tarefa.data_vencimento
-                    ? `Vencimento: ${formatDate(tarefa.data_vencimento)}`
-                    : "Sem data"}
-                </p>
-              </button>
-            ))}
-            {tarefasDaPessoa.length > 6 && (
-              <p className="text-xs text-muted-foreground">
-                +{tarefasDaPessoa.length - 6} atividades não exibidas neste card.
-              </p>
-            )}
-          </div>
+        </div>
+        {showContador && (
+          <Badge variant="secondary" className="shrink-0">
+            {totalTarefas} {totalTarefas === 1 ? "tarefa" : "tarefas"}
+          </Badge>
         )}
       </CardContent>
     </Card>
   );
+
+  if (!canOpenAgenda) return content;
+
+  return (
+    <Link
+      to="/equipe/$pessoaId"
+      params={{ pessoaId: pessoa.id }}
+      className="block rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      aria-label={`Ver agenda de ${pessoa.nome_completo}`}
+    >
+      {content}
+    </Link>
+  );
 }
 
 function EquipePage() {
+  const navigate = useNavigate();
+  const { data: profile, isLoading: loadingProfile } = useProfile();
   const { data: pessoas, isLoading: loadingPessoas } = usePessoas();
   const { data: tarefas, isLoading: loadingTarefas } = useTarefas();
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-
-  const tarefasPorPessoa = useMemo(() => {
-    const map = new Map<string, TarefaWithRelations[]>();
-    for (const tarefa of tarefas ?? []) {
-      const responsavelIds = getTarefaResponsaveis(tarefa).map((r) => r.id);
-      if (responsavelIds.length === 0 && tarefa.atribuido_a) {
-        responsavelIds.push(tarefa.atribuido_a);
-      }
-      for (const usuarioId of responsavelIds) {
-        const current = map.get(usuarioId) ?? [];
-        current.push(tarefa);
-        map.set(usuarioId, current);
-      }
-    }
-    return map;
-  }, [tarefas]);
+  const canManage = isAdminOrGerente(profile);
 
   const pessoasAtivas = useMemo(
     () => (pessoas ?? []).filter((pessoa) => pessoa.ativo),
@@ -149,19 +133,46 @@ function EquipePage() {
       }));
   }, [pessoasAtivas]);
 
+  if (!loadingProfile && profile && !canManage) {
+    return (
+      <div className="space-y-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Equipe</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            A visão de agendas da equipe é restrita a Administrador e Gestor.
+          </p>
+        </div>
+        <div className="rounded-xl border border-dashed p-12 text-center text-muted-foreground">
+          Você não tem permissão para acessar esta área.
+          <div className="mt-4">
+            <button
+              type="button"
+              className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+              onClick={() => navigate({ to: "/tarefas" })}
+            >
+              Ir para minha Agenda
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const loading = loadingProfile || loadingPessoas || (canManage && loadingTarefas);
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Equipe</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Cards por pessoa com as tarefas visíveis para o seu perfil atual.
+        <p className="mt-1 text-sm text-muted-foreground">
+          Colaboradores agrupados por setor. Clique no card para abrir a agenda da pessoa.
         </p>
       </div>
 
-      {loadingPessoas || loadingTarefas ? (
+      {loading ? (
         <div className={CARD_GRID_CLASS}>
           {Array.from({ length: 6 }).map((_, index) => (
-            <Skeleton key={index} className="h-72 rounded-xl" />
+            <Skeleton key={index} className="h-20 rounded-xl" />
           ))}
         </div>
       ) : !pessoasAtivas.length ? (
@@ -178,8 +189,9 @@ function EquipePage() {
                   <EquipePessoaCard
                     key={pessoa.id}
                     pessoa={pessoa}
-                    tarefasDaPessoa={tarefasPorPessoa.get(pessoa.id) ?? []}
-                    onSelectTask={setSelectedTaskId}
+                    totalTarefas={countTarefasDaPessoa(pessoa.id, tarefas)}
+                    showContador={canManage}
+                    canOpenAgenda={canManage}
                   />
                 ))}
               </div>
@@ -187,14 +199,6 @@ function EquipePage() {
           ))}
         </div>
       )}
-
-      <TarefaDetailSheet
-        tarefaId={selectedTaskId}
-        open={!!selectedTaskId}
-        onOpenChange={(open) => {
-          if (!open) setSelectedTaskId(null);
-        }}
-      />
     </div>
   );
 }

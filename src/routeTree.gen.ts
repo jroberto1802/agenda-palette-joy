@@ -24,6 +24,7 @@ import { Route as AuthenticatedCalendarioRouteImport } from './routes/_authentic
 import { Route as AuthenticatedAvisosRouteImport } from './routes/_authenticated/avisos'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedProjetosProjetoIdRouteImport } from './routes/_authenticated/projetos_.$projetoId'
+import { Route as AuthenticatedEquipePessoaIdRouteImport } from './routes/_authenticated/equipe_.$pessoaId'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -101,6 +102,12 @@ const AuthenticatedProjetosProjetoIdRoute =
     path: '/projetos/$projetoId',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedEquipePessoaIdRoute =
+  AuthenticatedEquipePessoaIdRouteImport.update({
+    id: '/equipe_/$pessoaId',
+    path: '/equipe/$pessoaId',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -116,6 +123,7 @@ export interface FileRoutesByFullPath {
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/setores': typeof AuthenticatedSetoresRoute
   '/tarefas': typeof AuthenticatedTarefasRoute
+  '/equipe/$pessoaId': typeof AuthenticatedEquipePessoaIdRoute
   '/projetos/$projetoId': typeof AuthenticatedProjetosProjetoIdRoute
 }
 export interface FileRoutesByTo {
@@ -132,6 +140,7 @@ export interface FileRoutesByTo {
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/setores': typeof AuthenticatedSetoresRoute
   '/tarefas': typeof AuthenticatedTarefasRoute
+  '/equipe/$pessoaId': typeof AuthenticatedEquipePessoaIdRoute
   '/projetos/$projetoId': typeof AuthenticatedProjetosProjetoIdRoute
 }
 export interface FileRoutesById {
@@ -150,6 +159,7 @@ export interface FileRoutesById {
   '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
   '/_authenticated/setores': typeof AuthenticatedSetoresRoute
   '/_authenticated/tarefas': typeof AuthenticatedTarefasRoute
+  '/_authenticated/equipe_/$pessoaId': typeof AuthenticatedEquipePessoaIdRoute
   '/_authenticated/projetos_/$projetoId': typeof AuthenticatedProjetosProjetoIdRoute
 }
 export interface FileRouteTypes {
@@ -168,6 +178,7 @@ export interface FileRouteTypes {
     | '/relatorios'
     | '/setores'
     | '/tarefas'
+    | '/equipe/$pessoaId'
     | '/projetos/$projetoId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -184,6 +195,7 @@ export interface FileRouteTypes {
     | '/relatorios'
     | '/setores'
     | '/tarefas'
+    | '/equipe/$pessoaId'
     | '/projetos/$projetoId'
   id:
     | '__root__'
@@ -201,6 +213,7 @@ export interface FileRouteTypes {
     | '/_authenticated/relatorios'
     | '/_authenticated/setores'
     | '/_authenticated/tarefas'
+    | '/_authenticated/equipe_/$pessoaId'
     | '/_authenticated/projetos_/$projetoId'
   fileRoutesById: FileRoutesById
 }
@@ -317,6 +330,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProjetosProjetoIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/equipe_/$pessoaId': {
+      id: '/_authenticated/equipe_/$pessoaId'
+      path: '/equipe/$pessoaId'
+      fullPath: '/equipe/$pessoaId'
+      preLoaderRoute: typeof AuthenticatedEquipePessoaIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
@@ -332,6 +352,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedRelatoriosRoute: typeof AuthenticatedRelatoriosRoute
   AuthenticatedSetoresRoute: typeof AuthenticatedSetoresRoute
   AuthenticatedTarefasRoute: typeof AuthenticatedTarefasRoute
+  AuthenticatedEquipePessoaIdRoute: typeof AuthenticatedEquipePessoaIdRoute
   AuthenticatedProjetosProjetoIdRoute: typeof AuthenticatedProjetosProjetoIdRoute
 }
 
@@ -347,6 +368,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedRelatoriosRoute: AuthenticatedRelatoriosRoute,
   AuthenticatedSetoresRoute: AuthenticatedSetoresRoute,
   AuthenticatedTarefasRoute: AuthenticatedTarefasRoute,
+  AuthenticatedEquipePessoaIdRoute: AuthenticatedEquipePessoaIdRoute,
   AuthenticatedProjetosProjetoIdRoute: AuthenticatedProjetosProjetoIdRoute,
 }
 
