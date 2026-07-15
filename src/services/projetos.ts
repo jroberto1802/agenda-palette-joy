@@ -1,6 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { ProjetoFormData, ProjetoMembro, ProjetoWithResponsavel } from "@/types";
-import { PROJETO_OPEN_ACTIVITY_STATUSES } from "@/utils/projetos";
 
 const PROJETO_SELECT = `
   *,
@@ -15,7 +14,7 @@ export type ProjetoAtividadeTransferivel = {
   kind: "tarefa" | "subtarefa";
   id: string;
   titulo: string;
-  status: string;
+  concluida: boolean;
 };
 
 export type ProjetoMembroTransferInput =
@@ -204,14 +203,14 @@ export async function countTarefasPorProjeto(projetoId: string): Promise<number>
   return count ?? 0;
 }
 
-/** Conta tarefas/subtarefas abertas (a_fazer / em_andamento) no projeto. */
+/** Conta tarefas/subtarefas abertas (não concluídas) no projeto. */
 export async function countAtividadesAbertasPorProjeto(projetoId: string): Promise<number> {
   const { count: tarefasCount, error: tarefasError } = await supabase
     .from("tarefas")
     .select("id", { count: "exact", head: true })
     .eq("projeto_id", projetoId)
     .is("deleted_at", null)
-    .in("status", PROJETO_OPEN_ACTIVITY_STATUSES);
+    .eq("concluida", false);
 
   if (tarefasError) throw tarefasError;
 
@@ -231,7 +230,7 @@ export async function countAtividadesAbertasPorProjeto(projetoId: string): Promi
       .from("subtarefas")
       .select("id", { count: "exact", head: true })
       .in("tarefa_id", tarefaIds)
-      .in("status", PROJETO_OPEN_ACTIVITY_STATUSES);
+      .eq("concluida", false);
     if (error) throw error;
     subtarefasCount += count ?? 0;
   }
@@ -241,7 +240,7 @@ export async function countAtividadesAbertasPorProjeto(projetoId: string): Promi
     .from("subtarefas")
     .select("id", { count: "exact", head: true })
     .eq("projeto_id", projetoId)
-    .in("status", PROJETO_OPEN_ACTIVITY_STATUSES);
+    .eq("concluida", false);
 
   if (subtarefasDiretasError) throw subtarefasDiretasError;
 
@@ -254,7 +253,7 @@ export async function countAtividadesAbertasPorProjeto(projetoId: string): Promi
       .from("subtarefas")
       .select("id, tarefa_id")
       .eq("projeto_id", projetoId)
-      .in("status", PROJETO_OPEN_ACTIVITY_STATUSES);
+      .eq("concluida", false);
     if (error) throw error;
     const tarefaSet = new Set(tarefaIds);
     const extras = (diretas ?? []).filter((s) => !tarefaSet.has(s.tarefa_id)).length;
@@ -281,7 +280,7 @@ export async function listAtividadesDoMembroNoProjeto(
 ): Promise<ProjetoAtividadeTransferivel[]> {
   const { data: tarefasDoProjeto, error: tarefasError } = await supabase
     .from("tarefas")
-    .select("id, titulo, status")
+    .select("id, titulo, concluida")
     .eq("projeto_id", projetoId)
     .is("deleted_at", null);
 
@@ -302,14 +301,14 @@ export async function listAtividadesDoMembroNoProjeto(
     const linked = new Set((links ?? []).map((l) => l.tarefa_id));
     for (const t of tarefas) {
       if (linked.has(t.id)) {
-        result.push({ kind: "tarefa", id: t.id, titulo: t.titulo, status: t.status });
+        result.push({ kind: "tarefa", id: t.id, titulo: t.titulo, concluida: t.concluida });
       }
     }
 
     const { data: subtarefas, error: subtarefasError } = await supabase
       .from("subtarefas")
       .select(
-        "id, titulo, status, tarefa_id, responsaveis:subtarefa_responsaveis(usuario_id)",
+        "id, titulo, concluida, tarefa_id, responsaveis:subtarefa_responsaveis(usuario_id)",
       )
       .in("tarefa_id", tarefaIds);
     if (subtarefasError) throw subtarefasError;
@@ -323,7 +322,7 @@ export async function listAtividadesDoMembroNoProjeto(
           kind: "subtarefa",
           id: s.id,
           titulo: s.titulo,
-          status: s.status,
+          concluida: s.concluida,
         });
       }
     }

@@ -1,9 +1,11 @@
 import { useMemo } from "react";
 import { Plus } from "lucide-react";
+import { toast } from "sonner";
 import { TarefaListView } from "@/components/tarefas/tarefa-list-view";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useTarefas } from "@/hooks/use-tarefas";
+import { useTarefas, useUpdateTarefaConclusao } from "@/hooks/use-tarefas";
+import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
 import type { TarefaWithRelations } from "@/types";
 import { startOfTodayLocal, toLocalDateKey } from "@/utils/agenda-datas";
 
@@ -17,6 +19,19 @@ export function AgendaHojeView({
   onCreate: () => void;
 }) {
   const hojeKey = toLocalDateKey(startOfTodayLocal())!;
+  const updateConclusao = useUpdateTarefaConclusao();
+
+  const handleToggleConcluida = async (tarefa: TarefaWithRelations, concluida: boolean) => {
+    try {
+      await updateConclusao.mutateAsync({ id: tarefa.id, concluida });
+      toast.success(concluida ? "Tarefa concluída" : "Tarefa reaberta");
+    } catch (error) {
+      toast.error(concluida ? "Erro ao concluir tarefa" : "Erro ao reabrir tarefa", {
+        description: getSupabaseErrorMessage(error as Error),
+      });
+      throw error;
+    }
+  };
 
   const { data: tarefas, isLoading } = useTarefas(
     {
@@ -54,5 +69,11 @@ export function AgendaHojeView({
     );
   }
 
-  return <TarefaListView tarefas={doDia} onOpenTarefa={onOpenTarefa} />;
+  return (
+    <TarefaListView
+      tarefas={doDia}
+      onOpenTarefa={onOpenTarefa}
+      onToggleConcluida={handleToggleConcluida}
+    />
+  );
 }

@@ -21,6 +21,7 @@ import { CalendarIcon, GripVertical, MoreHorizontal, Pencil, Plus, Trash2, User 
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ConfirmDeleteDialog } from "@/components/common/confirm-delete-dialog";
+import { ConclusaoBolinha } from "@/components/tarefas/conclusao-bolinha";
 import { MinhaAgendaBadge } from "@/components/tarefas/subtarefa-row";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -63,11 +64,13 @@ import {
 function ColunaCardContent({
   tarefa,
   isDragging,
+  onToggleConcluida,
 }: {
   tarefa: TarefaWithRelations;
   isDragging?: boolean;
+  onToggleConcluida?: (concluida: boolean) => void | Promise<void>;
 }) {
-  const vencimentoVariant = getVencimentoVariant(tarefa.data_inicio, tarefa.status);
+  const vencimentoVariant = getVencimentoVariant(tarefa.data_inicio, tarefa.concluida);
 
   return (
     <div
@@ -79,6 +82,14 @@ function ColunaCardContent({
     >
       <div className="flex items-start gap-2">
         <GripVertical className="mt-0.5 h-4 w-4 shrink-0 cursor-grab text-muted-foreground" />
+        {onToggleConcluida && (
+          <ConclusaoBolinha
+            concluida={tarefa.concluida}
+            kind="tarefa"
+            onToggle={onToggleConcluida}
+            className="mt-0.5"
+          />
+        )}
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium leading-snug">{tarefa.titulo}</p>
           <div className="mt-2 flex flex-wrap gap-1">
@@ -129,9 +140,11 @@ function ColunaCardContent({
 function SortableColunaCard({
   tarefa,
   onOpen,
+  onToggleConcluida,
 }: {
   tarefa: TarefaWithRelations;
   onOpen: () => void;
+  onToggleConcluida: (concluida: boolean) => void | Promise<void>;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: tarefa.id,
@@ -149,7 +162,11 @@ function SortableColunaCard({
       {...listeners}
       onClick={onOpen}
     >
-      <ColunaCardContent tarefa={tarefa} isDragging={isDragging} />
+      <ColunaCardContent
+        tarefa={tarefa}
+        isDragging={isDragging}
+        onToggleConcluida={onToggleConcluida}
+      />
     </div>
   );
 }
@@ -158,12 +175,14 @@ function DroppableColuna({
   coluna,
   tarefas,
   onOpenTarefa,
+  onToggleConcluida,
   onRename,
   onDelete,
 }: {
   coluna: TarefaBoardColuna;
   tarefas: TarefaWithRelations[];
   onOpenTarefa: (tarefa: TarefaWithRelations) => void;
+  onToggleConcluida: (tarefa: TarefaWithRelations, concluida: boolean) => void | Promise<void>;
   onRename: (coluna: TarefaBoardColuna) => void;
   onDelete: (coluna: TarefaBoardColuna) => void;
 }) {
@@ -225,6 +244,7 @@ function DroppableColuna({
                   key={tarefa.id}
                   tarefa={tarefa}
                   onOpen={() => onOpenTarefa(tarefa)}
+                  onToggleConcluida={(concluida) => onToggleConcluida(tarefa, concluida)}
                 />
               ))}
               {tarefas.length === 0 && (
@@ -253,9 +273,11 @@ function findContainer(
 export function TarefaColunasBoard({
   tarefas,
   onOpenTarefa,
+  onToggleConcluida,
 }: {
   tarefas: TarefaWithRelations[];
   onOpenTarefa: (tarefa: TarefaWithRelations) => void;
+  onToggleConcluida: (tarefa: TarefaWithRelations, concluida: boolean) => void | Promise<void>;
 }) {
   const { data: colunas = [], isLoading: loadingColunas } = useTarefaBoardColunas();
   const { data: itens = [] } = useTarefaBoardItens();
@@ -480,6 +502,7 @@ export function TarefaColunasBoard({
                 .map((id) => tarefaById.get(id))
                 .filter((t): t is TarefaWithRelations => !!t)}
               onOpenTarefa={onOpenTarefa}
+              onToggleConcluida={onToggleConcluida}
               onRename={(c) => {
                 setRenaming(c);
                 setRenameValue(c.nome);
@@ -551,7 +574,7 @@ export function TarefaColunasBoard({
         itemName={deleting?.nome}
         description={
           deleting
-            ? `Excluir a coluna "${deleting.nome}"? As tarefas vão para "A organizar". O Status delas não muda.`
+            ? `Excluir a coluna "${deleting.nome}"? As tarefas vão para "A organizar". A conclusão delas não muda.`
             : undefined
         }
         onConfirm={async () => {

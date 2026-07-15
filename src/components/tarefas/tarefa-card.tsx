@@ -1,5 +1,6 @@
 import { CalendarIcon, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
+import { ConclusaoBolinha } from "@/components/tarefas/conclusao-bolinha";
 import { MinhaAgendaBadge } from "@/components/tarefas/subtarefa-row";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,13 +11,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { TarefaStatus, TarefaWithRelations } from "@/types";
+import type { TarefaWithRelations } from "@/types";
 import { formatDate, getVencimentoVariant } from "@/utils/formatters";
 import {
   TAREFA_PRIORIDADE_BAND_CLASS,
   TAREFA_PRIORIDADE_COLORS,
-  TAREFA_STATUS_COLORS,
-  TAREFA_STATUS_LABELS,
   formatResponsaveisLabel,
   getTarefaResponsaveis,
 } from "@/utils/tarefas";
@@ -28,7 +27,7 @@ export function TarefaCard({
   canDelete,
   onEdit,
   onDelete,
-  onStatusChange,
+  onToggleConcluida,
   onOpen,
 }: {
   tarefa: TarefaWithRelations;
@@ -36,17 +35,17 @@ export function TarefaCard({
   canDelete: boolean;
   onEdit: () => void;
   onDelete: () => void;
-  onStatusChange: (status: TarefaStatus) => void;
+  onToggleConcluida: (concluida: boolean) => void | Promise<void>;
   onOpen?: () => void;
 }) {
-  const vencimentoVariant = getVencimentoVariant(tarefa.data_inicio, tarefa.status);
+  const vencimentoVariant = getVencimentoVariant(tarefa.data_inicio, tarefa.concluida);
 
   return (
     <Card
       className={cn(
         "overflow-hidden border-l-4",
         TAREFA_PRIORIDADE_BAND_CLASS[tarefa.prioridade],
-        tarefa.status === "concluida" && "opacity-75",
+        tarefa.concluida && "opacity-75",
         onOpen && "cursor-pointer transition-colors hover:bg-muted/40",
       )}
       onClick={onOpen}
@@ -65,47 +64,50 @@ export function TarefaCard({
     >
       <CardHeader className="space-y-0 p-3 pb-2">
         <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 space-y-1.5">
-            <div className="flex flex-wrap items-center gap-1">
-              <Badge
-                variant="outline"
-                className={cn("px-1.5 py-0 text-[10px]", TAREFA_PRIORIDADE_COLORS[tarefa.prioridade])}
-              >
-                {tarefa.prioridade}
-              </Badge>
-              <Badge
-                variant="secondary"
-                className={cn("px-1.5 py-0 text-[10px]", TAREFA_STATUS_COLORS[tarefa.status])}
-              >
-                {TAREFA_STATUS_LABELS[tarefa.status]}
-              </Badge>
-              {tarefa.setor && (
+          <div className="flex min-w-0 items-start gap-2">
+            <ConclusaoBolinha
+              concluida={tarefa.concluida}
+              kind="tarefa"
+              disabled={!canEdit}
+              onToggle={onToggleConcluida}
+              className="mt-0.5"
+            />
+            <div className="min-w-0 space-y-1.5">
+              <div className="flex flex-wrap items-center gap-1">
                 <Badge
                   variant="outline"
-                  className="px-1.5 py-0 text-[10px]"
-                  style={{
-                    borderColor: tarefa.setor.cor ?? undefined,
-                    color: tarefa.setor.cor ?? undefined,
-                  }}
+                  className={cn("px-1.5 py-0 text-[10px]", TAREFA_PRIORIDADE_COLORS[tarefa.prioridade])}
                 >
-                  {tarefa.setor.nome}
+                  {tarefa.prioridade}
                 </Badge>
-              )}
-              <MinhaAgendaBadge tarefa={tarefa} className="px-1.5 py-0 text-[10px]" />
-              {tarefa.projeto && (
-                <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
-                  {tarefa.projeto.nome}
-                </Badge>
-              )}
+                {tarefa.setor && (
+                  <Badge
+                    variant="outline"
+                    className="px-1.5 py-0 text-[10px]"
+                    style={{
+                      borderColor: tarefa.setor.cor ?? undefined,
+                      color: tarefa.setor.cor ?? undefined,
+                    }}
+                  >
+                    {tarefa.setor.nome}
+                  </Badge>
+                )}
+                <MinhaAgendaBadge tarefa={tarefa} className="px-1.5 py-0 text-[10px]" />
+                {tarefa.projeto && (
+                  <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
+                    {tarefa.projeto.nome}
+                  </Badge>
+                )}
+              </div>
+              <CardTitle
+                className={cn(
+                  "text-sm font-semibold leading-snug",
+                  tarefa.concluida && "line-through text-muted-foreground",
+                )}
+              >
+                {tarefa.titulo}
+              </CardTitle>
             </div>
-            <CardTitle
-              className={cn(
-                "text-sm font-semibold leading-snug",
-                tarefa.status === "concluida" && "line-through text-muted-foreground",
-              )}
-            >
-              {tarefa.titulo}
-            </CardTitle>
           </div>
 
           {(canEdit || canDelete) && (
@@ -123,32 +125,10 @@ export function TarefaCard({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 {canEdit && (
-                  <>
-                    <DropdownMenuItem onClick={onEdit}>
-                      <Pencil className="h-4 w-4 mr-2" />
-                      Editar
-                    </DropdownMenuItem>
-                    {tarefa.status !== "em_andamento" && (
-                      <DropdownMenuItem onClick={() => onStatusChange("em_andamento")}>
-                        Iniciar
-                      </DropdownMenuItem>
-                    )}
-                    {tarefa.status !== "concluida" && (
-                      <DropdownMenuItem onClick={() => onStatusChange("concluida")}>
-                        Concluir
-                      </DropdownMenuItem>
-                    )}
-                    {tarefa.status !== "cancelada" && tarefa.status !== "concluida" && (
-                      <DropdownMenuItem onClick={() => onStatusChange("cancelada")}>
-                        Cancelar
-                      </DropdownMenuItem>
-                    )}
-                    {tarefa.status !== "a_fazer" && tarefa.status !== "concluida" && (
-                      <DropdownMenuItem onClick={() => onStatusChange("a_fazer")}>
-                        Voltar para a fazer
-                      </DropdownMenuItem>
-                    )}
-                  </>
+                  <DropdownMenuItem onClick={onEdit}>
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Editar
+                  </DropdownMenuItem>
                 )}
                 {canDelete && (
                   <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">

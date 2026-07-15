@@ -164,9 +164,9 @@ function Dashboard() {
             icon={ClipboardList}
           />
           <KpiCard
-            title="A fazer"
-            value={kpis?.tarefasAFazer ?? 0}
-            description={`${kpis?.tarefasEmAndamento ?? 0} em andamento`}
+            title="Abertas"
+            value={kpis?.tarefasAbertas ?? 0}
+            description="Tarefas ainda não concluídas"
             icon={Clock}
           />
           <KpiCard

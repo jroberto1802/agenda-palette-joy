@@ -23,7 +23,7 @@ import {
 } from "@/hooks/use-tarefa-board";
 import { DENSE_CARD_GRID_CLASS } from "@/lib/layout";
 import { cn } from "@/lib/utils";
-import type { TarefaStatus, TarefaWithRelations } from "@/types";
+import type { TarefaWithRelations } from "@/types";
 
 function SortableCardShell({
   tarefa,
@@ -32,7 +32,7 @@ function SortableCardShell({
   onOpen,
   onEdit,
   onDelete,
-  onStatusChange,
+  onToggleConcluida,
 }: {
   tarefa: TarefaWithRelations;
   canEdit: boolean;
@@ -40,7 +40,7 @@ function SortableCardShell({
   onOpen: () => void;
   onEdit: () => void;
   onDelete: () => void;
-  onStatusChange: (status: TarefaStatus) => void;
+  onToggleConcluida: (concluida: boolean) => void | Promise<void>;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: tarefa.id,
@@ -69,7 +69,7 @@ function SortableCardShell({
         onOpen={onOpen}
         onEdit={onEdit}
         onDelete={onDelete}
-        onStatusChange={onStatusChange}
+        onToggleConcluida={onToggleConcluida}
       />
     </div>
   );
@@ -81,7 +81,7 @@ export function TarefaCardsGrid({
   canDeleteTarefa,
   onOpenTarefa,
   onDelete,
-  onStatusChange,
+  onToggleConcluida,
   enableReorder = false,
 }: {
   tarefas: TarefaWithRelations[];
@@ -89,7 +89,7 @@ export function TarefaCardsGrid({
   canDeleteTarefa: (tarefa: TarefaWithRelations) => boolean;
   onOpenTarefa: (tarefa: TarefaWithRelations) => void;
   onDelete: (tarefa: TarefaWithRelations) => void;
-  onStatusChange: (tarefa: TarefaWithRelations, status: TarefaStatus) => void;
+  onToggleConcluida: (tarefa: TarefaWithRelations, concluida: boolean) => void | Promise<void>;
   enableReorder?: boolean;
 }) {
   const { data: itens = [] } = useTarefaBoardItens(enableReorder);
@@ -153,7 +153,7 @@ export function TarefaCardsGrid({
             onOpen={() => onOpenTarefa(tarefa)}
             onEdit={() => onOpenTarefa(tarefa)}
             onDelete={() => onDelete(tarefa)}
-            onStatusChange={(status) => onStatusChange(tarefa, status)}
+            onToggleConcluida={(concluida) => onToggleConcluida(tarefa, concluida)}
           />
         ))}
       </div>
@@ -173,7 +173,7 @@ export function TarefaCardsGrid({
               onOpen={() => onOpenTarefa(tarefa)}
               onEdit={() => onOpenTarefa(tarefa)}
               onDelete={() => onDelete(tarefa)}
-              onStatusChange={(status) => onStatusChange(tarefa, status)}
+              onToggleConcluida={(concluida) => onToggleConcluida(tarefa, concluida)}
             />
           ))}
         </div>

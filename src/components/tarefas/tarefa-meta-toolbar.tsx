@@ -4,7 +4,6 @@ import {
   Bell,
   Building2,
   CalendarDays,
-  CircleDot,
   Eye,
   FolderKanban,
   RefreshCw,
@@ -44,15 +43,12 @@ import type {
   SetorWithGerente,
   TarefaLembreteOpcao,
   TarefaPrioridade,
-  TarefaStatus,
   TarefaVisibilidade,
 } from "@/types";
 import {
   TAREFA_LEMBRETE_LABELS,
   TAREFA_PRIORIDADE_DOT,
   TAREFA_PRIORIDADE_LABELS,
-  TAREFA_STATUS_COLORS,
-  TAREFA_STATUS_LABELS,
   TAREFA_VISIBILIDADE_LABELS,
   TAREFA_VISIBILIDADE_OPTIONS,
 } from "@/utils/tarefas";
@@ -68,7 +64,6 @@ export type TarefaMetaFormValues = {
   observador_ids: string[];
   data_inicio: Date | null;
   prioridade: TarefaPrioridade;
-  status: TarefaStatus;
   lembretes: TarefaLembreteOpcao[];
 };
 
@@ -176,7 +171,6 @@ export function TarefaMetaToolbar({
   const visibilidade = form.watch("visibilidade");
   const dataInicio = form.watch("data_inicio");
   const prioridade = form.watch("prioridade");
-  const status = form.watch("status");
   const lembretes = form.watch("lembretes") ?? [];
 
   const projetoNome = projetos.find((p) => p.id === projetoId)?.nome;
@@ -480,52 +474,6 @@ export function TarefaMetaToolbar({
                             />
                             {TAREFA_PRIORIDADE_LABELS[p]}
                           </span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </PopoverContent>
-              </Popover>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        {/* Status */}
-        <FormField
-          control={form.control}
-          name="status"
-          render={({ field }) => (
-            <FormItem className="space-y-0">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <span>
-                    <MetaIconButton
-                      label={`Status: ${TAREFA_STATUS_LABELS[status]}`}
-                      active
-                      disabled={!canEdit}
-                      className={cn(TAREFA_STATUS_COLORS[status])}
-                    >
-                      <CircleDot className="h-4 w-4" />
-                    </MetaIconButton>
-                  </span>
-                </PopoverTrigger>
-                <PopoverContent className={cn("w-56 space-y-2 p-3", META_OVERLAY_Z)} align="start">
-                  <p className="text-xs font-medium text-muted-foreground">Status</p>
-                  <Select
-                    value={field.value}
-                    onValueChange={(v) => field.onChange(v as TarefaStatus)}
-                    disabled={!canEdit}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent className={META_OVERLAY_Z}>
-                      {(Object.keys(TAREFA_STATUS_LABELS) as TarefaStatus[]).map((s) => (
-                        <SelectItem key={s} value={s}>
-                          {TAREFA_STATUS_LABELS[s]}
                         </SelectItem>
                       ))}
                     </SelectContent>

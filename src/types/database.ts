@@ -500,7 +500,6 @@ export type Database = {
           projeto_id: string | null;
           recorrencia: Json | null;
           setor_id: string | null;
-          status: "a_fazer" | "em_andamento" | "cancelada" | "concluida";
           tarefa_id: string;
           titulo: string;
           updated_at: string;
@@ -526,7 +525,6 @@ export type Database = {
           projeto_id?: string | null;
           recorrencia?: Json | null;
           setor_id?: string | null;
-          status?: "a_fazer" | "em_andamento" | "cancelada" | "concluida";
           tarefa_id: string;
           titulo: string;
           updated_at?: string;
@@ -552,7 +550,6 @@ export type Database = {
           projeto_id?: string | null;
           recorrencia?: Json | null;
           setor_id?: string | null;
-          status?: "a_fazer" | "em_andamento" | "cancelada" | "concluida";
           tarefa_id?: string;
           titulo?: string;
           updated_at?: string;
@@ -1096,6 +1093,7 @@ export type Database = {
       tarefas: {
         Row: {
           atribuido_a: string | null;
+          concluida: boolean;
           created_at: string;
           criado_por: string | null;
           data_conclusao: string | null;
@@ -1108,7 +1106,6 @@ export type Database = {
           projeto_id: string | null;
           recorrencia: Json | null;
           setor_id: string | null;
-          status: "a_fazer" | "em_andamento" | "cancelada" | "concluida";
           tags: string[];
           titulo: string;
           updated_at: string;
@@ -1121,6 +1118,7 @@ export type Database = {
         };
         Insert: {
           atribuido_a?: string | null;
+          concluida?: boolean;
           created_at?: string;
           criado_por?: string | null;
           data_conclusao?: string | null;
@@ -1133,7 +1131,6 @@ export type Database = {
           projeto_id?: string | null;
           recorrencia?: Json | null;
           setor_id?: string | null;
-          status?: "a_fazer" | "em_andamento" | "cancelada" | "concluida";
           tags?: string[];
           titulo: string;
           updated_at?: string;
@@ -1146,6 +1143,7 @@ export type Database = {
         };
         Update: {
           atribuido_a?: string | null;
+          concluida?: boolean;
           created_at?: string;
           criado_por?: string | null;
           data_conclusao?: string | null;
@@ -1158,7 +1156,6 @@ export type Database = {
           projeto_id?: string | null;
           recorrencia?: Json | null;
           setor_id?: string | null;
-          status?: "a_fazer" | "em_andamento" | "cancelada" | "concluida";
           tags?: string[];
           titulo?: string;
           updated_at?: string;

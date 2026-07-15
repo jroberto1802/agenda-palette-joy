@@ -83,11 +83,11 @@ import { parseRecorrencia } from "@/utils/recorrencia";
 import { isAdmin, isGerente } from "@/utils/permissions";
 import {
   TAREFA_PRIORIDADE_COLORS,
-  TAREFA_STATUS_COLORS,
-  TAREFA_STATUS_LABELS,
   canEditTarefa,
   canEditVisibilidade,
   getSetoresPermitidos,
+  getTarefaConclusaoColorClass,
+  getTarefaConclusaoLabel,
   parseLembretes,
   partitionSubtarefaIdsByConclusao,
   sortSubtarefasList,
@@ -101,7 +101,6 @@ const tarefaPanelSchema = z
     setor_id: z.string().nullable(),
     atribuido_ids: z.array(z.string()).min(1, "Selecione ao menos um responsável"),
     prioridade: z.enum(["P1", "P2", "P3", "P4"]),
-    status: z.enum(["a_fazer", "em_andamento", "cancelada", "concluida"]),
     data_inicio: z.date().nullable(),
     tagsInput: z.string(),
     visibilidade: z.enum([
@@ -235,10 +234,6 @@ function toFormValues(
       ? atribuidoIds
       : (defaultAtribuidoIds ?? []),
     prioridade: tarefa?.prioridade ?? "P4",
-    status:
-      (tarefa?.status as string | undefined) === "bloqueada"
-        ? "cancelada"
-        : (tarefa?.status ?? "a_fazer"),
     data_inicio: tarefa?.data_inicio
       ? new Date(tarefa.data_inicio)
       : defaultDataInicio
@@ -275,7 +270,6 @@ function toPayload(values: TarefaPanelSchema): TarefaFormData {
     atribuido_ids: values.atribuido_ids,
     atribuido_a: values.atribuido_ids[0] ?? null,
     prioridade: values.prioridade,
-    status: values.status,
     data_inicio: values.data_inicio ? values.data_inicio.toISOString() : null,
     tags: parseTags(values.tagsInput),
     recorrencia: toRecorrenciaPayload(values),
@@ -703,8 +697,11 @@ export function TarefaPanelSheet({
                           >
                             {tarefa.prioridade}
                           </Badge>
-                          <Badge variant="secondary" className={TAREFA_STATUS_COLORS[tarefa.status]}>
-                            {TAREFA_STATUS_LABELS[tarefa.status]}
+                          <Badge
+                            variant="secondary"
+                            className={getTarefaConclusaoColorClass(tarefa.concluida)}
+                          >
+                            {getTarefaConclusaoLabel(tarefa.concluida)}
                           </Badge>
                         </>
                       )}

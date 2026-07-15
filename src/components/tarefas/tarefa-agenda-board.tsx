@@ -14,7 +14,6 @@ import type {
   Projeto,
   SetorWithGerente,
   TarefaFilters,
-  TarefaStatus,
   TarefaWithRelations,
 } from "@/types";
 import {
@@ -37,7 +36,6 @@ export function createAgendaBoardState(
 ): AgendaBoardState {
   return {
     filters: {
-      status: "all",
       prioridade: "all",
       setor_id: "all",
       projeto_id: "all",
@@ -50,7 +48,6 @@ export function createAgendaBoardState(
       ...overrides,
     },
     debouncedFilters: {
-      status: "all",
       prioridade: "all",
       setor_id: "all",
       projeto_id: "all",
@@ -84,7 +81,7 @@ export function TarefaAgendaBoard({
   canDeleteTarefa,
   onOpenTarefa,
   onCreate,
-  onStatusChange,
+  onToggleConcluida,
   onDelete,
   somenteFinalizadas = false,
   hideCreate = false,
@@ -102,7 +99,7 @@ export function TarefaAgendaBoard({
   canDeleteTarefa: (tarefa: TarefaWithRelations) => boolean;
   onOpenTarefa: (tarefa: TarefaWithRelations) => void;
   onCreate: () => void;
-  onStatusChange: (tarefa: TarefaWithRelations, status: TarefaStatus) => void;
+  onToggleConcluida: (tarefa: TarefaWithRelations, concluida: boolean) => void;
   onDelete: (tarefa: TarefaWithRelations) => void;
   somenteFinalizadas?: boolean;
   hideCreate?: boolean;
@@ -169,7 +166,6 @@ export function TarefaAgendaBoard({
             hideProjeto={hideProjeto}
             hideResponsavel={hideResponsavel}
             variant={somenteFinalizadas ? "finalizados" : "default"}
-            hideFinalStatus={!somenteFinalizadas}
           />
         </div>
         <AgendaViewSelector
@@ -196,7 +192,7 @@ export function TarefaAgendaBoard({
               canDeleteTarefa={canDeleteTarefa}
               onOpenTarefa={onOpenTarefa}
               onDelete={onDelete}
-              onStatusChange={onStatusChange}
+              onToggleConcluida={onToggleConcluida}
               enableReorder={enableReorder}
             />
           )}
@@ -217,6 +213,7 @@ export function TarefaAgendaBoard({
             <TarefaListView
               tarefas={tarefas}
               onOpenTarefa={onOpenTarefa}
+              onToggleConcluida={onToggleConcluida}
               enableReorder={enableReorder}
             />
           )}
@@ -234,7 +231,11 @@ export function TarefaAgendaBoard({
           ) : !tarefas?.length ? (
             <EmptyState message={emptyMessage} onCreate={onCreate} hideCreate={hideCreate} />
           ) : (
-            <TarefaColunasBoard tarefas={tarefas} onOpenTarefa={onOpenTarefa} />
+            <TarefaColunasBoard
+              tarefas={tarefas}
+              onOpenTarefa={onOpenTarefa}
+              onToggleConcluida={onToggleConcluida}
+            />
           )}
         </div>
       )}

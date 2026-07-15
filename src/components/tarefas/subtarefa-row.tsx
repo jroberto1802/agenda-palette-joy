@@ -5,10 +5,10 @@ import { useMemo, useState, type ReactNode } from "react";
 import { ConfirmDeleteDialog } from "@/components/common/confirm-delete-dialog";
 import { PessoasMultiSelect } from "@/components/common/pessoas-multi-select";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
+import { ConclusaoBolinha } from "@/components/tarefas/conclusao-bolinha";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
@@ -189,12 +189,13 @@ export function SubtarefaRow({
       )}
     >
       {dragHandle}
-      <Checkbox
-        checked={subtarefa.concluida}
+      <ConclusaoBolinha
+        concluida={subtarefa.concluida}
+        kind="subtarefa"
         disabled={!canEdit || saving}
         className="mt-0.5"
-        onCheckedChange={async (checked) => {
-          await onToggle(!!checked);
+        onToggle={async (concluida) => {
+          await onToggle(concluida);
         }}
       />
 

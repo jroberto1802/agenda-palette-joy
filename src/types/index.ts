@@ -1,7 +1,6 @@
 import type { Tables } from "./database";
 
 export type Papel = Tables<"profiles">["papel"];
-export type TarefaStatus = Tables<"tarefas">["status"];
 export type TarefaPrioridade = Tables<"tarefas">["prioridade"];
 export type TarefaVisibilidade = Tables<"tarefas">["visibilidade"];
 export type TarefaLembreteOpcao = "no_prazo" | "1h_antes" | "1d_antes" | "1sem_antes";
@@ -78,10 +77,8 @@ export type ProfileFormData = {
 
 export type DashboardKpis = {
   totalTarefas: number;
-  tarefasAFazer: number;
-  tarefasEmAndamento: number;
+  tarefasAbertas: number;
   tarefasConcluidas: number;
-  tarefasCanceladas: number;
   tarefasVencendoHoje: number;
   totalSetores: number;
   totalPessoas: number;
@@ -121,7 +118,6 @@ export type TarefaFormData = {
   atribuido_a: string | null;
   atribuido_ids: string[];
   prioridade: TarefaPrioridade;
-  status: TarefaStatus;
   data_inicio: string | null;
   tags: string[];
   recorrencia: RecorrenciaConfig | null;
@@ -134,7 +130,6 @@ export type TarefaAnexo = Tables<"tarefa_anexos">;
 
 export type TarefaFilters = {
   search?: string;
-  status?: TarefaStatus | "all";
   prioridade?: TarefaPrioridade | "all";
   setor_id?: string | "all";
   projeto_id?: string | "all";
@@ -143,12 +138,9 @@ export type TarefaFilters = {
   /** Filtro multi: tarefa aparece se qualquer um destes for responsável */
   atribuido_ids?: string[];
   tag?: string;
-  /**
-   * Menu Finalizados: restringe a concluída/cancelada.
-   * Com status "all", lista ambos; com concluida/cancelada, refina.
-   */
+  /** Menu Finalizados: restringe a itens concluídos (`concluida = true`). */
   somente_finalizadas?: boolean;
-  /** Agenda/Projeto/Calendário: omite concluída e cancelada (vão para Finalizados). */
+  /** Agenda/Projeto/Calendário: omite concluídas (vão para Finalizados). */
   excluir_finalizadas?: boolean;
   /** YYYY-MM-DD — início do intervalo por data_conclusao */
   periodo_inicio?: string;
@@ -185,7 +177,6 @@ export type SubtarefaFormData = {
   setor_id: string | null;
   atribuido_ids: string[];
   prioridade: TarefaPrioridade;
-  status: TarefaStatus;
   data_inicio: string | null;
   recorrencia: RecorrenciaConfig | null;
   visibilidade: TarefaVisibilidade;
@@ -257,7 +248,7 @@ export type Notificacao = Tables<"notificacoes">;
 
 export type RelatoriosData = {
   totalTarefas: number;
-  porStatus: { status: TarefaStatus; total: number }[];
+  porConclusao: { concluida: boolean; total: number }[];
   porPrioridade: { prioridade: TarefaPrioridade; total: number }[];
   porSetor: { setor_id: string; nome: string; cor: string | null; total: number }[];
   porPessoa: { usuario_id: string; nome: string; total: number }[];

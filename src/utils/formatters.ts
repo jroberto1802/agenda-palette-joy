@@ -13,9 +13,9 @@ export function formatDateTime(date: string | null | undefined): string {
 
 export function getVencimentoVariant(
   dataVencimento: string | null | undefined,
-  status: string,
+  concluida: boolean,
 ): "default" | "warning" | "destructive" {
-  if (!dataVencimento || status === "concluida") return "default";
+  if (!dataVencimento || concluida) return "default";
   const date = parseISO(dataVencimento);
   if (isPast(date) && !isToday(date)) return "destructive";
   if (isToday(date)) return "warning";

@@ -23,11 +23,7 @@ import { DENSE_CARD_GRID_CLASS } from "@/lib/layout";
 import { countAtividadesAbertasPorProjeto } from "@/services/projetos";
 import type { ProjetoFormData, ProjetoWithResponsavel } from "@/types";
 import { canDeleteProjeto, canManageProjetoMembros, isAdmin, isGerente } from "@/utils/permissions";
-import {
-  isProjetoOpenActivityStatus,
-  PROJETO_STATUS_BADGE_CLASS,
-  PROJETO_STATUS_LABELS,
-} from "@/utils/projetos";
+import { PROJETO_STATUS_BADGE_CLASS, PROJETO_STATUS_LABELS } from "@/utils/projetos";
 import { cn } from "@/lib/utils";
 
 export function CadastroProjetosPanel({
@@ -78,7 +74,7 @@ export function CadastroProjetosPanel({
   const tarefasAbertasPorProjeto = useMemo(() => {
     const map = new Map<string, number>();
     for (const tarefa of tarefas ?? []) {
-      if (!tarefa.projeto_id || !isProjetoOpenActivityStatus(tarefa.status)) continue;
+      if (!tarefa.projeto_id || tarefa.concluida) continue;
       map.set(tarefa.projeto_id, (map.get(tarefa.projeto_id) ?? 0) + 1);
     }
     return map;

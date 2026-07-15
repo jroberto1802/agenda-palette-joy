@@ -17,12 +17,12 @@ import { usePessoas } from "@/hooks/use-pessoas";
 import { useProjetos } from "@/hooks/use-projetos";
 import { useProfile } from "@/hooks/use-profile";
 import { useSetores } from "@/hooks/use-setores";
-import { useSoftDeleteTarefa, useUpdateTarefaStatus } from "@/hooks/use-tarefas";
+import { useSoftDeleteTarefa, useUpdateTarefaConclusao } from "@/hooks/use-tarefas";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
-import type { TarefaStatus, TarefaWithRelations } from "@/types";
+import type { TarefaWithRelations } from "@/types";
 import { localDateAtNoon, startOfTodayLocal } from "@/utils/agenda-datas";
 import { isAdmin, isGerente } from "@/utils/permissions";
-import { canEditTarefa, TAREFA_STATUS_LABELS } from "@/utils/tarefas";
+import { canEditTarefa } from "@/utils/tarefas";
 
 type AgendaSearch = {
   tarefaId?: string;
@@ -77,7 +77,7 @@ function AgendaPage() {
     setPanelOpen(true);
   }, [search.tarefaId, search.aba, search.comentarioId, search.subtarefaId]);
 
-  const updateStatus = useUpdateTarefaStatus();
+  const updateConclusao = useUpdateTarefaConclusao();
   const softDelete = useSoftDeleteTarefa();
 
   const pessoasAtivas = useMemo(
@@ -116,14 +116,15 @@ function AgendaPage() {
     setPanelOpen(true);
   };
 
-  const handleStatusChange = async (tarefa: TarefaWithRelations, status: TarefaStatus) => {
+  const handleToggleConcluida = async (tarefa: TarefaWithRelations, concluida: boolean) => {
     try {
-      await updateStatus.mutateAsync({ id: tarefa.id, status });
-      toast.success(`Status alterado para "${TAREFA_STATUS_LABELS[status]}"`);
+      await updateConclusao.mutateAsync({ id: tarefa.id, concluida });
+      toast.success(concluida ? "Tarefa concluída" : "Tarefa reaberta");
     } catch (error) {
-      toast.error("Erro ao alterar status", {
+      toast.error(concluida ? "Erro ao concluir tarefa" : "Erro ao reabrir tarefa", {
         description: getSupabaseErrorMessage(error as Error),
       });
+      throw error;
     }
   };
 
@@ -231,7 +232,7 @@ function AgendaPage() {
             canDeleteTarefa={canDeleteTarefa}
             onOpenTarefa={openTarefa}
             onCreate={() => openCreate(null)}
-            onStatusChange={handleStatusChange}
+            onToggleConcluida={handleToggleConcluida}
             onDelete={setDeleting}
           />
         </TabsContent>

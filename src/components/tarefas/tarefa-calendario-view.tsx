@@ -17,12 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTarefasCalendario } from "@/hooks/use-tarefas";
 import type { TarefaWithRelations } from "@/types";
-import {
-  TAREFA_PRIORIDADE_COLORS,
-  TAREFA_STATUS_COLORS,
-  TAREFA_STATUS_LABELS,
-  formatResponsaveisLabel,
-} from "@/utils/tarefas";
+import { TAREFA_PRIORIDADE_COLORS, formatResponsaveisLabel } from "@/utils/tarefas";
 
 export function TarefaCalendarioView({
   onSelectTarefa,
@@ -152,9 +147,6 @@ function TimelineItem({
       <div className="flex flex-wrap gap-2 mb-2">
         <Badge variant="outline" className={TAREFA_PRIORIDADE_COLORS[tarefa.prioridade]}>
           {tarefa.prioridade}
-        </Badge>
-        <Badge variant="secondary" className={TAREFA_STATUS_COLORS[tarefa.status]}>
-          {TAREFA_STATUS_LABELS[tarefa.status]}
         </Badge>
         {tarefa.setor && (
           <Badge variant="outline" style={{ borderColor: tarefa.setor.cor ?? undefined }}>

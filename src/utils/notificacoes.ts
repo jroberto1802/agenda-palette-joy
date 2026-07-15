@@ -1,7 +1,6 @@
 export type NotificacaoTipo =
   | "tarefa_atribuida"
   | "tarefa_concluida"
-  | "tarefa_status"
   | "tarefa_prioridade"
   | "tarefa_responsavel"
   | "tarefa_prazo"
@@ -29,7 +28,6 @@ export type NotificacaoMeta = {
 export const NOTIFICACAO_TIPO_LABELS: Record<NotificacaoTipo, string> = {
   tarefa_atribuida: "Tarefa atribuída",
   tarefa_concluida: "Tarefa concluída",
-  tarefa_status: "Status alterado",
   tarefa_prioridade: "Prioridade alterada",
   tarefa_responsavel: "Responsável alterado",
   tarefa_prazo: "Data alterada",

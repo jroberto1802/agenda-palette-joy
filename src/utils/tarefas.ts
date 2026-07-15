@@ -4,7 +4,6 @@ import type {
   SubtarefaWithAuthors,
   TarefaLembreteOpcao,
   TarefaPrioridade,
-  TarefaStatus,
   TarefaVisibilidade,
   TarefaWithRelations,
 } from "@/types";
@@ -15,19 +14,14 @@ export type SubtarefaListOrderable = Pick<
   "id" | "concluida" | "posicao" | "created_at"
 >;
 
-export const KANBAN_COLUMNS: { id: TarefaStatus; label: string }[] = [
-  { id: "a_fazer", label: "A fazer" },
-  { id: "em_andamento", label: "Em andamento" },
-  { id: "cancelada", label: "Cancelada" },
-  { id: "concluida", label: "Concluída" },
-];
-
-export const TAREFA_STATUS_LABELS: Record<TarefaStatus, string> = {
-  a_fazer: "A fazer",
-  em_andamento: "Em andamento",
-  cancelada: "Cancelada",
+export const TAREFA_CONCLUIDA_LABELS: Record<"aberta" | "concluida", string> = {
+  aberta: "Aberta",
   concluida: "Concluída",
 };
+
+export function getTarefaConclusaoLabel(concluida: boolean): string {
+  return concluida ? TAREFA_CONCLUIDA_LABELS.concluida : TAREFA_CONCLUIDA_LABELS.aberta;
+}
 
 export const TAREFA_PRIORIDADE_LABELS: Record<TarefaPrioridade, string> = {
   P1: "P1",
@@ -58,12 +52,14 @@ export const TAREFA_PRIORIDADE_BAND_CLASS: Record<TarefaPrioridade, string> = {
   P4: "border-l-slate-400",
 };
 
-export const TAREFA_STATUS_COLORS: Record<TarefaStatus, string> = {
-  a_fazer: "bg-slate-500/15 text-slate-700 dark:text-slate-300",
-  em_andamento: "bg-blue-500/15 text-blue-700 dark:text-blue-400",
-  cancelada: "bg-red-500/15 text-red-700 dark:text-red-400",
+export const TAREFA_CONCLUIDA_COLORS: Record<"aberta" | "concluida", string> = {
+  aberta: "bg-slate-500/15 text-slate-700 dark:text-slate-300",
   concluida: "bg-green-500/15 text-green-700 dark:text-green-400",
 };
+
+export function getTarefaConclusaoColorClass(concluida: boolean): string {
+  return concluida ? TAREFA_CONCLUIDA_COLORS.concluida : TAREFA_CONCLUIDA_COLORS.aberta;
+}
 
 export const TAREFA_VISIBILIDADE_LABELS: Record<TarefaVisibilidade, string> = {
   somente_para_mim: "Somente para mim",

@@ -23,7 +23,7 @@ import {
   updateSubtarefaTitulo,
   updateTarefa,
   updateTarefaComentario,
-  updateTarefaStatus,
+  updateTarefaConclusao,
 } from "@/services/tarefas";
 import type {
   SubtarefaDetail,
@@ -31,7 +31,6 @@ import type {
   TarefaDetail,
   TarefaFilters,
   TarefaFormData,
-  TarefaStatus,
 } from "@/types";
 import { sortSubtarefasList } from "@/utils/tarefas";
 
@@ -46,7 +45,6 @@ export function useTarefas(
 ) {
   const filterKey = {
     search: filters.search ?? "",
-    status: filters.status ?? "all",
     prioridade: filters.prioridade ?? "all",
     setor_id: filters.setor_id ?? "all",
     projeto_id: filters.projeto_id ?? "all",
@@ -113,11 +111,11 @@ export function useUpdateTarefa() {
   });
 }
 
-export function useUpdateTarefaStatus() {
+export function useUpdateTarefaConclusao() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, status }: { id: string; status: TarefaStatus }) =>
-      updateTarefaStatus(id, status),
+    mutationFn: ({ id, concluida }: { id: string; concluida: boolean }) =>
+      updateTarefaConclusao(id, concluida),
     onSuccess: () => invalidateTarefas(queryClient),
   });
 }
@@ -174,15 +172,7 @@ export function useToggleSubtarefa() {
         (old) => {
           if (!old?.subtarefas?.some((s) => s.id === id)) return old;
           const subtarefas = sortSubtarefasList(
-            old.subtarefas.map((s) => {
-              if (s.id !== id) return s;
-              const nextStatus: TarefaStatus = concluida
-                ? "concluida"
-                : s.status === "concluida"
-                  ? "a_fazer"
-                  : s.status;
-              return { ...s, concluida, status: nextStatus };
-            }),
+            old.subtarefas.map((s) => (s.id !== id ? s : { ...s, concluida })),
           );
           return { ...old, subtarefas };
         },
@@ -190,12 +180,7 @@ export function useToggleSubtarefa() {
 
       queryClient.setQueryData<SubtarefaDetail>(subtarefaKeys.detail(id), (old) => {
         if (!old) return old;
-        const nextStatus: TarefaStatus = concluida
-          ? "concluida"
-          : old.status === "concluida"
-            ? "a_fazer"
-            : old.status;
-        return { ...old, concluida, status: nextStatus };
+        return { ...old, concluida };
       });
 
       return { previousTarefas, previousSubtarefa, id };

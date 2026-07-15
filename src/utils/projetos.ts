@@ -1,11 +1,4 @@
-import type { ProjetoStatus, TarefaStatus } from "@/types";
-
-/** Status que bloqueiam exclusão simples e contam como atividades abertas. */
-export const PROJETO_OPEN_ACTIVITY_STATUSES: TarefaStatus[] = ["a_fazer", "em_andamento"];
-
-export function isProjetoOpenActivityStatus(status: string | null | undefined): boolean {
-  return status === "a_fazer" || status === "em_andamento";
-}
+import type { ProjetoStatus } from "@/types";
 
 export const PROJETO_STATUS_LABELS: Record<ProjetoStatus, string> = {
   nao_iniciado: "Não iniciado",

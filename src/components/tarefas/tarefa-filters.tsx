@@ -14,7 +14,7 @@ import type {
   SetorWithGerente,
   TarefaFilters,
 } from "@/types";
-import { TAREFA_PRIORIDADE_LABELS, TAREFA_STATUS_LABELS } from "@/utils/tarefas";
+import { TAREFA_PRIORIDADE_LABELS } from "@/utils/tarefas";
 
 const filterControlClass = "h-9 w-[148px] shrink-0";
 
@@ -26,10 +26,8 @@ export function TarefaFiltersBar({
   pessoas,
   hideResponsavel = false,
   hideProjeto = false,
-  /** Menu Finalizados: status restrito + período por data de finalização */
+  /** Menu Finalizados: período por data de finalização */
   variant = "default",
-  /** Oculta Concluída/Cancelada do filtro (já vão para Finalizados). */
-  hideFinalStatus = false,
 }: {
   filters: TarefaFilters;
   onChange: (filters: TarefaFilters) => void;
@@ -39,14 +37,9 @@ export function TarefaFiltersBar({
   hideResponsavel?: boolean;
   hideProjeto?: boolean;
   variant?: "default" | "finalizados";
-  hideFinalStatus?: boolean;
 }) {
   const atribuidoIds = filters.atribuido_ids ?? [];
   const isFinalizados = variant === "finalizados";
-  const statusEntries = Object.entries(TAREFA_STATUS_LABELS).filter(([value]) => {
-    if (!hideFinalStatus || isFinalizados) return true;
-    return value !== "concluida" && value !== "cancelada";
-  });
 
   return (
     <div className="-mx-1 overflow-x-auto pb-1">
@@ -60,35 +53,6 @@ export function TarefaFiltersBar({
             onChange={(e) => onChange({ ...filters, search: e.target.value })}
           />
         </div>
-
-        <Select
-          value={filters.status ?? "all"}
-          onValueChange={(v) =>
-            onChange({ ...filters, status: v as TarefaFilters["status"] })
-          }
-        >
-          <SelectTrigger className={filterControlClass}>
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            {isFinalizados ? (
-              <>
-                <SelectItem value="all">Ambos</SelectItem>
-                <SelectItem value="concluida">{TAREFA_STATUS_LABELS.concluida}</SelectItem>
-                <SelectItem value="cancelada">{TAREFA_STATUS_LABELS.cancelada}</SelectItem>
-              </>
-            ) : (
-              <>
-                <SelectItem value="all">Todos os status</SelectItem>
-                {statusEntries.map(([value, label]) => (
-                  <SelectItem key={value} value={value}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </>
-            )}
-          </SelectContent>
-        </Select>
 
         <Select
           value={filters.prioridade ?? "all"}
@@ -168,7 +132,7 @@ export function TarefaFiltersBar({
             <Input
               type="date"
               aria-label="Período — de"
-              title="Data de conclusão/cancelamento — de"
+              title="Data de conclusão — de"
               className="h-9 w-[148px] shrink-0"
               value={filters.periodo_inicio ?? ""}
               onChange={(e) => onChange({ ...filters, periodo_inicio: e.target.value })}
@@ -176,7 +140,7 @@ export function TarefaFiltersBar({
             <Input
               type="date"
               aria-label="Período — até"
-              title="Data de conclusão/cancelamento — até"
+              title="Data de conclusão — até"
               className="h-9 w-[148px] shrink-0"
               value={filters.periodo_fim ?? ""}
               onChange={(e) => onChange({ ...filters, periodo_fim: e.target.value })}

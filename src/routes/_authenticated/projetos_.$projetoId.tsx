@@ -18,12 +18,12 @@ import { usePessoas } from "@/hooks/use-pessoas";
 import { useProjeto, useProjetoMembros } from "@/hooks/use-projetos";
 import { useProfile } from "@/hooks/use-profile";
 import { useSetores } from "@/hooks/use-setores";
-import { useSoftDeleteTarefa, useUpdateTarefaStatus } from "@/hooks/use-tarefas";
+import { useSoftDeleteTarefa, useUpdateTarefaConclusao } from "@/hooks/use-tarefas";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
-import type { TarefaStatus, TarefaWithRelations } from "@/types";
+import type { TarefaWithRelations } from "@/types";
 import { canManageProjetoMembros, isAdmin, isGerente } from "@/utils/permissions";
 import { PROJETO_STATUS_BADGE_CLASS, PROJETO_STATUS_LABELS } from "@/utils/projetos";
-import { canEditTarefa, TAREFA_STATUS_LABELS } from "@/utils/tarefas";
+import { canEditTarefa } from "@/utils/tarefas";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/projetos_/$projetoId")({
@@ -47,7 +47,7 @@ function ProjetoDetailPage() {
   const [panelId, setPanelId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<TarefaWithRelations | null>(null);
 
-  const updateStatus = useUpdateTarefaStatus();
+  const updateConclusao = useUpdateTarefaConclusao();
   const softDelete = useSoftDeleteTarefa();
 
   const pessoasAtivas = useMemo(
@@ -78,14 +78,15 @@ function ProjetoDetailPage() {
     setPanelOpen(true);
   };
 
-  const handleStatusChange = async (tarefa: TarefaWithRelations, status: TarefaStatus) => {
+  const handleToggleConcluida = async (tarefa: TarefaWithRelations, concluida: boolean) => {
     try {
-      await updateStatus.mutateAsync({ id: tarefa.id, status });
-      toast.success(`Status alterado para "${TAREFA_STATUS_LABELS[status]}"`);
+      await updateConclusao.mutateAsync({ id: tarefa.id, concluida });
+      toast.success(concluida ? "Tarefa concluída" : "Tarefa reaberta");
     } catch (error) {
-      toast.error("Erro ao alterar status", {
+      toast.error(concluida ? "Erro ao concluir tarefa" : "Erro ao reabrir tarefa", {
         description: getSupabaseErrorMessage(error as Error),
       });
+      throw error;
     }
   };
 
@@ -186,7 +187,7 @@ function ProjetoDetailPage() {
         canDeleteTarefa={canDeleteTarefa}
         onOpenTarefa={openTarefa}
         onCreate={openCreate}
-        onStatusChange={handleStatusChange}
+        onToggleConcluida={handleToggleConcluida}
         onDelete={setDeleting}
       />
 

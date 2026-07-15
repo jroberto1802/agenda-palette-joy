@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useProfile } from "@/hooks/use-profile";
 import { useRelatorios } from "@/hooks/use-relatorios";
 import { canAccessRelatorios } from "@/utils/permissions";
-import { TAREFA_PRIORIDADE_LABELS, TAREFA_STATUS_LABELS } from "@/utils/tarefas";
+import { TAREFA_PRIORIDADE_LABELS, getTarefaConclusaoLabel } from "@/utils/tarefas";
 
 export const Route = createFileRoute("/_authenticated/relatorios")({
   component: RelatoriosPage,
@@ -77,8 +77,8 @@ function RelatoriosPage() {
     );
   }
 
-  const statusData = data.porStatus.map((s) => ({
-    name: TAREFA_STATUS_LABELS[s.status],
+  const statusData = data.porConclusao.map((s) => ({
+    name: getTarefaConclusaoLabel(s.concluida),
     total: s.total,
   }));
 
@@ -105,8 +105,8 @@ function RelatoriosPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Tarefas por status</CardTitle>
-            <CardDescription>Distribuição atual do fluxo de trabalho</CardDescription>
+            <CardTitle className="text-base">Tarefas por situação</CardTitle>
+            <CardDescription>Aberta vs. Concluída</CardDescription>
           </CardHeader>
           <CardContent>
             <ChartContainer config={statusChartConfig} className="h-64 w-full">

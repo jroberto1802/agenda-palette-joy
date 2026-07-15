@@ -8,6 +8,7 @@ import {
   listTarefaMencionaveis,
   notifySubtarefaMencao,
   notifyTarefaComentario,
+  notifyTarefaConcluida,
   notifyTarefaMencao,
   notifyTarefaResposta,
   notifyTarefaSubtarefaConcluida,
@@ -34,7 +35,6 @@ import type {
   TarefaFilters,
   TarefaFormData,
   TarefaLembreteOpcao,
-  TarefaStatus,
   TarefaWithRelations,
 } from "@/types";
 import type { Json, TablesUpdate } from "@/types/database";
@@ -174,20 +174,13 @@ export async function listTarefas(filters: TarefaFilters = {}): Promise<TarefaWi
   let query = supabase.from("tarefas").select(TAREFA_SELECT).is("deleted_at", null);
 
   if (filters.somente_finalizadas) {
-    if (filters.status === "concluida" || filters.status === "cancelada") {
-      query = query.eq("status", filters.status);
-    } else {
-      query = query.in("status", ["concluida", "cancelada"]);
-    }
+    query = query.eq("concluida", true);
     query = query.order("data_conclusao", { ascending: false, nullsFirst: false });
   } else {
     if (filters.excluir_finalizadas) {
-      query = query.not("status", "in", "(concluida,cancelada)");
+      query = query.eq("concluida", false);
     }
     query = query.order("created_at", { ascending: false });
-    if (filters.status && filters.status !== "all") {
-      query = query.eq("status", filters.status);
-    }
   }
 
   if (filters.prioridade && filters.prioridade !== "all") {
@@ -269,7 +262,7 @@ export async function listRecentTarefas(limit = 5): Promise<TarefaWithRelations[
     .from("tarefas")
     .select(TAREFA_SELECT)
     .is("deleted_at", null)
-    .neq("status", "concluida")
+    .eq("concluida", false)
     .order("data_inicio", { ascending: true, nullsFirst: false })
     .limit(limit);
 
@@ -285,7 +278,7 @@ export async function listTarefasCalendario(
     .from("tarefas")
     .select(TAREFA_SELECT)
     .is("deleted_at", null)
-    .not("status", "in", "(concluida,cancelada)")
+    .eq("concluida", false)
     .not("data_inicio", "is", null)
     .gte("data_inicio", inicio)
     .lte("data_inicio", fim)
@@ -321,7 +314,7 @@ async function spawnProximaOcorrencia(tarefa: TarefaWithRelations): Promise<void
     setor_id: tarefa.setor_id,
     atribuido_a: primaryAtribuido(responsavelIds),
     prioridade: tarefa.prioridade,
-    status: "a_fazer",
+    concluida: false,
     data_inicio: proxima.toISOString(),
     tags: tarefa.tags,
     recorrencia: serializeRecorrencia(config),
@@ -377,7 +370,6 @@ export async function createTarefa(payload: TarefaFormData): Promise<TarefaWithR
       setor_id: normalized.setor_id,
       atribuido_a: primaryAtribuido(atribuidoIds),
       prioridade: normalized.prioridade,
-      status: normalized.status,
       data_inicio: normalized.data_inicio,
       tags: normalized.tags,
       recorrencia: serializeRecorrencia(normalized.recorrencia),
@@ -454,12 +446,6 @@ export async function updateTarefa(
     throw new Error("Selecione ao menos uma pessoa para visibilidade específica.");
   }
 
-  const { data: anterior } = await supabase
-    .from("tarefas")
-    .select("atribuido_a, status, recorrencia, data_inicio, titulo, descricao, setor_id, prioridade, tags")
-    .eq("id", id)
-    .single();
-
   const anterioresIds = await listResponsavelIds(id);
 
   const updateData: TablesUpdate<"tarefas"> = {
@@ -469,19 +455,12 @@ export async function updateTarefa(
     setor_id: payload.setor_id,
     atribuido_a: primaryAtribuido(atribuidoIds),
     prioridade: payload.prioridade,
-    status: payload.status,
     data_inicio: payload.data_inicio,
     tags: payload.tags,
     recorrencia: serializeRecorrencia(payload.recorrencia),
     visibilidade: payload.visibilidade,
     lembretes: serializeLembretes(payload.lembretes),
   };
-
-  if (payload.status === "concluida" || payload.status === "cancelada") {
-    updateData.data_conclusao = new Date().toISOString();
-  } else {
-    updateData.data_conclusao = null;
-  }
 
   const { data, error } = await supabase
     .from("tarefas")
@@ -510,38 +489,28 @@ export async function updateTarefa(
     }).catch(() => undefined);
   }
 
-  if (payload.status !== anterior?.status) {
-    await notifyUsers(atribuidoIds, {
-      tipo: "tarefa_status",
-      referencia_tipo: "tarefa",
-      referencia_id: tarefa.id,
-    }).catch(() => undefined);
-  }
-
-  if (payload.status === "concluida" && anterior?.status !== "concluida") {
-    await spawnProximaOcorrencia(tarefa).catch(() => undefined);
-  }
-
   return tarefa;
 }
 
-export async function updateTarefaStatus(
+/**
+ * Alterna o estado Aberta/Concluída da tarefa.
+ * Se houver subtarefas abertas, o banco bloqueia a conclusão (trigger) e
+ * o erro deve ser tratado pela camada de chamada (ver `getSupabaseErrorMessage`).
+ */
+export async function updateTarefaConclusao(
   id: string,
-  status: TarefaStatus,
+  concluida: boolean,
 ): Promise<TarefaWithRelations> {
   const { data: anterior } = await supabase
     .from("tarefas")
-    .select("status")
+    .select("concluida")
     .eq("id", id)
     .single();
 
-  const updateData: TablesUpdate<"tarefas"> = { status };
-
-  if (status === "concluida" || status === "cancelada") {
-    updateData.data_conclusao = new Date().toISOString();
-  } else {
-    updateData.data_conclusao = null;
-  }
+  const updateData: TablesUpdate<"tarefas"> = {
+    concluida,
+    data_conclusao: concluida ? new Date().toISOString() : null,
+  };
 
   const { data, error } = await supabase
     .from("tarefas")
@@ -557,15 +526,17 @@ export async function updateTarefaStatus(
     tarefa.responsaveis?.map((r) => r.usuario_id) ??
     (tarefa.atribuido_a ? [tarefa.atribuido_a] : []);
 
-  if (responsavelIds.length > 0) {
-    await notifyUsers(responsavelIds, {
-      tipo: "tarefa_status",
-      referencia_tipo: "tarefa",
-      referencia_id: tarefa.id,
-    }).catch(() => undefined);
-  }
+  if (concluida && !anterior?.concluida) {
+    const ator = await getCurrentActor();
+    const alvos = responsavelIds.filter((uid) => uid !== ator?.id);
+    if (alvos.length > 0) {
+      await notifyTarefaConcluida({
+        usuarioIds: alvos,
+        tarefaId: tarefa.id,
+        atorNome: ator?.nome ?? "Alguém",
+      }).catch(() => undefined);
+    }
 
-  if (status === "concluida" && anterior?.status !== "concluida") {
     await spawnProximaOcorrencia(tarefa).catch(() => undefined);
   }
 
@@ -594,7 +565,7 @@ export async function getTarefaDetail(id: string): Promise<TarefaDetail> {
       `${TAREFA_SELECT},
       subtarefas(
         id, tarefa_id, titulo, concluida, posicao, created_at, criado_por, concluido_por,
-        data_inicio, descricao, prioridade, status, lembretes,
+        data_inicio, descricao, prioridade, lembretes,
         recorrencia, projeto_id, setor_id, visibilidade, updated_at,
         criador:profiles!subtarefas_criado_por_fkey(id, nome_completo, avatar_url),
         concluido_por_usuario:profiles!subtarefas_concluido_por_fkey(id, nome_completo, avatar_url),
@@ -625,7 +596,7 @@ export async function getTarefaDetail(id: string): Promise<TarefaDetail> {
 
 const SUBTAREFA_SELECT = `
   id, tarefa_id, titulo, concluida, posicao, created_at, criado_por, concluido_por,
-  data_inicio, descricao, prioridade, status, lembretes,
+  data_inicio, descricao, prioridade, lembretes,
   recorrencia, projeto_id, setor_id, visibilidade, updated_at,
   criador:profiles!subtarefas_criado_por_fkey(id, nome_completo, avatar_url),
   concluido_por_usuario:profiles!subtarefas_concluido_por_fkey(id, nome_completo, avatar_url),
@@ -786,23 +757,16 @@ export async function toggleSubtarefa(
 
   const { data: current, error: currentError } = await supabase
     .from("subtarefas")
-    .select("status, concluida, titulo, tarefa_id")
+    .select("concluida, titulo, tarefa_id")
     .eq("id", id)
     .single();
   if (currentError) throw currentError;
-
-  const nextStatus: TarefaStatus = concluida
-    ? "concluida"
-    : current.status === "concluida"
-      ? "a_fazer"
-      : current.status;
 
   const { data, error } = await supabase
     .from("subtarefas")
     .update({
       concluida,
       concluido_por: concluida ? user.id : null,
-      status: nextStatus,
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)
@@ -889,29 +853,16 @@ export async function updateSubtarefa(
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Usuário não autenticado");
 
-  const concluida = payload.status === "concluida";
-  const { data: current, error: currentError } = await supabase
-    .from("subtarefas")
-    .select("concluida, concluido_por, titulo, tarefa_id")
-    .eq("id", id)
-    .single();
-  if (currentError) throw currentError;
-
   const patch = {
     titulo: payload.titulo.trim(),
     descricao: payload.descricao || null,
     projeto_id: payload.projeto_id,
     setor_id: payload.setor_id,
     prioridade: payload.prioridade,
-    status: payload.status,
     data_inicio: payload.data_inicio,
     visibilidade: payload.visibilidade,
     lembretes: payload.lembretes as unknown as Json,
     recorrencia: serializeRecorrencia(payload.recorrencia) as Json | null,
-    concluida,
-    concluido_por: concluida
-      ? (current.concluido_por ?? user.id)
-      : null,
     updated_at: new Date().toISOString(),
   };
 
@@ -923,22 +874,6 @@ export async function updateSubtarefa(
     await syncSubtarefaObservadores(id, payload.observador_ids);
   } else {
     await syncSubtarefaObservadores(id, []);
-  }
-
-  if (concluida && !current.concluida) {
-    const [ator, stakeholders, { data: tarefa }] = await Promise.all([
-      getCurrentActor(),
-      getSubtarefaStakeholderIds(id),
-      supabase.from("tarefas").select("titulo").eq("id", current.tarefa_id).single(),
-    ]);
-    await notifyTarefaSubtarefaConcluida({
-      usuarioIds: stakeholders.filter((uid) => uid !== user.id),
-      tarefaId: current.tarefa_id,
-      titulo: tarefa?.titulo ?? "tarefa",
-      atorNome: ator?.nome ?? "Alguém",
-      subtarefaId: id,
-      subtarefaTitulo: payload.titulo.trim() || current.titulo,
-    }).catch(() => undefined);
   }
 
   return getSubtarefaDetail(id);
@@ -1188,7 +1123,7 @@ export async function getDashboardKpis(): Promise<DashboardKpis> {
   const [tarefasRes, setoresRes, pessoasRes] = await Promise.all([
     supabase
       .from("tarefas")
-      .select("status, data_inicio")
+      .select("concluida, data_inicio")
       .is("deleted_at", null),
     supabase.from("setores").select("id", { count: "exact", head: true }),
     supabase
@@ -1205,16 +1140,14 @@ export async function getDashboardKpis(): Promise<DashboardKpis> {
 
   return {
     totalTarefas: tarefas.length,
-    tarefasAFazer: tarefas.filter((t) => t.status === "a_fazer").length,
-    tarefasEmAndamento: tarefas.filter((t) => t.status === "em_andamento").length,
-    tarefasConcluidas: tarefas.filter((t) => t.status === "concluida").length,
-    tarefasCanceladas: tarefas.filter((t) => t.status === "cancelada").length,
+    tarefasAbertas: tarefas.filter((t) => !t.concluida).length,
+    tarefasConcluidas: tarefas.filter((t) => t.concluida).length,
     tarefasVencendoHoje: tarefas.filter(
       (t) =>
         t.data_inicio &&
         t.data_inicio >= hojeInicio &&
         t.data_inicio <= hojeFim &&
-        t.status !== "concluida",
+        !t.concluida,
     ).length,
     totalSetores: setoresRes.count ?? 0,
     totalPessoas: pessoasRes.count ?? 0,

@@ -2,8 +2,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { notifyUsers } from "@/services/notificacoes";
 import type { NotificacaoMeta, NotificacaoTipo } from "@/utils/notificacoes";
 import { extractMentionedUserIds } from "@/utils/notificacoes";
-import { TAREFA_PRIORIDADE_LABELS, TAREFA_STATUS_LABELS } from "@/utils/tarefas";
-import type { TarefaPrioridade, TarefaStatus } from "@/types";
+import { TAREFA_PRIORIDADE_LABELS } from "@/utils/tarefas";
+import type { TarefaPrioridade } from "@/types";
 
 export async function getCurrentActor(): Promise<{ id: string; nome: string } | null> {
   const {
@@ -100,22 +100,6 @@ export async function notifyTarefaConcluida(params: {
     usuarioIds: params.usuarioIds,
     tipo: "tarefa_concluida",
     mensagem: `${params.atorNome} marcou sua tarefa como concluída`,
-    referencia_tipo: "tarefa",
-    referencia_id: params.tarefaId,
-  });
-}
-
-export async function notifyTarefaStatus(params: {
-  usuarioIds: string[];
-  tarefaId: string;
-  titulo: string;
-  status: TarefaStatus;
-  atorNome: string;
-}) {
-  await notifyEvent({
-    usuarioIds: params.usuarioIds,
-    tipo: "tarefa_status",
-    mensagem: `${params.atorNome} alterou o status da tarefa ${params.titulo} para ${TAREFA_STATUS_LABELS[params.status]}`,
     referencia_tipo: "tarefa",
     referencia_id: params.tarefaId,
   });

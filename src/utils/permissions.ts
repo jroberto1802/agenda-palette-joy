@@ -60,7 +60,7 @@ export function canCreateProjetos(profile: Profile | null | undefined): boolean 
 
 /**
  * Exclusão de projeto:
- * - com atividades abertas (a_fazer/em_andamento): somente administrador;
+ * - com atividades abertas (não concluídas): somente administrador;
  * - sem abertas: criador, gestor ou administrador.
  */
 export function canDeleteProjeto(

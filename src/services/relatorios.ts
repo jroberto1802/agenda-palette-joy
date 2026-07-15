@@ -1,12 +1,12 @@
 import { supabase } from "@/integrations/supabase/client";
-import type { RelatoriosData, TarefaPrioridade, TarefaStatus } from "@/types";
+import type { RelatoriosData, TarefaPrioridade } from "@/types";
 import { format, subDays, startOfDay } from "date-fns";
 
 export async function getRelatoriosData(): Promise<RelatoriosData> {
   const [tarefasRes, setoresRes, profilesRes, responsaveisRes] = await Promise.all([
     supabase
       .from("tarefas")
-      .select("id, status, prioridade, setor_id, data_conclusao, created_at, atribuido_a")
+      .select("id, concluida, prioridade, setor_id, data_conclusao, created_at, atribuido_a")
       .is("deleted_at", null),
     supabase.from("setores").select("id, nome, cor"),
     supabase.from("profiles").select("id, nome_completo, setor_id, ativo").eq("ativo", true),
@@ -30,12 +30,10 @@ export async function getRelatoriosData(): Promise<RelatoriosData> {
     responsaveisPorTarefa.set(row.tarefa_id, current);
   }
 
-  const porStatus = (["a_fazer", "em_andamento", "cancelada", "concluida"] as TarefaStatus[]).map(
-    (status) => ({
-      status,
-      total: tarefas.filter((t) => t.status === status).length,
-    }),
-  );
+  const porConclusao = [false, true].map((concluida) => ({
+    concluida,
+    total: tarefas.filter((t) => t.concluida === concluida).length,
+  }));
 
   const porPrioridade = (["P1", "P2", "P3", "P4"] as TarefaPrioridade[]).map((prioridade) => ({
     prioridade,
@@ -83,7 +81,7 @@ export async function getRelatoriosData(): Promise<RelatoriosData> {
 
   return {
     totalTarefas: tarefas.length,
-    porStatus,
+    porConclusao,
     porPrioridade,
     porSetor,
     porPessoa,

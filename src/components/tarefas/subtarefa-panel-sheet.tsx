@@ -56,11 +56,11 @@ import { parseRecorrencia } from "@/utils/recorrencia";
 import { isAdmin, isGerente } from "@/utils/permissions";
 import {
   TAREFA_PRIORIDADE_COLORS,
-  TAREFA_STATUS_COLORS,
-  TAREFA_STATUS_LABELS,
   canEditTarefa,
   canEditVisibilidade,
   getSetoresPermitidos,
+  getTarefaConclusaoColorClass,
+  getTarefaConclusaoLabel,
   parseLembretes,
 } from "@/utils/tarefas";
 
@@ -72,7 +72,6 @@ const subtarefaPanelSchema = z
     setor_id: z.string().nullable(),
     atribuido_ids: z.array(z.string()),
     prioridade: z.enum(["P1", "P2", "P3", "P4"]),
-    status: z.enum(["a_fazer", "em_andamento", "cancelada", "concluida"]),
     data_inicio: z.date().nullable(),
     visibilidade: z.enum([
       "todos_empresa",
@@ -139,7 +138,6 @@ function toFormValues(
     setor_id: parentTarefa?.setor_id ?? subtarefa?.setor_id ?? null,
     atribuido_ids: atribuidoIds,
     prioridade: subtarefa?.prioridade ?? "P4",
-    status: subtarefa?.status ?? (subtarefa?.concluida ? "concluida" : "a_fazer"),
     data_inicio: subtarefa?.data_inicio ? new Date(subtarefa.data_inicio) : null,
     visibilidade: inheritedVisibilidade,
     observador_ids:
@@ -178,7 +176,6 @@ function toPayload(
     setor_id: parentTarefa?.setor_id ?? values.setor_id,
     atribuido_ids: values.atribuido_ids,
     prioridade: values.prioridade,
-    status: values.status,
     data_inicio: values.data_inicio ? values.data_inicio.toISOString() : null,
     recorrencia: toRecorrenciaPayload(values),
     visibilidade: values.visibilidade,
@@ -483,9 +480,9 @@ export function SubtarefaPanelSheet({
                     </Badge>
                     <Badge
                       variant="secondary"
-                      className={TAREFA_STATUS_COLORS[subtarefa.status]}
+                      className={getTarefaConclusaoColorClass(subtarefa.concluida)}
                     >
-                      {TAREFA_STATUS_LABELS[subtarefa.status]}
+                      {getTarefaConclusaoLabel(subtarefa.concluida)}
                     </Badge>
                   </div>
                 </div>

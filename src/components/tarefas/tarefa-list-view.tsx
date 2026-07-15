@@ -16,6 +16,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { CalendarIcon, ChevronRight, GripVertical } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
+import { ConclusaoBolinha } from "@/components/tarefas/conclusao-bolinha";
 import { MinhaAgendaBadge } from "@/components/tarefas/subtarefa-row";
 import { Badge } from "@/components/ui/badge";
 import { useReorderTarefasLista, useSyncTarefaBoardItens, useTarefaBoardItens } from "@/hooks/use-tarefa-board";
@@ -26,8 +27,6 @@ import {
   TAREFA_PRIORIDADE_BAND_CLASS,
   TAREFA_PRIORIDADE_COLORS,
   TAREFA_PRIORIDADE_LABELS,
-  TAREFA_STATUS_COLORS,
-  TAREFA_STATUS_LABELS,
   formatResponsaveisLabel,
   getTarefaResponsaveis,
 } from "@/utils/tarefas";
@@ -35,15 +34,19 @@ import {
 function TarefaListRowContent({
   tarefa,
   onOpen,
+  onToggleConcluida,
+  canEdit = true,
   dragHandle,
   isDragging,
 }: {
   tarefa: TarefaWithRelations;
   onOpen: () => void;
+  onToggleConcluida?: (concluida: boolean) => void | Promise<void>;
+  canEdit?: boolean;
   dragHandle?: ReactNode;
   isDragging?: boolean;
 }) {
-  const vencimentoVariant = getVencimentoVariant(tarefa.data_inicio, tarefa.status);
+  const vencimentoVariant = getVencimentoVariant(tarefa.data_inicio, tarefa.concluida);
 
   return (
     <div
@@ -54,22 +57,24 @@ function TarefaListRowContent({
       )}
     >
       {dragHandle}
+      {onToggleConcluida && (
+        <ConclusaoBolinha
+          concluida={tarefa.concluida}
+          kind="tarefa"
+          disabled={!canEdit}
+          onToggle={onToggleConcluida}
+        />
+      )}
       <button type="button" onClick={onOpen} className="min-w-0 flex-1 space-y-1 text-left">
         <p
           className={cn(
             "truncate text-sm font-medium",
-            tarefa.status === "concluida" && "text-muted-foreground line-through",
+            tarefa.concluida && "text-muted-foreground line-through",
           )}
         >
           {tarefa.titulo}
         </p>
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          <Badge
-            variant="outline"
-            className={cn("px-1.5 py-0 text-[10px]", TAREFA_STATUS_COLORS[tarefa.status])}
-          >
-            {TAREFA_STATUS_LABELS[tarefa.status]}
-          </Badge>
           <Badge
             variant="outline"
             className={cn("px-1.5 py-0 text-[10px]", TAREFA_PRIORIDADE_COLORS[tarefa.prioridade])}
@@ -110,9 +115,11 @@ function TarefaListRowContent({
 function SortableListRow({
   tarefa,
   onOpen,
+  onToggleConcluida,
 }: {
   tarefa: TarefaWithRelations;
   onOpen: () => void;
+  onToggleConcluida?: (concluida: boolean) => void | Promise<void>;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: tarefa.id,
@@ -123,6 +130,7 @@ function SortableListRow({
       <TarefaListRowContent
         tarefa={tarefa}
         onOpen={onOpen}
+        onToggleConcluida={onToggleConcluida}
         isDragging={isDragging}
         dragHandle={
           <button
@@ -143,10 +151,12 @@ function SortableListRow({
 export function TarefaListView({
   tarefas,
   onOpenTarefa,
+  onToggleConcluida,
   enableReorder = false,
 }: {
   tarefas: TarefaWithRelations[];
   onOpenTarefa: (tarefa: TarefaWithRelations) => void;
+  onToggleConcluida?: (tarefa: TarefaWithRelations, concluida: boolean) => void | Promise<void>;
   enableReorder?: boolean;
 }) {
   const { data: itens = [] } = useTarefaBoardItens(enableReorder);
@@ -205,7 +215,15 @@ export function TarefaListView({
         <ul className="space-y-2">
           {tarefas.map((tarefa) => (
             <li key={tarefa.id}>
-              <TarefaListRowContent tarefa={tarefa} onOpen={() => onOpenTarefa(tarefa)} />
+              <TarefaListRowContent
+                tarefa={tarefa}
+                onOpen={() => onOpenTarefa(tarefa)}
+                onToggleConcluida={
+                  onToggleConcluida
+                    ? (concluida) => onToggleConcluida(tarefa, concluida)
+                    : undefined
+                }
+              />
             </li>
           ))}
         </ul>
@@ -223,6 +241,11 @@ export function TarefaListView({
                 key={tarefa.id}
                 tarefa={tarefa}
                 onOpen={() => onOpenTarefa(tarefa)}
+                onToggleConcluida={
+                  onToggleConcluida
+                    ? (concluida) => onToggleConcluida(tarefa, concluida)
+                    : undefined
+                }
               />
             ))}
           </ul>
