@@ -81,11 +81,15 @@ export async function uploadAnexo(tarefaId: string, file: File): Promise<TarefaA
 }
 
 export async function deleteAnexo(anexo: TarefaAnexo): Promise<void> {
-  const { error: storageError } = await supabase.storage.from(BUCKET).remove([anexo.storage_path]);
-  if (storageError) throw storageError;
-
   const { error } = await supabase.from("tarefa_anexos").delete().eq("id", anexo.id);
   if (error) throw error;
+
+  const { error: storageError } = await supabase.storage
+    .from(BUCKET)
+    .remove([anexo.storage_path]);
+  if (storageError) {
+    console.warn("Falha ao remover arquivo do storage da tarefa:", storageError.message);
+  }
 }
 
 export async function listSubtarefaAnexos(subtarefaId: string): Promise<SubtarefaAnexo[]> {
@@ -159,11 +163,16 @@ export async function uploadSubtarefaAnexo(
 }
 
 export async function deleteSubtarefaAnexo(anexo: SubtarefaAnexo): Promise<void> {
-  const { error: storageError } = await supabase.storage.from(BUCKET).remove([anexo.storage_path]);
-  if (storageError) throw storageError;
-
+  // Remove o registro primeiro para a UI atualizar mesmo se o Storage falhar.
   const { error } = await supabase.from("subtarefa_anexos").delete().eq("id", anexo.id);
   if (error) throw error;
+
+  const { error: storageError } = await supabase.storage
+    .from(BUCKET)
+    .remove([anexo.storage_path]);
+  if (storageError) {
+    console.warn("Falha ao remover arquivo do storage da subtarefa:", storageError.message);
+  }
 }
 
 export async function getAnexoSignedUrl(storagePath: string): Promise<string> {

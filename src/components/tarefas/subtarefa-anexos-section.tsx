@@ -125,6 +125,7 @@ export function SubtarefaAnexosSection({
                 size="icon"
                 className="h-7 w-7"
                 onClick={() => void handleDownload(anexo)}
+                title={`Baixar ${anexo.nome}`}
               >
                 <Download className="h-3.5 w-3.5" />
               </Button>
@@ -133,8 +134,9 @@ export function SubtarefaAnexosSection({
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7 opacity-0 group-hover:opacity-100"
+                  className="h-7 w-7 text-destructive hover:text-destructive"
                   onClick={() => setDeleting(anexo)}
+                  title={`Excluir ${anexo.nome}`}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
