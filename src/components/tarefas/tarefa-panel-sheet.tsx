@@ -73,6 +73,8 @@ import type {
   RecorrenciaConfig,
   RecorrenciaTipo,
   SubtarefaWithAuthors,
+  TarefaAnexo,
+  TarefaComentario,
   TarefaFormData,
   TarefaVisibilidade,
   TarefaWithRelations,
@@ -144,6 +146,10 @@ const tarefaPanelSchema = z
 type TarefaPanelSchema = z.infer<typeof tarefaPanelSchema>;
 
 type EditableTarefaField = "titulo" | "descricao";
+
+const EMPTY_SUBTAREFAS: SubtarefaWithAuthors[] = [];
+const EMPTY_COMENTARIOS: TarefaComentario[] = [];
+const EMPTY_ANEXOS: TarefaAnexo[] = [];
 
 function parseTags(input: string): string[] {
   return input
@@ -440,6 +446,11 @@ export function TarefaPanelSheet({
     return pessoasAtivas.filter((p) => memberIds.has(p.id) || selected.has(p.id));
   }, [projetoId, projetoMembros, pessoasAtivas, atribuidoIds]);
 
+  const defaultAtribuidoIdsKey = (defaultAtribuidoIds ?? []).join(",");
+  const defaultDataInicioKey = defaultDataInicio
+    ? defaultDataInicio.getTime()
+    : null;
+
   useEffect(() => {
     if (!open) return;
     form.reset(
@@ -451,15 +462,8 @@ export function TarefaPanelSheet({
       ),
     );
     setNovaSubtarefa("");
-  }, [
-    open,
-    tarefa,
-    tarefaId,
-    defaultProjetoId,
-    defaultDataInicio,
-    defaultAtribuidoIds,
-    form,
-  ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- defaults via keys estáveis
+  }, [open, tarefa, tarefaId, defaultProjetoId, defaultDataInicioKey, defaultAtribuidoIdsKey, form]);
 
   const criadorDisplay = useMemo(() => {
     if (tarefa?.criador) return tarefa.criador;
@@ -497,9 +501,9 @@ export function TarefaPanelSheet({
       }));
   }, [observadorIds, pessoasAtivas]);
 
-  const subtarefas = tarefa?.subtarefas ?? [];
-  const comentarios = tarefa?.comentarios ?? [];
-  const anexos = tarefa?.anexos ?? [];
+  const subtarefas = tarefa?.subtarefas ?? EMPTY_SUBTAREFAS;
+  const comentarios = tarefa?.comentarios ?? EMPTY_COMENTARIOS;
+  const anexos = tarefa?.anexos ?? EMPTY_ANEXOS;
   const concluidas = subtarefas.filter((s) => s.concluida).length;
 
   const subtarefaOrderKey = useMemo(
@@ -511,8 +515,9 @@ export function TarefaPanelSheet({
   );
 
   useEffect(() => {
-    setSubtarefaOrder(sortSubtarefasList(subtarefas).map((s) => s.id));
-  }, [subtarefaOrderKey, subtarefas]);
+    const next = sortSubtarefasList(subtarefas).map((s) => s.id);
+    setSubtarefaOrder((prev) => (prev.join(",") === next.join(",") ? prev : next));
+  }, [subtarefaOrderKey]); // subtarefas está refletido em subtarefaOrderKey
 
   const subtarefasById = useMemo(
     () => new Map(subtarefas.map((s) => [s.id, s])),
