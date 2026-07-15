@@ -84,7 +84,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         name: "description",
         content:
-          "CoreGestor: quadro geral e visão pessoal em Kanban, tarefas com etiquetas, checklists e prazos.",
+          "CoreGestor: quadro geral e visão pessoal em Kanban, tarefas com etiquetas, checklists e datas.",
       },
       { name: "author", content: "CoreGestor" },
       { property: "og:title", content: "CoreGestor — Organize tarefas da sua equipe" },

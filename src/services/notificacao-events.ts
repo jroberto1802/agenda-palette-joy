@@ -161,7 +161,7 @@ export async function notifyTarefaPrazo(params: {
   await notifyEvent({
     usuarioIds: params.usuarioIds,
     tipo: "tarefa_prazo",
-    mensagem: `${params.atorNome} alterou o prazo da tarefa ${params.titulo}`,
+    mensagem: `${params.atorNome} alterou a data da tarefa ${params.titulo}`,
     referencia_tipo: "tarefa",
     referencia_id: params.tarefaId,
   });

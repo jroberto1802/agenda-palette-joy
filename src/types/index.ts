@@ -123,7 +123,6 @@ export type TarefaFormData = {
   prioridade: TarefaPrioridade;
   status: TarefaStatus;
   data_inicio: string | null;
-  data_vencimento: string | null;
   tags: string[];
   recorrencia: RecorrenciaConfig | null;
   visibilidade: TarefaVisibilidade;
@@ -174,7 +173,7 @@ export type SubtarefaWithAuthors = Subtarefa & {
 };
 
 export type SubtarefaMetaUpdate = {
-  data_vencimento?: string | null;
+  data_inicio?: string | null;
   atribuido_ids?: string[];
   visibilidade?: Subtarefa["visibilidade"];
 };
@@ -188,7 +187,6 @@ export type SubtarefaFormData = {
   prioridade: TarefaPrioridade;
   status: TarefaStatus;
   data_inicio: string | null;
-  data_vencimento: string | null;
   recorrencia: RecorrenciaConfig | null;
   visibilidade: TarefaVisibilidade;
   observador_ids: string[];

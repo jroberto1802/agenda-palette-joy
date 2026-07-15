@@ -1,6 +1,6 @@
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarClock, Eye, Trash2, UserRound } from "lucide-react";
+import { CalendarDays, Eye, Trash2, UserRound } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import { ConfirmDeleteDialog } from "@/components/common/confirm-delete-dialog";
 import { PessoasMultiSelect } from "@/components/common/pessoas-multi-select";
@@ -135,7 +135,7 @@ export function SubtarefaRow({
   onToggle: (concluida: boolean) => Promise<void>;
   onDelete: () => Promise<void>;
   onUpdateMeta: (meta: {
-    data_vencimento?: string | null;
+    data_inicio?: string | null;
     atribuido_ids?: string[];
     visibilidade?: SubtarefaWithAuthors["visibilidade"];
   }) => Promise<void>;
@@ -161,13 +161,13 @@ export function SubtarefaRow({
     [subtarefa.responsaveis],
   );
 
-  const prazoDate = subtarefa.data_vencimento
-    ? new Date(subtarefa.data_vencimento)
+  const dataInicio = subtarefa.data_inicio
+    ? new Date(subtarefa.data_inicio)
     : null;
 
   const runMeta = async (
     meta: {
-      data_vencimento?: string | null;
+      data_inicio?: string | null;
       atribuido_ids?: string[];
       visibilidade?: SubtarefaWithAuthors["visibilidade"];
     },
@@ -215,25 +215,25 @@ export function SubtarefaRow({
           className="flex shrink-0 items-center gap-0.5"
           onClick={(event) => event.stopPropagation()}
         >
-          {/* Prazo */}
+          {/* Data */}
           <Popover>
             <PopoverTrigger asChild>
               <span>
                 <MetaIconButton
                   label={
-                    prazoDate
-                      ? `Prazo: ${format(prazoDate, "dd/MM/yyyy", { locale: ptBR })}`
-                      : "Prazo"
+                    dataInicio
+                      ? `Data: ${format(dataInicio, "dd/MM/yyyy", { locale: ptBR })}`
+                      : "Data"
                   }
-                  active={!!prazoDate}
+                  active={!!dataInicio}
                   disabled={!canEdit || saving}
                 >
-                  {prazoDate ? (
+                  {dataInicio ? (
                     <span className="text-[10px] font-medium leading-none">
-                      {format(prazoDate, "dd/MM", { locale: ptBR })}
+                      {format(dataInicio, "dd/MM", { locale: ptBR })}
                     </span>
                   ) : (
-                    <CalendarClock className="h-3.5 w-3.5" />
+                    <CalendarDays className="h-3.5 w-3.5" />
                   )}
                 </MetaIconButton>
               </span>
@@ -241,23 +241,23 @@ export function SubtarefaRow({
             <PopoverContent className={cn("w-auto p-0", META_OVERLAY_Z)} align="end">
               <Calendar
                 mode="single"
-                selected={prazoDate ?? undefined}
+                selected={dataInicio ?? undefined}
                 onSelect={(date) =>
                   void runMeta({
-                    data_vencimento: date ? date.toISOString() : null,
+                    data_inicio: date ? date.toISOString() : null,
                   })
                 }
                 locale={ptBR}
                 initialFocus
               />
-              {prazoDate && (
+              {dataInicio && (
                 <div className="border-t p-2">
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
                     className="w-full"
-                    onClick={() => void runMeta({ data_vencimento: null })}
+                    onClick={() => void runMeta({ data_inicio: null })}
                   >
                     Remover data
                   </Button>

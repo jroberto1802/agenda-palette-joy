@@ -74,7 +74,6 @@ const subtarefaPanelSchema = z
     prioridade: z.enum(["P1", "P2", "P3", "P4"]),
     status: z.enum(["a_fazer", "em_andamento", "cancelada", "concluida"]),
     data_inicio: z.date().nullable(),
-    data_vencimento: z.date().nullable(),
     visibilidade: z.enum([
       "todos_empresa",
       "todos_setor",
@@ -142,9 +141,6 @@ function toFormValues(
     prioridade: subtarefa?.prioridade ?? "P4",
     status: subtarefa?.status ?? (subtarefa?.concluida ? "concluida" : "a_fazer"),
     data_inicio: subtarefa?.data_inicio ? new Date(subtarefa.data_inicio) : null,
-    data_vencimento: subtarefa?.data_vencimento
-      ? new Date(subtarefa.data_vencimento)
-      : null,
     visibilidade: inheritedVisibilidade,
     observador_ids:
       ownObservadores.length > 0
@@ -184,7 +180,6 @@ function toPayload(
     prioridade: values.prioridade,
     status: values.status,
     data_inicio: values.data_inicio ? values.data_inicio.toISOString() : null,
-    data_vencimento: values.data_vencimento ? values.data_vencimento.toISOString() : null,
     recorrencia: toRecorrenciaPayload(values),
     visibilidade: values.visibilidade,
     observador_ids: values.observador_ids,

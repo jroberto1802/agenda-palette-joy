@@ -78,7 +78,7 @@ export const TAREFA_VISIBILIDADE_OPTIONS = Object.keys(
 ) as TarefaVisibilidade[];
 
 export const TAREFA_LEMBRETE_LABELS: Record<TarefaLembreteOpcao, string> = {
-  no_prazo: "No prazo",
+  no_prazo: "Na data",
   "1h_antes": "1 hora antes",
   "1d_antes": "1 dia antes",
   "1sem_antes": "1 semana antes",

@@ -492,7 +492,6 @@ export type Database = {
           created_at: string;
           criado_por: string | null;
           data_inicio: string | null;
-          data_vencimento: string | null;
           descricao: string | null;
           id: string;
           lembretes: Json;
@@ -519,7 +518,6 @@ export type Database = {
           created_at?: string;
           criado_por?: string | null;
           data_inicio?: string | null;
-          data_vencimento?: string | null;
           descricao?: string | null;
           id?: string;
           lembretes?: Json;
@@ -546,7 +544,6 @@ export type Database = {
           created_at?: string;
           criado_por?: string | null;
           data_inicio?: string | null;
-          data_vencimento?: string | null;
           descricao?: string | null;
           id?: string;
           lembretes?: Json;
@@ -1103,7 +1100,6 @@ export type Database = {
           criado_por: string | null;
           data_conclusao: string | null;
           data_inicio: string | null;
-          data_vencimento: string | null;
           deleted_at: string | null;
           descricao: string | null;
           id: string;
@@ -1129,7 +1125,6 @@ export type Database = {
           criado_por?: string | null;
           data_conclusao?: string | null;
           data_inicio?: string | null;
-          data_vencimento?: string | null;
           deleted_at?: string | null;
           descricao?: string | null;
           id?: string;
@@ -1155,7 +1150,6 @@ export type Database = {
           criado_por?: string | null;
           data_conclusao?: string | null;
           data_inicio?: string | null;
-          data_vencimento?: string | null;
           deleted_at?: string | null;
           descricao?: string | null;
           id?: string;

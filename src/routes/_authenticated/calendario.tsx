@@ -7,7 +7,7 @@ export const Route = createFileRoute("/_authenticated/calendario")({
   head: () => ({
     meta: [
       { title: "Calendário — CoreGestor" },
-      { name: "description", content: "Visualize tarefas por data de vencimento." },
+      { name: "description", content: "Visualize tarefas por data." },
     ],
   }),
   component: CalendarioPage,
@@ -21,7 +21,7 @@ function CalendarioPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Calendário</h1>
         <p className="text-muted-foreground">
-          Tarefas organizadas por data de vencimento com timeline diária.
+          Tarefas organizadas por data com timeline diária.
         </p>
       </div>
 

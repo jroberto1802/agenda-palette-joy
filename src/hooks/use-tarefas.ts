@@ -233,7 +233,7 @@ export function useUpdateSubtarefaMeta() {
     }: {
       id: string;
       data: {
-        data_vencimento?: string | null;
+        data_inicio?: string | null;
         atribuido_ids?: string[];
         visibilidade?: import("@/types").Subtarefa["visibilidade"];
       };

@@ -43,7 +43,7 @@ function TarefaListRowContent({
   dragHandle?: ReactNode;
   isDragging?: boolean;
 }) {
-  const vencimentoVariant = getVencimentoVariant(tarefa.data_vencimento, tarefa.status);
+  const vencimentoVariant = getVencimentoVariant(tarefa.data_inicio, tarefa.status);
 
   return (
     <div
@@ -87,7 +87,7 @@ function TarefaListRowContent({
               <span className="truncate">{formatResponsaveisLabel(tarefa)}</span>
             </span>
           )}
-          {tarefa.data_vencimento && (
+          {tarefa.data_inicio && (
             <span
               className={cn(
                 "inline-flex items-center gap-1",
@@ -97,7 +97,7 @@ function TarefaListRowContent({
               )}
             >
               <CalendarIcon className="h-3 w-3" />
-              {formatDate(tarefa.data_vencimento)}
+              {formatDate(tarefa.data_inicio)}
             </span>
           )}
         </div>

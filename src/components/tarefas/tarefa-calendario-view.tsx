@@ -40,8 +40,8 @@ export function TarefaCalendarioView({
   const diasComTarefas = useMemo(() => {
     const map = new Map<string, number>();
     for (const t of tarefas ?? []) {
-      if (!t.data_vencimento) continue;
-      const key = format(parseISO(t.data_vencimento), "yyyy-MM-dd");
+      if (!t.data_inicio) continue;
+      const key = format(parseISO(t.data_inicio), "yyyy-MM-dd");
       map.set(key, (map.get(key) ?? 0) + 1);
     }
     return map;
@@ -49,7 +49,7 @@ export function TarefaCalendarioView({
 
   const tarefasDoDia = useMemo(() => {
     return (tarefas ?? []).filter(
-      (t) => t.data_vencimento && isSameDay(parseISO(t.data_vencimento), diaSelecionado),
+      (t) => t.data_inicio && isSameDay(parseISO(t.data_inicio), diaSelecionado),
     );
   }, [tarefas, diaSelecionado]);
 
@@ -122,7 +122,7 @@ export function TarefaCalendarioView({
               <Skeleton className="h-16 w-full" />
             </div>
           ) : tarefasDoDia.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhuma tarefa com vencimento neste dia.</p>
+            <p className="text-sm text-muted-foreground">Nenhuma tarefa com data neste dia.</p>
           ) : (
             <div className="space-y-3">
               {tarefasDoDia.map((tarefa) => (
@@ -168,9 +168,9 @@ function TimelineItem({
           Responsável: {formatResponsaveisLabel(tarefa)}
         </p>
       )}
-      {tarefa.data_vencimento && (
+      {tarefa.data_inicio && (
         <p className="text-xs text-muted-foreground">
-          {format(parseISO(tarefa.data_vencimento), "HH:mm", { locale: ptBR })}
+          {format(parseISO(tarefa.data_inicio), "HH:mm", { locale: ptBR })}
         </p>
       )}
     </button>

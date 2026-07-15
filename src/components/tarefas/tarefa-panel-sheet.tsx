@@ -103,7 +103,6 @@ const tarefaPanelSchema = z
     prioridade: z.enum(["P1", "P2", "P3", "P4"]),
     status: z.enum(["a_fazer", "em_andamento", "cancelada", "concluida"]),
     data_inicio: z.date().nullable(),
-    data_vencimento: z.date().nullable(),
     tagsInput: z.string(),
     visibilidade: z.enum([
       "todos_empresa",
@@ -174,7 +173,7 @@ function SortableSubtarefaRow({
   onToggle: (concluida: boolean) => Promise<void>;
   onDelete: () => Promise<void>;
   onUpdateMeta: (meta: {
-    data_vencimento?: string | null;
+    data_inicio?: string | null;
     atribuido_ids?: string[];
     visibilidade?: SubtarefaWithAuthors["visibilidade"];
   }) => Promise<void>;
@@ -245,7 +244,6 @@ function toFormValues(
       : defaultDataInicio
         ? new Date(defaultDataInicio)
         : null,
-    data_vencimento: tarefa?.data_vencimento ? new Date(tarefa.data_vencimento) : null,
     tagsInput: tarefa?.tags?.join(", ") ?? "",
     visibilidade: (tarefa?.visibilidade as TarefaVisibilidade | undefined) ?? "somente_para_mim",
     observador_ids: tarefa?.observadores?.map((o) => o.usuario_id) ?? [],
@@ -279,7 +277,6 @@ function toPayload(values: TarefaPanelSchema): TarefaFormData {
     prioridade: values.prioridade,
     status: values.status,
     data_inicio: values.data_inicio ? values.data_inicio.toISOString() : null,
-    data_vencimento: values.data_vencimento ? values.data_vencimento.toISOString() : null,
     tags: parseTags(values.tagsInput),
     recorrencia: toRecorrenciaPayload(values),
     visibilidade: values.visibilidade,

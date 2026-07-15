@@ -39,7 +39,7 @@ export function TarefaCard({
   onStatusChange: (status: TarefaStatus) => void;
   onOpen?: () => void;
 }) {
-  const vencimentoVariant = getVencimentoVariant(tarefa.data_vencimento, tarefa.status);
+  const vencimentoVariant = getVencimentoVariant(tarefa.data_inicio, tarefa.status);
 
   return (
     <Card
@@ -185,7 +185,7 @@ export function TarefaCard({
               <span className="truncate">{formatResponsaveisLabel(tarefa)}</span>
             </span>
           )}
-          {tarefa.data_vencimento && (
+          {tarefa.data_inicio && (
             <span
               className={cn(
                 "flex items-center gap-1",
@@ -194,7 +194,7 @@ export function TarefaCard({
               )}
             >
               <CalendarIcon className="h-3 w-3 shrink-0" />
-              {formatDate(tarefa.data_vencimento)}
+              {formatDate(tarefa.data_inicio)}
             </span>
           )}
         </div>

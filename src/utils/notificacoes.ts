@@ -32,7 +32,7 @@ export const NOTIFICACAO_TIPO_LABELS: Record<NotificacaoTipo, string> = {
   tarefa_status: "Status alterado",
   tarefa_prioridade: "Prioridade alterada",
   tarefa_responsavel: "Responsável alterado",
-  tarefa_prazo: "Prazo alterado",
+  tarefa_prazo: "Data alterada",
   tarefa_movida: "Tarefa movida",
   tarefa_subtarefa: "Nova subtarefa",
   tarefa_subtarefa_concluida: "Subtarefa concluída",

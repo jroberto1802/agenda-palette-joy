@@ -270,7 +270,7 @@ export async function listRecentTarefas(limit = 5): Promise<TarefaWithRelations[
     .select(TAREFA_SELECT)
     .is("deleted_at", null)
     .neq("status", "concluida")
-    .order("data_vencimento", { ascending: true, nullsFirst: false })
+    .order("data_inicio", { ascending: true, nullsFirst: false })
     .limit(limit);
 
   if (error) throw error;
@@ -286,10 +286,10 @@ export async function listTarefasCalendario(
     .select(TAREFA_SELECT)
     .is("deleted_at", null)
     .not("status", "in", "(concluida,cancelada)")
-    .not("data_vencimento", "is", null)
-    .gte("data_vencimento", inicio)
-    .lte("data_vencimento", fim)
-    .order("data_vencimento", { ascending: true });
+    .not("data_inicio", "is", null)
+    .gte("data_inicio", inicio)
+    .lte("data_inicio", fim)
+    .order("data_inicio", { ascending: true });
 
   if (error) throw error;
   return (data ?? []) as TarefaWithRelations[];
@@ -299,7 +299,7 @@ async function spawnProximaOcorrencia(tarefa: TarefaWithRelations): Promise<void
   const config = parseRecorrencia(tarefa.recorrencia);
   if (!config) return;
 
-  const proxima = calcularProximaData(tarefa.data_vencimento, config);
+  const proxima = calcularProximaData(tarefa.data_inicio, config);
   if (!proxima || !deveGerarProximaOcorrencia(config, proxima)) return;
 
   const {
@@ -322,8 +322,7 @@ async function spawnProximaOcorrencia(tarefa: TarefaWithRelations): Promise<void
     atribuido_a: primaryAtribuido(responsavelIds),
     prioridade: tarefa.prioridade,
     status: "a_fazer",
-    data_inicio: tarefa.data_inicio,
-    data_vencimento: proxima.toISOString(),
+    data_inicio: proxima.toISOString(),
     tags: tarefa.tags,
     recorrencia: serializeRecorrencia(config),
     visibilidade: tarefa.visibilidade,
@@ -380,7 +379,6 @@ export async function createTarefa(payload: TarefaFormData): Promise<TarefaWithR
       prioridade: normalized.prioridade,
       status: normalized.status,
       data_inicio: normalized.data_inicio,
-      data_vencimento: normalized.data_vencimento,
       tags: normalized.tags,
       recorrencia: serializeRecorrencia(normalized.recorrencia),
       visibilidade: normalized.visibilidade,
@@ -458,7 +456,7 @@ export async function updateTarefa(
 
   const { data: anterior } = await supabase
     .from("tarefas")
-    .select("atribuido_a, status, recorrencia, data_vencimento, titulo, descricao, setor_id, prioridade, tags")
+    .select("atribuido_a, status, recorrencia, data_inicio, titulo, descricao, setor_id, prioridade, tags")
     .eq("id", id)
     .single();
 
@@ -473,7 +471,6 @@ export async function updateTarefa(
     prioridade: payload.prioridade,
     status: payload.status,
     data_inicio: payload.data_inicio,
-    data_vencimento: payload.data_vencimento,
     tags: payload.tags,
     recorrencia: serializeRecorrencia(payload.recorrencia),
     visibilidade: payload.visibilidade,
@@ -597,7 +594,7 @@ export async function getTarefaDetail(id: string): Promise<TarefaDetail> {
       `${TAREFA_SELECT},
       subtarefas(
         id, tarefa_id, titulo, concluida, posicao, created_at, criado_por, concluido_por,
-        data_inicio, data_vencimento, descricao, prioridade, status, lembretes,
+        data_inicio, descricao, prioridade, status, lembretes,
         recorrencia, projeto_id, setor_id, visibilidade, updated_at,
         criador:profiles!subtarefas_criado_por_fkey(id, nome_completo, avatar_url),
         concluido_por_usuario:profiles!subtarefas_concluido_por_fkey(id, nome_completo, avatar_url),
@@ -628,7 +625,7 @@ export async function getTarefaDetail(id: string): Promise<TarefaDetail> {
 
 const SUBTAREFA_SELECT = `
   id, tarefa_id, titulo, concluida, posicao, created_at, criado_por, concluido_por,
-  data_inicio, data_vencimento, descricao, prioridade, status, lembretes,
+  data_inicio, descricao, prioridade, status, lembretes,
   recorrencia, projeto_id, setor_id, visibilidade, updated_at,
   criador:profiles!subtarefas_criado_por_fkey(id, nome_completo, avatar_url),
   concluido_por_usuario:profiles!subtarefas_concluido_por_fkey(id, nome_completo, avatar_url),
@@ -852,19 +849,19 @@ export async function updateSubtarefaTitulo(
 export async function updateSubtarefaMeta(
   id: string,
   meta: {
-    data_vencimento?: string | null;
+    data_inicio?: string | null;
     atribuido_ids?: string[];
     visibilidade?: SubtarefaWithAuthors["visibilidade"];
   },
 ): Promise<SubtarefaWithAuthors> {
   const patch: {
-    data_vencimento?: string | null;
+    data_inicio?: string | null;
     visibilidade?: SubtarefaWithAuthors["visibilidade"];
     updated_at?: string;
   } = {};
 
-  if (meta.data_vencimento !== undefined) {
-    patch.data_vencimento = meta.data_vencimento;
+  if (meta.data_inicio !== undefined) {
+    patch.data_inicio = meta.data_inicio;
   }
   if (meta.visibilidade !== undefined) {
     patch.visibilidade = meta.visibilidade;
@@ -908,7 +905,6 @@ export async function updateSubtarefa(
     prioridade: payload.prioridade,
     status: payload.status,
     data_inicio: payload.data_inicio,
-    data_vencimento: payload.data_vencimento,
     visibilidade: payload.visibilidade,
     lembretes: payload.lembretes as unknown as Json,
     recorrencia: serializeRecorrencia(payload.recorrencia) as Json | null,
@@ -1192,7 +1188,7 @@ export async function getDashboardKpis(): Promise<DashboardKpis> {
   const [tarefasRes, setoresRes, pessoasRes] = await Promise.all([
     supabase
       .from("tarefas")
-      .select("status, data_vencimento")
+      .select("status, data_inicio")
       .is("deleted_at", null),
     supabase.from("setores").select("id", { count: "exact", head: true }),
     supabase
@@ -1215,9 +1211,9 @@ export async function getDashboardKpis(): Promise<DashboardKpis> {
     tarefasCanceladas: tarefas.filter((t) => t.status === "cancelada").length,
     tarefasVencendoHoje: tarefas.filter(
       (t) =>
-        t.data_vencimento &&
-        t.data_vencimento >= hojeInicio &&
-        t.data_vencimento <= hojeFim &&
+        t.data_inicio &&
+        t.data_inicio >= hojeInicio &&
+        t.data_inicio <= hojeFim &&
         t.status !== "concluida",
     ).length,
     totalSetores: setoresRes.count ?? 0,

@@ -3,7 +3,6 @@ import { ptBR } from "date-fns/locale";
 import {
   Bell,
   Building2,
-  CalendarClock,
   CalendarDays,
   CircleDot,
   Eye,
@@ -68,7 +67,6 @@ export type TarefaMetaFormValues = {
   visibilidade: TarefaVisibilidade;
   observador_ids: string[];
   data_inicio: Date | null;
-  data_vencimento: Date | null;
   prioridade: TarefaPrioridade;
   status: TarefaStatus;
   lembretes: TarefaLembreteOpcao[];
@@ -177,7 +175,6 @@ export function TarefaMetaToolbar({
   const atribuidoIds = form.watch("atribuido_ids") ?? [];
   const visibilidade = form.watch("visibilidade");
   const dataInicio = form.watch("data_inicio");
-  const dataVencimento = form.watch("data_vencimento");
   const prioridade = form.watch("prioridade");
   const status = form.watch("status");
   const lembretes = form.watch("lembretes") ?? [];
@@ -408,7 +405,7 @@ export function TarefaMetaToolbar({
           )}
         />
 
-        {/* Data (início) */}
+        {/* Data */}
         <FormField
           control={form.control}
           name="data_inicio"
@@ -427,37 +424,6 @@ export function TarefaMetaToolbar({
                       disabled={!canEdit}
                     >
                       <CalendarDays className="h-4 w-4" />
-                    </MetaIconButton>
-                  </span>
-                </PopoverTrigger>
-                <PopoverContent className={cn("w-auto p-0", META_OVERLAY_Z)} align="start">
-                  <DatePopoverBody value={field.value} onChange={field.onChange} />
-                </PopoverContent>
-              </Popover>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        {/* Prazo */}
-        <FormField
-          control={form.control}
-          name="data_vencimento"
-          render={({ field }) => (
-            <FormItem className="space-y-0">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <span>
-                    <MetaIconButton
-                      label={
-                        dataVencimento
-                          ? `Prazo: ${format(dataVencimento, "dd/MM/yyyy", { locale: ptBR })}`
-                          : "Prazo"
-                      }
-                      active={!!dataVencimento}
-                      disabled={!canEdit}
-                    >
-                      <CalendarClock className="h-4 w-4" />
                     </MetaIconButton>
                   </span>
                 </PopoverTrigger>

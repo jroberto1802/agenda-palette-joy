@@ -67,7 +67,7 @@ function ColunaCardContent({
   tarefa: TarefaWithRelations;
   isDragging?: boolean;
 }) {
-  const vencimentoVariant = getVencimentoVariant(tarefa.data_vencimento, tarefa.status);
+  const vencimentoVariant = getVencimentoVariant(tarefa.data_inicio, tarefa.status);
 
   return (
     <div
@@ -108,7 +108,7 @@ function ColunaCardContent({
             {formatResponsaveisLabel(tarefa)}
           </span>
         )}
-        {tarefa.data_vencimento && (
+        {tarefa.data_inicio && (
           <span
             className={cn(
               "flex items-center gap-1",
@@ -118,7 +118,7 @@ function ColunaCardContent({
             )}
           >
             <CalendarIcon className="h-3 w-3" />
-            {formatDate(tarefa.data_vencimento)}
+            {formatDate(tarefa.data_inicio)}
           </span>
         )}
       </div>
