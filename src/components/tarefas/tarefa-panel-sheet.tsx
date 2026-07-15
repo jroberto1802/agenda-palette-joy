@@ -963,8 +963,8 @@ export function TarefaPanelSheet({
                       value="anexos"
                       className="mt-0 min-h-0 flex-1 data-[state=inactive]:hidden"
                     >
-                      <ScrollArea className="h-full max-h-[calc(90vh-10rem)]">
-                        <div className="space-y-3 p-4">
+                      <ScrollArea className="h-full max-h-[calc(90vh-10rem)] [&>[data-radix-scroll-area-viewport]>div]:!block">
+                        <div className="w-full space-y-3 p-4">
                           {!showInteractions ? (
                             <p className="text-sm text-muted-foreground">
                               Salve a tarefa para adicionar anexos.
