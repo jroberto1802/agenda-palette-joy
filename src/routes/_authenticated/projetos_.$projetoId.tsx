@@ -23,7 +23,7 @@ import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
 import type { TarefaWithRelations } from "@/types";
 import { canManageProjetoMembros, isAdmin, isGerente } from "@/utils/permissions";
 import { PROJETO_STATUS_BADGE_CLASS, PROJETO_STATUS_LABELS } from "@/utils/projetos";
-import { canEditTarefa } from "@/utils/tarefas";
+import { canEditTarefa, canToggleTarefaConclusao } from "@/utils/tarefas";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/projetos_/$projetoId")({
@@ -67,6 +67,15 @@ function ProjetoDetailPage() {
 
   const canEdit = (tarefa: TarefaWithRelations) =>
     canEditTarefa(tarefa, profile?.id, isAdmin(profile), isGerente(profile), profile?.setor_id);
+
+  const canToggleConcluida = (tarefa: TarefaWithRelations) =>
+    canToggleTarefaConclusao(
+      tarefa,
+      profile?.id,
+      isAdmin(profile),
+      isGerente(profile),
+      profile?.setor_id,
+    );
 
   const openCreate = () => {
     setPanelId(null);
@@ -185,6 +194,7 @@ function ProjetoDetailPage() {
         emptyMessage="Nenhuma tarefa vinculada a este projeto."
         canEdit={canEdit}
         canDeleteTarefa={canDeleteTarefa}
+        canToggleConcluida={canToggleConcluida}
         onOpenTarefa={openTarefa}
         onCreate={openCreate}
         onToggleConcluida={handleToggleConcluida}

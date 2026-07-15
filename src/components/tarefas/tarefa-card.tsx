@@ -25,6 +25,7 @@ export function TarefaCard({
   tarefa,
   canEdit,
   canDelete,
+  canToggleConcluida,
   onEdit,
   onDelete,
   onToggleConcluida,
@@ -33,11 +34,14 @@ export function TarefaCard({
   tarefa: TarefaWithRelations;
   canEdit: boolean;
   canDelete: boolean;
+  /** Permissão específica da bolinha: concluir (aberta) ou reabrir (concluída, respeita janela de 20min). */
+  canToggleConcluida?: boolean;
   onEdit: () => void;
   onDelete: () => void;
   onToggleConcluida: (concluida: boolean) => void | Promise<void>;
   onOpen?: () => void;
 }) {
+  const podeAlternarConcluida = canToggleConcluida ?? canEdit;
   const vencimentoVariant = getVencimentoVariant(tarefa.data_inicio, tarefa.concluida);
 
   return (
@@ -68,7 +72,7 @@ export function TarefaCard({
             <ConclusaoBolinha
               concluida={tarefa.concluida}
               kind="tarefa"
-              disabled={!canEdit}
+              disabled={!podeAlternarConcluida}
               onToggle={onToggleConcluida}
               className="mt-0.5"
             />

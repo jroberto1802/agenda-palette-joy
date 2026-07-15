@@ -35,14 +35,14 @@ function TarefaListRowContent({
   tarefa,
   onOpen,
   onToggleConcluida,
-  canEdit = true,
+  canToggleConcluida = true,
   dragHandle,
   isDragging,
 }: {
   tarefa: TarefaWithRelations;
   onOpen: () => void;
   onToggleConcluida?: (concluida: boolean) => void | Promise<void>;
-  canEdit?: boolean;
+  canToggleConcluida?: boolean;
   dragHandle?: ReactNode;
   isDragging?: boolean;
 }) {
@@ -61,7 +61,7 @@ function TarefaListRowContent({
         <ConclusaoBolinha
           concluida={tarefa.concluida}
           kind="tarefa"
-          disabled={!canEdit}
+          disabled={!canToggleConcluida}
           onToggle={onToggleConcluida}
         />
       )}
@@ -116,10 +116,12 @@ function SortableListRow({
   tarefa,
   onOpen,
   onToggleConcluida,
+  canToggleConcluida,
 }: {
   tarefa: TarefaWithRelations;
   onOpen: () => void;
   onToggleConcluida?: (concluida: boolean) => void | Promise<void>;
+  canToggleConcluida?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: tarefa.id,
@@ -131,6 +133,7 @@ function SortableListRow({
         tarefa={tarefa}
         onOpen={onOpen}
         onToggleConcluida={onToggleConcluida}
+        canToggleConcluida={canToggleConcluida}
         isDragging={isDragging}
         dragHandle={
           <button
@@ -152,11 +155,13 @@ export function TarefaListView({
   tarefas,
   onOpenTarefa,
   onToggleConcluida,
+  canToggleConcluida,
   enableReorder = false,
 }: {
   tarefas: TarefaWithRelations[];
   onOpenTarefa: (tarefa: TarefaWithRelations) => void;
   onToggleConcluida?: (tarefa: TarefaWithRelations, concluida: boolean) => void | Promise<void>;
+  canToggleConcluida?: (tarefa: TarefaWithRelations) => boolean;
   enableReorder?: boolean;
 }) {
   const { data: itens = [] } = useTarefaBoardItens(enableReorder);
@@ -223,6 +228,7 @@ export function TarefaListView({
                     ? (concluida) => onToggleConcluida(tarefa, concluida)
                     : undefined
                 }
+                canToggleConcluida={canToggleConcluida ? canToggleConcluida(tarefa) : undefined}
               />
             </li>
           ))}
@@ -246,6 +252,7 @@ export function TarefaListView({
                     ? (concluida) => onToggleConcluida(tarefa, concluida)
                     : undefined
                 }
+                canToggleConcluida={canToggleConcluida ? canToggleConcluida(tarefa) : undefined}
               />
             ))}
           </ul>

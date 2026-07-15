@@ -65,10 +65,12 @@ function ColunaCardContent({
   tarefa,
   isDragging,
   onToggleConcluida,
+  canToggleConcluida = true,
 }: {
   tarefa: TarefaWithRelations;
   isDragging?: boolean;
   onToggleConcluida?: (concluida: boolean) => void | Promise<void>;
+  canToggleConcluida?: boolean;
 }) {
   const vencimentoVariant = getVencimentoVariant(tarefa.data_inicio, tarefa.concluida);
 
@@ -86,6 +88,7 @@ function ColunaCardContent({
           <ConclusaoBolinha
             concluida={tarefa.concluida}
             kind="tarefa"
+            disabled={!canToggleConcluida}
             onToggle={onToggleConcluida}
             className="mt-0.5"
           />
@@ -141,10 +144,12 @@ function SortableColunaCard({
   tarefa,
   onOpen,
   onToggleConcluida,
+  canToggleConcluida,
 }: {
   tarefa: TarefaWithRelations;
   onOpen: () => void;
   onToggleConcluida: (concluida: boolean) => void | Promise<void>;
+  canToggleConcluida: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: tarefa.id,
@@ -166,6 +171,7 @@ function SortableColunaCard({
         tarefa={tarefa}
         isDragging={isDragging}
         onToggleConcluida={onToggleConcluida}
+        canToggleConcluida={canToggleConcluida}
       />
     </div>
   );
@@ -176,6 +182,7 @@ function DroppableColuna({
   tarefas,
   onOpenTarefa,
   onToggleConcluida,
+  canToggleConcluida,
   onRename,
   onDelete,
 }: {
@@ -183,6 +190,7 @@ function DroppableColuna({
   tarefas: TarefaWithRelations[];
   onOpenTarefa: (tarefa: TarefaWithRelations) => void;
   onToggleConcluida: (tarefa: TarefaWithRelations, concluida: boolean) => void | Promise<void>;
+  canToggleConcluida: (tarefa: TarefaWithRelations) => boolean;
   onRename: (coluna: TarefaBoardColuna) => void;
   onDelete: (coluna: TarefaBoardColuna) => void;
 }) {
@@ -245,6 +253,7 @@ function DroppableColuna({
                   tarefa={tarefa}
                   onOpen={() => onOpenTarefa(tarefa)}
                   onToggleConcluida={(concluida) => onToggleConcluida(tarefa, concluida)}
+                  canToggleConcluida={canToggleConcluida(tarefa)}
                 />
               ))}
               {tarefas.length === 0 && (
@@ -274,10 +283,12 @@ export function TarefaColunasBoard({
   tarefas,
   onOpenTarefa,
   onToggleConcluida,
+  canToggleConcluida,
 }: {
   tarefas: TarefaWithRelations[];
   onOpenTarefa: (tarefa: TarefaWithRelations) => void;
   onToggleConcluida: (tarefa: TarefaWithRelations, concluida: boolean) => void | Promise<void>;
+  canToggleConcluida: (tarefa: TarefaWithRelations) => boolean;
 }) {
   const { data: colunas = [], isLoading: loadingColunas } = useTarefaBoardColunas();
   const { data: itens = [] } = useTarefaBoardItens();
@@ -503,6 +514,7 @@ export function TarefaColunasBoard({
                 .filter((t): t is TarefaWithRelations => !!t)}
               onOpenTarefa={onOpenTarefa}
               onToggleConcluida={onToggleConcluida}
+              canToggleConcluida={canToggleConcluida}
               onRename={(c) => {
                 setRenaming(c);
                 setRenameValue(c.nome);

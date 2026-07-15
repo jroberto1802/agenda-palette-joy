@@ -16,7 +16,7 @@ import { useSoftDeleteTarefa, useUpdateTarefaConclusao } from "@/hooks/use-taref
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
 import type { TarefaWithRelations } from "@/types";
 import { isAdmin, isGerente } from "@/utils/permissions";
-import { canEditTarefa } from "@/utils/tarefas";
+import { canEditTarefa, canToggleTarefaConclusao } from "@/utils/tarefas";
 
 type FinalizadosSearch = {
   tarefaId?: string;
@@ -82,6 +82,15 @@ function FinalizadosPage() {
   const canEdit = (tarefa: TarefaWithRelations) =>
     canEditTarefa(tarefa, profile?.id, isAdmin(profile), isGerente(profile), profile?.setor_id);
 
+  const canToggleConcluida = (tarefa: TarefaWithRelations) =>
+    canToggleTarefaConclusao(
+      tarefa,
+      profile?.id,
+      isAdmin(profile),
+      isGerente(profile),
+      profile?.setor_id,
+    );
+
   const openTarefa = (tarefa: TarefaWithRelations) => {
     setPanelId(tarefa.id);
     setPanelOpen(true);
@@ -137,6 +146,7 @@ function FinalizadosPage() {
         emptyMessage="Nenhuma tarefa finalizada encontrada com os filtros atuais."
         canEdit={canEdit}
         canDeleteTarefa={canDeleteTarefa}
+        canToggleConcluida={canToggleConcluida}
         onOpenTarefa={openTarefa}
         onCreate={() => undefined}
         onToggleConcluida={handleToggleConcluida}

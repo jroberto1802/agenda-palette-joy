@@ -22,7 +22,7 @@ import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
 import type { TarefaWithRelations } from "@/types";
 import { localDateAtNoon, startOfTodayLocal } from "@/utils/agenda-datas";
 import { isAdmin, isGerente } from "@/utils/permissions";
-import { canEditTarefa } from "@/utils/tarefas";
+import { canEditTarefa, canToggleTarefaConclusao } from "@/utils/tarefas";
 
 type AgendaSearch = {
   tarefaId?: string;
@@ -97,6 +97,15 @@ function AgendaPage() {
 
   const canEdit = (tarefa: TarefaWithRelations) =>
     canEditTarefa(tarefa, profile?.id, isAdmin(profile), isGerente(profile), profile?.setor_id);
+
+  const canToggleConcluida = (tarefa: TarefaWithRelations) =>
+    canToggleTarefaConclusao(
+      tarefa,
+      profile?.id,
+      isAdmin(profile),
+      isGerente(profile),
+      profile?.setor_id,
+    );
 
   const openCreate = (dataInicio?: Date | null) => {
     setPanelId(null);
@@ -230,6 +239,7 @@ function AgendaPage() {
             emptyMessage="Nenhuma tarefa atribuída a você."
             canEdit={canEdit}
             canDeleteTarefa={canDeleteTarefa}
+            canToggleConcluida={canToggleConcluida}
             onOpenTarefa={openTarefa}
             onCreate={() => openCreate(null)}
             onToggleConcluida={handleToggleConcluida}

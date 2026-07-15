@@ -79,6 +79,7 @@ export function TarefaAgendaBoard({
   emptyMessage,
   canEdit,
   canDeleteTarefa,
+  canToggleConcluida,
   onOpenTarefa,
   onCreate,
   onToggleConcluida,
@@ -97,6 +98,8 @@ export function TarefaAgendaBoard({
   emptyMessage: string;
   canEdit: (tarefa: TarefaWithRelations) => boolean;
   canDeleteTarefa: (tarefa: TarefaWithRelations) => boolean;
+  /** Permissão específica da bolinha: concluir (aberta) ou reabrir (concluída, respeita janela de reabertura). */
+  canToggleConcluida: (tarefa: TarefaWithRelations) => boolean;
   onOpenTarefa: (tarefa: TarefaWithRelations) => void;
   onCreate: () => void;
   onToggleConcluida: (tarefa: TarefaWithRelations, concluida: boolean) => void;
@@ -190,6 +193,7 @@ export function TarefaAgendaBoard({
               tarefas={tarefas}
               canEdit={canEdit}
               canDeleteTarefa={canDeleteTarefa}
+              canToggleConcluida={canToggleConcluida}
               onOpenTarefa={onOpenTarefa}
               onDelete={onDelete}
               onToggleConcluida={onToggleConcluida}
@@ -214,6 +218,7 @@ export function TarefaAgendaBoard({
               tarefas={tarefas}
               onOpenTarefa={onOpenTarefa}
               onToggleConcluida={onToggleConcluida}
+              canToggleConcluida={canToggleConcluida}
               enableReorder={enableReorder}
             />
           )}
@@ -235,6 +240,7 @@ export function TarefaAgendaBoard({
               tarefas={tarefas}
               onOpenTarefa={onOpenTarefa}
               onToggleConcluida={onToggleConcluida}
+              canToggleConcluida={canToggleConcluida}
             />
           )}
         </div>

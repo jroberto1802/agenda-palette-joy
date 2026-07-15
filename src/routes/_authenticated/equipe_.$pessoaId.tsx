@@ -19,7 +19,7 @@ import { useSoftDeleteTarefa, useUpdateTarefaConclusao } from "@/hooks/use-taref
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
 import type { TarefaWithRelations } from "@/types";
 import { isAdmin, isAdminOrGerente, isGerente } from "@/utils/permissions";
-import { canEditTarefa } from "@/utils/tarefas";
+import { canEditTarefa, canToggleTarefaConclusao } from "@/utils/tarefas";
 
 export const Route = createFileRoute("/_authenticated/equipe_/$pessoaId")({
   head: ({ params }) => ({
@@ -68,6 +68,15 @@ function EquipePessoaAgendaPage() {
 
   const canEdit = (tarefa: TarefaWithRelations) =>
     canEditTarefa(tarefa, profile?.id, isAdmin(profile), isGerente(profile), profile?.setor_id);
+
+  const canToggleConcluida = (tarefa: TarefaWithRelations) =>
+    canToggleTarefaConclusao(
+      tarefa,
+      profile?.id,
+      isAdmin(profile),
+      isGerente(profile),
+      profile?.setor_id,
+    );
 
   const openCreate = () => {
     setPanelId(null);
@@ -225,6 +234,7 @@ function EquipePessoaAgendaPage() {
         emptyMessage="Nenhuma tarefa atribuída a você."
         canEdit={canEdit}
         canDeleteTarefa={canDeleteTarefa}
+        canToggleConcluida={canToggleConcluida}
         onOpenTarefa={openTarefa}
         onCreate={openCreate}
         onToggleConcluida={handleToggleConcluida}

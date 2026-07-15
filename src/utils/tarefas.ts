@@ -91,7 +91,11 @@ export function getSetoresPermitidos(
   return setores.filter((s) => s.id === profile.setor_id);
 }
 
-export function canEditTarefa(
+/** Janela, em minutos, em que usuário/gestor ainda podem reabrir uma tarefa concluída. Após esse prazo, somente Administrador. */
+export const TAREFA_REABERTURA_JANELA_MINUTOS = 20;
+
+/** Vínculo básico de edição (criador/responsável/gestor do setor), sem considerar se a tarefa está concluída. */
+function temVinculoDeEdicaoTarefa(
   tarefa: TarefaWithRelations,
   userId: string | undefined,
   isAdminUser: boolean,
@@ -104,6 +108,62 @@ export function canEditTarefa(
   if (tarefa.responsaveis?.some((r) => r.usuario_id === userId)) return true;
   if (isGerenteUser && tarefa.setor_id && tarefa.setor_id === userSetorId) return true;
   return false;
+}
+
+/**
+ * Edição de campos da tarefa (título, descrição, metadados, subtarefas, anexos, comentários).
+ * Tarefa concluída: edição de campos é sempre restrita ao Administrador, em qualquer
+ * momento — mesmo dentro da janela de reabertura, usuário/gestor não editam campos.
+ */
+export function canEditTarefa(
+  tarefa: TarefaWithRelations,
+  userId: string | undefined,
+  isAdminUser: boolean,
+  isGerenteUser: boolean,
+  userSetorId: string | null | undefined,
+): boolean {
+  if (tarefa.concluida) return isAdminUser;
+  return temVinculoDeEdicaoTarefa(tarefa, userId, isAdminUser, isGerenteUser, userSetorId);
+}
+
+/**
+ * Reabertura de tarefa concluída (Concluída → Aberta):
+ * - Administrador: pode reabrir a qualquer momento.
+ * - Usuário/gestor com vínculo (criador/responsável/gestor do setor): só até
+ *   `TAREFA_REABERTURA_JANELA_MINUTOS` minutos após `data_conclusao`.
+ */
+export function canReabrirTarefa(
+  tarefa: TarefaWithRelations,
+  userId: string | undefined,
+  isAdminUser: boolean,
+  isGerenteUser: boolean,
+  userSetorId: string | null | undefined,
+): boolean {
+  if (!tarefa.concluida) return false;
+  if (isAdminUser) return true;
+  if (!temVinculoDeEdicaoTarefa(tarefa, userId, isAdminUser, isGerenteUser, userSetorId)) {
+    return false;
+  }
+  if (!tarefa.data_conclusao) return false;
+  const minutosDesdeConclusao = (Date.now() - new Date(tarefa.data_conclusao).getTime()) / 60000;
+  return minutosDesdeConclusao <= TAREFA_REABERTURA_JANELA_MINUTOS;
+}
+
+/**
+ * Permissão para acionar a bolinha de conclusão da tarefa: concluir (se aberta,
+ * mesmo vínculo de `canEditTarefa`) ou reabrir (se concluída, ver `canReabrirTarefa`).
+ */
+export function canToggleTarefaConclusao(
+  tarefa: TarefaWithRelations,
+  userId: string | undefined,
+  isAdminUser: boolean,
+  isGerenteUser: boolean,
+  userSetorId: string | null | undefined,
+): boolean {
+  if (tarefa.concluida) {
+    return canReabrirTarefa(tarefa, userId, isAdminUser, isGerenteUser, userSetorId);
+  }
+  return temVinculoDeEdicaoTarefa(tarefa, userId, isAdminUser, isGerenteUser, userSetorId);
 }
 
 export function getTarefaResponsaveis(
@@ -135,6 +195,7 @@ export function canEditVisibilidade(
 ): boolean {
   if (!userId) return false;
   if (!tarefa) return true;
+  if (tarefa.concluida) return isAdminUser;
   if (isAdminUser) return true;
   if (tarefa.criado_por === userId) return true;
   if (isGerenteUser && tarefa.setor_id && tarefa.setor_id === userSetorId) return true;

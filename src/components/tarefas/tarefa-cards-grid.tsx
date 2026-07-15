@@ -29,6 +29,7 @@ function SortableCardShell({
   tarefa,
   canEdit,
   canDelete,
+  canToggleConcluida,
   onOpen,
   onEdit,
   onDelete,
@@ -37,6 +38,7 @@ function SortableCardShell({
   tarefa: TarefaWithRelations;
   canEdit: boolean;
   canDelete: boolean;
+  canToggleConcluida: boolean;
   onOpen: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -66,6 +68,7 @@ function SortableCardShell({
         tarefa={tarefa}
         canEdit={canEdit}
         canDelete={canDelete}
+        canToggleConcluida={canToggleConcluida}
         onOpen={onOpen}
         onEdit={onEdit}
         onDelete={onDelete}
@@ -79,6 +82,7 @@ export function TarefaCardsGrid({
   tarefas,
   canEdit,
   canDeleteTarefa,
+  canToggleConcluida,
   onOpenTarefa,
   onDelete,
   onToggleConcluida,
@@ -87,6 +91,7 @@ export function TarefaCardsGrid({
   tarefas: TarefaWithRelations[];
   canEdit: (tarefa: TarefaWithRelations) => boolean;
   canDeleteTarefa: (tarefa: TarefaWithRelations) => boolean;
+  canToggleConcluida: (tarefa: TarefaWithRelations) => boolean;
   onOpenTarefa: (tarefa: TarefaWithRelations) => void;
   onDelete: (tarefa: TarefaWithRelations) => void;
   onToggleConcluida: (tarefa: TarefaWithRelations, concluida: boolean) => void | Promise<void>;
@@ -150,6 +155,7 @@ export function TarefaCardsGrid({
             tarefa={tarefa}
             canEdit={canEdit(tarefa)}
             canDelete={canDeleteTarefa(tarefa)}
+            canToggleConcluida={canToggleConcluida(tarefa)}
             onOpen={() => onOpenTarefa(tarefa)}
             onEdit={() => onOpenTarefa(tarefa)}
             onDelete={() => onDelete(tarefa)}
@@ -170,6 +176,7 @@ export function TarefaCardsGrid({
               tarefa={tarefa}
               canEdit={canEdit(tarefa)}
               canDelete={canDeleteTarefa(tarefa)}
+              canToggleConcluida={canToggleConcluida(tarefa)}
               onOpen={() => onOpenTarefa(tarefa)}
               onEdit={() => onOpenTarefa(tarefa)}
               onDelete={() => onDelete(tarefa)}
