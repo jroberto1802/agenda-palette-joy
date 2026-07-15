@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useDeleteAnexo, useUploadAnexo } from "@/hooks/use-anexos";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
 import { cn } from "@/lib/utils";
-import { getAnexoSignedUrl } from "@/services/anexos";
+import { downloadAnexoFile } from "@/services/anexos";
 import type { TarefaAnexo } from "@/types";
 import { formatDateTime } from "@/utils/formatters";
 
@@ -50,8 +50,7 @@ export function TarefaAnexosSection({
 
   const handleDownload = async (anexo: TarefaAnexo) => {
     try {
-      const url = await getAnexoSignedUrl(anexo.storage_path);
-      window.open(url, "_blank", "noopener,noreferrer");
+      await downloadAnexoFile(anexo.storage_path, anexo.nome);
     } catch (error) {
       toast.error("Erro ao baixar anexo", {
         description: getSupabaseErrorMessage(error as Error),
@@ -104,8 +103,15 @@ export function TarefaAnexosSection({
               className="flex items-center gap-2 rounded-md border px-3 py-2 group"
             >
               <FileIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{anexo.nome}</p>
+              <div className="min-w-0 flex-1">
+                <button
+                  type="button"
+                  className="block w-full truncate text-left text-sm font-medium hover:underline"
+                  onClick={() => void handleDownload(anexo)}
+                  title={`Baixar ${anexo.nome}`}
+                >
+                  {anexo.nome}
+                </button>
                 <p className="text-xs text-muted-foreground">
                   {formatFileSize(anexo.tamanho)} · {formatDateTime(anexo.created_at)}
                 </p>
@@ -115,7 +121,7 @@ export function TarefaAnexosSection({
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7"
-                onClick={() => handleDownload(anexo)}
+                onClick={() => void handleDownload(anexo)}
               >
                 <Download className="h-3.5 w-3.5" />
               </Button>
