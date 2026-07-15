@@ -2,6 +2,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Bell, CheckCheck } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,6 +23,7 @@ import { cn } from "@/lib/utils";
 import {
   getNotificacaoMensagem,
   getNotificacaoNavigateTarget,
+  OPEN_NOTIFICATIONS_EVENT,
 } from "@/utils/notificacoes";
 
 export function NotificationBell() {
@@ -29,6 +31,13 @@ export function NotificationBell() {
   const { data: notificacoes, unreadCount } = useNotificacoes();
   const markLida = useMarkNotificacaoLida();
   const markAll = useMarkAllNotificacoesLidas();
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    const handleOpen = () => setOpen(true);
+    window.addEventListener(OPEN_NOTIFICATIONS_EVENT, handleOpen);
+    return () => window.removeEventListener(OPEN_NOTIFICATIONS_EVENT, handleOpen);
+  }, []);
 
   const handleClick = async (id: string) => {
     const notificacao = notificacoes?.find((n) => n.id === id);
@@ -38,15 +47,18 @@ export function NotificationBell() {
       await markLida.mutateAsync(id);
     }
 
+    setOpen(false);
+
     const target = getNotificacaoNavigateTarget(notificacao);
-    navigate({
-      to: target.to,
-      ...(target.search ? { search: target.search } : {}),
-    });
+    if (target.search) {
+      navigate({ to: target.to, search: target.search });
+    } else {
+      navigate({ to: target.to });
+    }
   };
 
   return (
-    <DropdownMenu>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="relative" aria-label="Notificações">
           <Bell className="h-4 w-4" />
@@ -87,7 +99,7 @@ export function NotificationBell() {
                   "flex flex-col items-start gap-1 p-3 cursor-pointer",
                   !n.lida && "bg-primary/5",
                 )}
-                onClick={() => handleClick(n.id)}
+                onClick={() => void handleClick(n.id)}
               >
                 <span className="text-sm font-medium leading-snug">{getNotificacaoMensagem(n)}</span>
                 <span className="text-xs text-muted-foreground">

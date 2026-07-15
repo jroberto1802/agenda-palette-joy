@@ -53,11 +53,15 @@ Deno.serve(async (req) => {
       .eq("id", user.id)
       .single();
 
-    if (profile?.papel !== "admin") {
-      return new Response(JSON.stringify({ error: "Apenas administradores podem criar usuários" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    const callerPapel = profile?.papel;
+    if (callerPapel !== "admin" && callerPapel !== "gerente") {
+      return new Response(
+        JSON.stringify({ error: "Apenas administradores e gestores podem criar usuários" }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
     const body = (await req.json()) as CreateUserBody;
@@ -85,6 +89,17 @@ Deno.serve(async (req) => {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // Gestor não pode criar administradores
+    if (callerPapel === "gerente" && papel === "admin") {
+      return new Response(
+        JSON.stringify({ error: "Gestores não podem criar administradores." }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
     const supabaseAdmin = createClient(

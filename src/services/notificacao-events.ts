@@ -36,6 +36,30 @@ export async function getTarefaStakeholderIds(tarefaId: string): Promise<string[
   ];
 }
 
+/** Responsáveis da subtarefa. */
+export async function getSubtarefaResponsavelIds(subtarefaId: string): Promise<string[]> {
+  const { data: responsaveis } = await supabase
+    .from("subtarefa_responsaveis")
+    .select("usuario_id")
+    .eq("subtarefa_id", subtarefaId);
+
+  return [...new Set((responsaveis ?? []).map((r) => r.usuario_id).filter(Boolean))];
+}
+
+/** Criador + responsáveis da subtarefa. */
+export async function getSubtarefaStakeholderIds(subtarefaId: string): Promise<string[]> {
+  const [{ data: subtarefa }, responsaveis] = await Promise.all([
+    supabase.from("subtarefas").select("criado_por").eq("id", subtarefaId).single(),
+    getSubtarefaResponsavelIds(subtarefaId),
+  ]);
+
+  return [
+    ...new Set(
+      [subtarefa?.criado_por, ...responsaveis].filter((id): id is string => !!id),
+    ),
+  ];
+}
+
 async function notifyEvent(params: {
   usuarioIds: string[];
   tipo: NotificacaoTipo;
@@ -179,13 +203,60 @@ export async function notifyTarefaSubtarefaConcluida(params: {
   tarefaId: string;
   titulo: string;
   atorNome: string;
+  subtarefaId?: string;
+  subtarefaTitulo?: string;
 }) {
+  const subtarefaLabel = params.subtarefaTitulo?.trim();
   await notifyEvent({
     usuarioIds: params.usuarioIds,
     tipo: "tarefa_subtarefa_concluida",
-    mensagem: `${params.atorNome} concluiu uma subtarefa em ${params.titulo}`,
+    mensagem: subtarefaLabel
+      ? `${params.atorNome} concluiu a subtarefa ${subtarefaLabel} em ${params.titulo}`
+      : `${params.atorNome} concluiu uma subtarefa em ${params.titulo}`,
     referencia_tipo: "tarefa",
     referencia_id: params.tarefaId,
+    meta: params.subtarefaId ? { subtarefa_id: params.subtarefaId } : undefined,
+  });
+}
+
+export async function notifySubtarefaAnexo(params: {
+  usuarioIds: string[];
+  tarefaId: string;
+  subtarefaId: string;
+  tarefaTitulo: string;
+  subtarefaTitulo: string;
+  atorNome: string;
+}) {
+  await notifyEvent({
+    usuarioIds: params.usuarioIds,
+    tipo: "tarefa_anexo",
+    mensagem: `${params.atorNome} enviou um anexo na subtarefa ${params.subtarefaTitulo} (${params.tarefaTitulo})`,
+    referencia_tipo: "tarefa",
+    referencia_id: params.tarefaId,
+    meta: { aba: "anexos", subtarefa_id: params.subtarefaId },
+  });
+}
+
+export async function notifySubtarefaMencao(params: {
+  usuarioIds: string[];
+  tarefaId: string;
+  subtarefaId: string;
+  comentarioId: string;
+  tarefaTitulo: string;
+  subtarefaTitulo: string;
+  atorNome: string;
+}) {
+  await notifyEvent({
+    usuarioIds: params.usuarioIds,
+    tipo: "tarefa_mencao",
+    mensagem: `${params.atorNome} mencionou você em um comentário na subtarefa ${params.subtarefaTitulo} (${params.tarefaTitulo})`,
+    referencia_tipo: "tarefa",
+    referencia_id: params.tarefaId,
+    meta: {
+      aba: "comentarios",
+      comentario_id: params.comentarioId,
+      subtarefa_id: params.subtarefaId,
+    },
   });
 }
 
@@ -372,6 +443,67 @@ export async function listTarefaMencionaveis(
       .select("id")
       .eq("ativo", true)
       .eq("setor_id", tarefa.setor_id);
+    for (const row of doSetor ?? []) ids.add(row.id);
+  }
+
+  if (ids.size === 0) return [];
+
+  const { data: pessoas } = await supabase
+    .from("profiles")
+    .select("id, nome_completo, avatar_url")
+    .eq("ativo", true)
+    .in("id", [...ids]);
+
+  return (pessoas ?? []).map((p) => ({
+    id: p.id,
+    nome_completo: p.nome_completo,
+    avatar_url: p.avatar_url,
+  }));
+}
+
+/** Pessoas elegíveis para @ em uma subtarefa (responsáveis/observadores/acesso da tarefa pai). */
+export async function listSubtarefaMencionaveis(
+  subtarefaId: string,
+): Promise<{ id: string; nome_completo: string; avatar_url: string | null }[]> {
+  const { data: subtarefa } = await supabase
+    .from("subtarefas")
+    .select("criado_por, tarefa_id, setor_id, projeto_id")
+    .eq("id", subtarefaId)
+    .single();
+
+  if (!subtarefa) return [];
+
+  const ids = new Set<string>();
+  if (subtarefa.criado_por) ids.add(subtarefa.criado_por);
+
+  const [{ data: responsaveis }, { data: observadores }, mencionaveisTarefa] = await Promise.all([
+    supabase
+      .from("subtarefa_responsaveis")
+      .select("usuario_id")
+      .eq("subtarefa_id", subtarefaId),
+    supabase
+      .from("subtarefa_observadores")
+      .select("usuario_id")
+      .eq("subtarefa_id", subtarefaId),
+    listTarefaMencionaveis(subtarefa.tarefa_id),
+  ]);
+
+  for (const row of responsaveis ?? []) ids.add(row.usuario_id);
+  for (const row of observadores ?? []) ids.add(row.usuario_id);
+  for (const pessoa of mencionaveisTarefa) ids.add(pessoa.id);
+
+  if (subtarefa.projeto_id) {
+    const { data: membros } = await supabase
+      .from("projeto_membros")
+      .select("usuario_id")
+      .eq("projeto_id", subtarefa.projeto_id);
+    for (const row of membros ?? []) ids.add(row.usuario_id);
+  } else if (subtarefa.setor_id) {
+    const { data: doSetor } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("ativo", true)
+      .eq("setor_id", subtarefa.setor_id);
     for (const row of doSetor ?? []) ids.add(row.id);
   }
 

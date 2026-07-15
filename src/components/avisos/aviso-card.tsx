@@ -36,10 +36,10 @@ export function AvisoCard({
       )}
       onClick={onOpen}
     >
-      <CardHeader className="space-y-2 p-3 pb-1">
+      <CardHeader className="space-y-1.5 p-3 pb-1">
         <div className="flex items-start justify-between gap-2">
-          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-            {aviso.fixado && <Pin className="h-3.5 w-3.5 shrink-0 text-amber-500" />}
+          <div className="flex min-w-0 flex-wrap items-center gap-1">
+            {aviso.fixado && <Pin className="h-3 w-3 shrink-0 text-amber-500" />}
             <Badge
               variant="outline"
               className={cn(
@@ -51,36 +51,38 @@ export function AvisoCard({
             </Badge>
           </div>
           {lido ? (
-            <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-green-600" aria-label="Lido" />
+            <CheckCircle2 className="h-3 w-3 shrink-0 text-green-600" aria-label="Lido" />
           ) : (
-            <Circle className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-label="Não lido" />
+            <Circle className="h-3 w-3 shrink-0 text-muted-foreground" aria-label="Não lido" />
           )}
         </div>
 
-        <CardTitle className="line-clamp-2 text-sm leading-snug">{aviso.titulo}</CardTitle>
+        <CardTitle className="line-clamp-2 text-sm font-semibold leading-snug">
+          {aviso.titulo}
+        </CardTitle>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <ProfileAvatar
             name={aviso.criador?.nome_completo ?? "Sistema"}
             avatarUrl={aviso.criador?.avatar_url}
-            className="h-6 w-6"
-            fallbackClassName="text-[9px]"
+            className="h-4 w-4"
+            fallbackClassName="text-[8px]"
           />
           <div className="min-w-0">
-            <p className="truncate text-xs font-medium">
+            <p className="truncate text-xs font-medium leading-tight">
               {aviso.criador?.nome_completo ?? "Sistema"}
             </p>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-[10px] text-muted-foreground">
               {format(new Date(aviso.data_publicacao), "dd MMM yyyy", { locale: ptBR })}
             </p>
           </div>
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-1.5 p-3 pt-0">
+      <CardContent className="space-y-1 p-3 pt-0">
         <AvisoDestinatarioDisplay aviso={aviso} compact />
-        <p className="line-clamp-1 text-xs text-muted-foreground">{preview}</p>
-        <p className="text-[11px] font-medium text-muted-foreground">
+        <p className="line-clamp-1 text-xs leading-snug text-muted-foreground">{preview}</p>
+        <p className="text-[10px] font-medium text-muted-foreground">
           {formatAvisoExpiracao(aviso.data_expiracao)}
         </p>
       </CardContent>

@@ -1,7 +1,8 @@
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { CalendarClock, Eye, Trash2, UserRound } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
+import { ConfirmDeleteDialog } from "@/components/common/confirm-delete-dialog";
 import { PessoasMultiSelect } from "@/components/common/pessoas-multi-select";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +31,7 @@ import type {
   TarefaWithRelations,
 } from "@/types";
 import {
+  TAREFA_PRIORIDADE_BAND_CLASS,
   TAREFA_VISIBILIDADE_LABELS,
   TAREFA_VISIBILIDADE_OPTIONS,
 } from "@/utils/tarefas";
@@ -123,6 +125,8 @@ export function SubtarefaRow({
   onToggle,
   onDelete,
   onUpdateMeta,
+  dragHandle,
+  isDragging,
 }: {
   subtarefa: SubtarefaWithAuthors;
   canEdit: boolean;
@@ -135,8 +139,11 @@ export function SubtarefaRow({
     atribuido_ids?: string[];
     visibilidade?: SubtarefaWithAuthors["visibilidade"];
   }) => Promise<void>;
+  dragHandle?: ReactNode;
+  isDragging?: boolean;
 }) {
   const [saving, setSaving] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   const criadorNome = subtarefa.criador?.nome_completo ?? "Desconhecido";
   const concluidoNome = subtarefa.concluido_por_usuario?.nome_completo;
@@ -174,10 +181,18 @@ export function SubtarefaRow({
   };
 
   return (
-    <div className="group flex items-center gap-2 rounded-xl border bg-card px-2.5 py-2 shadow-sm">
+    <div
+      className={cn(
+        "group flex items-start gap-2.5 overflow-hidden rounded-xl border border-l-4 bg-card px-3 py-3 shadow-sm",
+        TAREFA_PRIORIDADE_BAND_CLASS[subtarefa.prioridade],
+        isDragging && "opacity-60 ring-2 ring-primary",
+      )}
+    >
+      {dragHandle}
       <Checkbox
         checked={subtarefa.concluida}
         disabled={!canEdit || saving}
+        className="mt-0.5"
         onCheckedChange={async (checked) => {
           await onToggle(!!checked);
         }}
@@ -186,13 +201,13 @@ export function SubtarefaRow({
       <button
         type="button"
         className={cn(
-          "min-w-0 flex-1 rounded-md px-1 text-left text-sm outline-none transition-colors hover:bg-muted/40 focus-visible:ring-1 focus-visible:ring-ring",
+          "min-w-0 flex-1 rounded-md px-1 py-0.5 text-left text-sm leading-snug outline-none transition-colors hover:bg-muted/40 focus-visible:ring-1 focus-visible:ring-ring",
           subtarefa.concluida && "text-muted-foreground line-through",
         )}
         onClick={onOpen}
         title="Abrir detalhes da subtarefa"
       >
-        <span className="block truncate">{subtarefa.titulo}</span>
+        <span className="block whitespace-normal break-words">{subtarefa.titulo}</span>
       </button>
 
       <TooltipProvider delayDuration={200}>
@@ -358,13 +373,21 @@ export function SubtarefaRow({
               variant="ghost"
               size="icon"
               className="h-7 w-7 opacity-0 group-hover:opacity-100"
-              onClick={() => void onDelete()}
+              onClick={() => setConfirmDeleteOpen(true)}
             >
               <Trash2 className="h-3.5 w-3.5" />
             </Button>
           )}
         </div>
       </TooltipProvider>
+
+      <ConfirmDeleteDialog
+        open={confirmDeleteOpen}
+        onOpenChange={setConfirmDeleteOpen}
+        itemKind="subtarefa"
+        itemName={subtarefa.titulo}
+        onConfirm={onDelete}
+      />
     </div>
   );
 }

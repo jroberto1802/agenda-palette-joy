@@ -2,6 +2,7 @@ import { Plus, UserMinus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
+import { ProjetoMembroTransferDialog } from "@/components/projetos/projeto-membro-transfer-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -10,8 +11,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useAddProjetoMembro, useRemoveProjetoMembro } from "@/hooks/use-projetos";
+import {
+  useAddProjetoMembro,
+  useRemoveProjetoMembro,
+} from "@/hooks/use-projetos";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
+import { listAtividadesDoMembroNoProjeto, type ProjetoAtividadeTransferivel } from "@/services/projetos";
 import type { ProfileWithSetor, ProjetoMembro } from "@/types";
 import { PAPEL_LABELS } from "@/utils/permissions";
 
@@ -30,12 +35,22 @@ export function ProjetoEquipeSection({
   embedded?: boolean;
 }) {
   const [addingId, setAddingId] = useState<string>("");
+  const [transferMembro, setTransferMembro] = useState<ProjetoMembro | null>(null);
+  const [transferAtividades, setTransferAtividades] = useState<ProjetoAtividadeTransferivel[]>(
+    [],
+  );
   const addMembro = useAddProjetoMembro();
   const removeMembro = useRemoveProjetoMembro();
 
   const disponiveis = useMemo(() => {
     const memberIds = new Set(membros.map((m) => m.id));
     return pessoas.filter((p) => p.ativo && !memberIds.has(p.id));
+  }, [pessoas, membros]);
+
+  /** Novos responsáveis na transferência: só membros atuais do projeto. */
+  const candidatosTransferencia = useMemo(() => {
+    const memberIds = new Set(membros.map((m) => m.id));
+    return pessoas.filter((p) => p.ativo && memberIds.has(p.id));
   }, [pessoas, membros]);
 
   const handleAdd = async () => {
@@ -51,9 +66,15 @@ export function ProjetoEquipeSection({
     }
   };
 
-  const handleRemove = async (usuarioId: string) => {
+  const handleRemove = async (membro: ProjetoMembro) => {
     try {
-      await removeMembro.mutateAsync({ projetoId, usuarioId });
+      const atividades = await listAtividadesDoMembroNoProjeto(projetoId, membro.id);
+      if (atividades.length > 0) {
+        setTransferMembro(membro);
+        setTransferAtividades(atividades);
+        return;
+      }
+      await removeMembro.mutateAsync({ projetoId, usuarioId: membro.id });
       toast.success("Pessoa removida da equipe");
     } catch (error) {
       toast.error("Erro ao remover membro", {
@@ -82,7 +103,7 @@ export function ProjetoEquipeSection({
           variant="outline"
           className="gap-2"
           disabled={!addingId || addMembro.isPending}
-          onClick={handleAdd}
+          onClick={() => void handleAdd()}
         >
           <Plus className="h-4 w-4" />
           Adicionar
@@ -107,6 +128,12 @@ export function ProjetoEquipeSection({
       )}
 
       {embedded && addControls}
+
+      {!canManage && (
+        <p className="text-xs text-muted-foreground">
+          Somente o criador do projeto, gestores ou administradores podem alterar a equipe.
+        </p>
+      )}
 
       {membros.length === 0 ? (
         <p className="text-sm text-muted-foreground">
@@ -146,7 +173,7 @@ export function ProjetoEquipeSection({
                   className="shrink-0 text-destructive hover:text-destructive"
                   aria-label={`Remover ${membro.nome_completo}`}
                   disabled={removeMembro.isPending}
-                  onClick={() => handleRemove(membro.id)}
+                  onClick={() => void handleRemove(membro)}
                 >
                   <UserMinus className="h-4 w-4" />
                 </Button>
@@ -155,6 +182,20 @@ export function ProjetoEquipeSection({
           ))}
         </ul>
       )}
+
+      <ProjetoMembroTransferDialog
+        open={!!transferMembro}
+        onOpenChange={(next) => {
+          if (!next) {
+            setTransferMembro(null);
+            setTransferAtividades([]);
+          }
+        }}
+        projetoId={projetoId}
+        membro={transferMembro}
+        atividades={transferAtividades}
+        candidatos={candidatosTransferencia}
+      />
     </section>
   );
 }

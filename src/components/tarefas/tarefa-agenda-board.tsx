@@ -1,14 +1,14 @@
-import { Columns3, LayoutGrid, List, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useMemo, useRef } from "react";
+import { AgendaViewSelector } from "@/components/tarefas/agenda-view-selector";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TarefaCard } from "@/components/tarefas/tarefa-card";
+import { TarefaCardsGrid } from "@/components/tarefas/tarefa-cards-grid";
+import { TarefaColunasBoard } from "@/components/tarefas/tarefa-colunas-board";
 import { TarefaFiltersBar } from "@/components/tarefas/tarefa-filters";
-import { TarefaKanban } from "@/components/tarefas/tarefa-kanban";
 import { TarefaListView } from "@/components/tarefas/tarefa-list-view";
 import { useTarefas } from "@/hooks/use-tarefas";
-import { CARD_GRID_CLASS } from "@/lib/layout";
+import { DENSE_CARD_GRID_CLASS } from "@/lib/layout";
 import type {
   ProfileWithSetor,
   Projeto,
@@ -17,8 +17,14 @@ import type {
   TarefaStatus,
   TarefaWithRelations,
 } from "@/types";
+import {
+  normalizeAgendaViewMode,
+  readAgendaViewPreference,
+  writeAgendaViewPreference,
+  type AgendaViewMode,
+} from "@/utils/agenda-view-preference";
 
-export type AgendaViewMode = "cards" | "lista" | "kanban";
+export type { AgendaViewMode };
 
 export type AgendaBoardState = {
   filters: TarefaFilters;
@@ -39,6 +45,8 @@ export function createAgendaBoardState(
       atribuido_ids: [],
       search: "",
       tag: "",
+      periodo_inicio: "",
+      periodo_fim: "",
       ...overrides,
     },
     debouncedFilters: {
@@ -50,10 +58,16 @@ export function createAgendaBoardState(
       atribuido_ids: [],
       search: "",
       tag: "",
+      periodo_inicio: "",
+      periodo_fim: "",
       ...overrides,
     },
-    view: "cards",
+    view: readAgendaViewPreference(),
   };
+}
+
+function normalizeView(view: string): AgendaViewMode {
+  return normalizeAgendaViewMode(view);
 }
 
 export function TarefaAgendaBoard({
@@ -72,6 +86,8 @@ export function TarefaAgendaBoard({
   onCreate,
   onStatusChange,
   onDelete,
+  somenteFinalizadas = false,
+  hideCreate = false,
 }: {
   state: AgendaBoardState;
   onStateChange: (state: AgendaBoardState) => void;
@@ -80,7 +96,6 @@ export function TarefaAgendaBoard({
   pessoas: ProfileWithSetor[];
   hideProjeto?: boolean;
   hideResponsavel?: boolean;
-  /** Sempre filtra por este projeto (tela de detalhe). */
   forceProjetoId?: string;
   emptyMessage: string;
   canEdit: (tarefa: TarefaWithRelations) => boolean;
@@ -89,8 +104,13 @@ export function TarefaAgendaBoard({
   onCreate: () => void;
   onStatusChange: (tarefa: TarefaWithRelations, status: TarefaStatus) => void;
   onDelete: (tarefa: TarefaWithRelations) => void;
+  somenteFinalizadas?: boolean;
+  hideCreate?: boolean;
 }) {
-  const { filters, debouncedFilters, view } = state;
+  const view = normalizeView(state.view);
+  const effectiveView =
+    somenteFinalizadas && view === "colunas" ? ("cards" as const) : view;
+  const { filters, debouncedFilters } = state;
   const stateRef = useRef(state);
   stateRef.current = state;
 
@@ -112,85 +132,79 @@ export function TarefaAgendaBoard({
     };
   }, [onStateChange]);
 
+  const handleViewChange = (nextView: AgendaViewMode) => {
+    const normalized = normalizeView(nextView);
+    writeAgendaViewPreference(normalized);
+    onStateChange({
+      ...stateRef.current,
+      view: normalized,
+    });
+  };
+
   const queryFilters = useMemo(() => {
-    const base =
-      view === "kanban"
-        ? { ...debouncedFilters, status: "all" as const }
-        : debouncedFilters;
+    const base = somenteFinalizadas
+      ? { ...debouncedFilters, somente_finalizadas: true as const }
+      : { ...debouncedFilters, excluir_finalizadas: true as const };
 
     if (forceProjetoId) {
       return { ...base, projeto_id: forceProjetoId };
     }
 
     return base;
-  }, [debouncedFilters, forceProjetoId, view]);
+  }, [debouncedFilters, forceProjetoId, somenteFinalizadas]);
 
   const { data: tarefas, isLoading } = useTarefas(queryFilters);
+  const enableReorder = !somenteFinalizadas;
 
   return (
     <div className="space-y-4">
-      <TarefaFiltersBar
-        filters={filters}
-        onChange={handleFiltersChange}
-        setores={setores}
-        projetos={projetos}
-        pessoas={pessoas}
-        hideProjeto={hideProjeto}
-        hideResponsavel={hideResponsavel}
-      />
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <TarefaFiltersBar
+            filters={filters}
+            onChange={handleFiltersChange}
+            setores={setores}
+            projetos={projetos}
+            pessoas={pessoas}
+            hideProjeto={hideProjeto}
+            hideResponsavel={hideResponsavel}
+            variant={somenteFinalizadas ? "finalizados" : "default"}
+            hideFinalStatus={!somenteFinalizadas}
+          />
+        </div>
+        <AgendaViewSelector
+          value={effectiveView}
+          onChange={handleViewChange}
+          hideColunas={somenteFinalizadas}
+        />
+      </div>
 
-      <Tabs
-        value={view}
-        onValueChange={(value) =>
-          onStateChange({
-            ...state,
-            view: value as AgendaViewMode,
-          })
-        }
-      >
-        <TabsList>
-          <TabsTrigger value="cards" className="gap-2">
-            <LayoutGrid className="h-4 w-4" />
-            Cards
-          </TabsTrigger>
-          <TabsTrigger value="lista" className="gap-2">
-            <List className="h-4 w-4" />
-            Lista
-          </TabsTrigger>
-          <TabsTrigger value="kanban" className="gap-2">
-            <Columns3 className="h-4 w-4" />
-            Kanban
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="cards" className="mt-4">
+      {effectiveView === "cards" && (
+        <div>
           {isLoading ? (
-            <div className={CARD_GRID_CLASS}>
-              {Array.from({ length: 6 }).map((_, i) => (
-                <Skeleton key={i} className="h-40 rounded-xl" />
+            <div className={DENSE_CARD_GRID_CLASS}>
+              {Array.from({ length: 8 }).map((_, i) => (
+                <Skeleton key={i} className="h-36 rounded-xl" />
               ))}
             </div>
           ) : !tarefas?.length ? (
-            <EmptyState message={emptyMessage} onCreate={onCreate} />
+            <EmptyState message={emptyMessage} onCreate={onCreate} hideCreate={hideCreate} />
           ) : (
-            <div className={CARD_GRID_CLASS}>
-              {tarefas.map((tarefa) => (
-                <TarefaCard
-                  key={tarefa.id}
-                  tarefa={tarefa}
-                  canEdit={canEdit(tarefa)}
-                  canDelete={canDeleteTarefa(tarefa)}
-                  onOpen={() => onOpenTarefa(tarefa)}
-                  onEdit={() => onOpenTarefa(tarefa)}
-                  onDelete={() => onDelete(tarefa)}
-                  onStatusChange={(status) => onStatusChange(tarefa, status)}
-                />
-              ))}
-            </div>
+            <TarefaCardsGrid
+              tarefas={tarefas}
+              canEdit={canEdit}
+              canDeleteTarefa={canDeleteTarefa}
+              onOpenTarefa={onOpenTarefa}
+              onDelete={onDelete}
+              onStatusChange={onStatusChange}
+              enableReorder={enableReorder}
+            />
           )}
-        </TabsContent>
+        </div>
+      )}
 
-        <TabsContent value="lista" className="mt-4">
+      {effectiveView === "lista" && (
+        <div>
           {isLoading ? (
             <div className="space-y-2 rounded-xl border p-2">
               {Array.from({ length: 6 }).map((_, i) => (
@@ -198,42 +212,54 @@ export function TarefaAgendaBoard({
               ))}
             </div>
           ) : !tarefas?.length ? (
-            <EmptyState message={emptyMessage} onCreate={onCreate} />
+            <EmptyState message={emptyMessage} onCreate={onCreate} hideCreate={hideCreate} />
           ) : (
-            <TarefaListView tarefas={tarefas} onOpenTarefa={onOpenTarefa} />
+            <TarefaListView
+              tarefas={tarefas}
+              onOpenTarefa={onOpenTarefa}
+              enableReorder={enableReorder}
+            />
           )}
-        </TabsContent>
+        </div>
+      )}
 
-        <TabsContent value="kanban" className="mt-4">
+      {effectiveView === "colunas" && !somenteFinalizadas && (
+        <div>
           {isLoading ? (
             <div className="flex gap-4">
-              {Array.from({ length: 4 }).map((_, i) => (
+              {Array.from({ length: 3 }).map((_, i) => (
                 <Skeleton key={i} className="h-[520px] min-w-[280px] flex-1 rounded-xl" />
               ))}
             </div>
           ) : !tarefas?.length ? (
-            <EmptyState message={emptyMessage} onCreate={onCreate} />
+            <EmptyState message={emptyMessage} onCreate={onCreate} hideCreate={hideCreate} />
           ) : (
-            <TarefaKanban
-              tarefas={tarefas}
-              onStatusChange={onStatusChange}
-              onOpenTarefa={onOpenTarefa}
-            />
+            <TarefaColunasBoard tarefas={tarefas} onOpenTarefa={onOpenTarefa} />
           )}
-        </TabsContent>
-      </Tabs>
+        </div>
+      )}
     </div>
   );
 }
 
-function EmptyState({ message, onCreate }: { message: string; onCreate: () => void }) {
+function EmptyState({
+  message,
+  onCreate,
+  hideCreate = false,
+}: {
+  message: string;
+  onCreate: () => void;
+  hideCreate?: boolean;
+}) {
   return (
     <div className="rounded-xl border border-dashed p-12 text-center">
       <p className="text-muted-foreground">{message}</p>
-      <Button variant="outline" className="mt-4 gap-2" onClick={onCreate}>
-        <Plus className="h-4 w-4" />
-        Criar primeira tarefa
-      </Button>
+      {!hideCreate && (
+        <Button variant="outline" className="mt-4 gap-2" onClick={onCreate}>
+          <Plus className="h-4 w-4" />
+          Criar primeira tarefa
+        </Button>
+      )}
     </div>
   );
 }

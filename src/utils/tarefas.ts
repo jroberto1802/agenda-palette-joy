@@ -1,12 +1,19 @@
 import type {
   Profile,
   SetorWithGerente,
+  SubtarefaWithAuthors,
   TarefaLembreteOpcao,
   TarefaPrioridade,
   TarefaStatus,
   TarefaVisibilidade,
   TarefaWithRelations,
 } from "@/types";
+
+/** Campos mínimos para ordenar a lista de subtarefas (pendentes acima). */
+export type SubtarefaListOrderable = Pick<
+  SubtarefaWithAuthors,
+  "id" | "concluida" | "posicao" | "created_at"
+>;
 
 export const KANBAN_COLUMNS: { id: TarefaStatus; label: string }[] = [
   { id: "a_fazer", label: "A fazer" },
@@ -41,6 +48,14 @@ export const TAREFA_PRIORIDADE_DOT: Record<TarefaPrioridade, string> = {
   P2: "bg-orange-500",
   P3: "bg-amber-500",
   P4: "bg-slate-400",
+};
+
+/** Borda esquerda dos cards/linhas — mesma paleta do ponto de prioridade. */
+export const TAREFA_PRIORIDADE_BAND_CLASS: Record<TarefaPrioridade, string> = {
+  P1: "border-l-red-500",
+  P2: "border-l-orange-500",
+  P3: "border-l-amber-500",
+  P4: "border-l-slate-400",
 };
 
 export const TAREFA_STATUS_COLORS: Record<TarefaStatus, string> = {
@@ -134,4 +149,44 @@ export function parseLembretes(value: unknown): TarefaLembreteOpcao[] {
   if (!Array.isArray(value)) return [];
   const allowed: TarefaLembreteOpcao[] = ["no_prazo", "1h_antes", "1d_antes", "1sem_antes"];
   return value.filter((item): item is TarefaLembreteOpcao => allowed.includes(item as TarefaLembreteOpcao));
+}
+
+/**
+ * Ordena subtarefas: pendentes primeiro (por `posicao` / criação),
+ * concluídas no final (mesma ordem relativa entre si).
+ * Usa apenas `concluida` (checkbox), independente de status Cancelada.
+ */
+export function compareSubtarefasListOrder(
+  a: SubtarefaListOrderable,
+  b: SubtarefaListOrderable,
+): number {
+  const concluidaDiff = Number(a.concluida) - Number(b.concluida);
+  if (concluidaDiff !== 0) return concluidaDiff;
+  const pa = a.posicao ?? 0;
+  const pb = b.posicao ?? 0;
+  if (pa !== pb) return pa - pb;
+  return a.created_at.localeCompare(b.created_at);
+}
+
+export function sortSubtarefasList<T extends SubtarefaListOrderable>(items: T[]): T[] {
+  return [...items].sort(compareSubtarefasListOrder);
+}
+
+/**
+ * Após um drag livre, reagrupa: pendentes na ordem relativa do array,
+ * depois concluídas — para não misturar grupos.
+ */
+export function partitionSubtarefaIdsByConclusao(
+  orderedIds: string[],
+  byId: Map<string, Pick<SubtarefaListOrderable, "concluida">>,
+): string[] {
+  const pending: string[] = [];
+  const done: string[] = [];
+  for (const id of orderedIds) {
+    const item = byId.get(id);
+    if (!item) continue;
+    if (item.concluida) done.push(id);
+    else pending.push(id);
+  }
+  return [...pending, ...done];
 }

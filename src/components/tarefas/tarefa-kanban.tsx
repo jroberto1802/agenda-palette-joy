@@ -20,6 +20,7 @@ import type { TarefaStatus, TarefaWithRelations } from "@/types";
 import { formatDate, getVencimentoVariant } from "@/utils/formatters";
 import {
   KANBAN_COLUMNS,
+  TAREFA_PRIORIDADE_BAND_CLASS,
   TAREFA_PRIORIDADE_COLORS,
   TAREFA_STATUS_COLORS,
   formatResponsaveisLabel,
@@ -37,7 +38,8 @@ function KanbanCardContent({
   return (
     <div
       className={cn(
-        "rounded-lg border bg-card p-3 shadow-sm space-y-2 cursor-pointer hover:border-primary/40 transition-colors",
+        "space-y-2 cursor-pointer rounded-lg border border-l-4 bg-card p-3 shadow-sm transition-colors hover:border-primary/40",
+        TAREFA_PRIORIDADE_BAND_CLASS[tarefa.prioridade],
         isDragging && "opacity-50 ring-2 ring-primary",
         tarefa.status === "concluida" && "opacity-75",
       )}

@@ -496,6 +496,7 @@ export type Database = {
           descricao: string | null;
           id: string;
           lembretes: Json;
+          posicao: number;
           prioridade: "P1" | "P2" | "P3" | "P4";
           projeto_id: string | null;
           recorrencia: Json | null;
@@ -522,6 +523,7 @@ export type Database = {
           descricao?: string | null;
           id?: string;
           lembretes?: Json;
+          posicao?: number;
           prioridade?: "P1" | "P2" | "P3" | "P4";
           projeto_id?: string | null;
           recorrencia?: Json | null;
@@ -548,6 +550,7 @@ export type Database = {
           descricao?: string | null;
           id?: string;
           lembretes?: Json;
+          posicao?: number;
           prioridade?: "P1" | "P2" | "P3" | "P4";
           projeto_id?: string | null;
           recorrencia?: Json | null;
@@ -672,6 +675,8 @@ export type Database = {
         Row: {
           conteudo: string;
           created_at: string;
+          editado_em: string | null;
+          editado_por: string | null;
           id: string;
           parent_id: string | null;
           subtarefa_id: string;
@@ -680,6 +685,8 @@ export type Database = {
         Insert: {
           conteudo: string;
           created_at?: string;
+          editado_em?: string | null;
+          editado_por?: string | null;
           id?: string;
           parent_id?: string | null;
           subtarefa_id: string;
@@ -688,12 +695,21 @@ export type Database = {
         Update: {
           conteudo?: string;
           created_at?: string;
+          editado_em?: string | null;
+          editado_por?: string | null;
           id?: string;
           parent_id?: string | null;
           subtarefa_id?: string;
           usuario_id?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "subtarefa_comentarios_editado_por_fkey",
+            columns: ["editado_por"],
+            isOneToOne: false,
+            referencedRelation: "profiles",
+            referencedColumns: ["id"],
+          },
           {
             foreignKeyName: "subtarefa_comentarios_parent_id_fkey",
             columns: ["parent_id"],
@@ -793,10 +809,102 @@ export type Database = {
           },
         ];
       };
+      tarefa_board_colunas: {
+        Row: {
+          created_at: string;
+          id: string;
+          is_inbox: boolean;
+          nome: string;
+          posicao: number;
+          updated_at: string;
+          usuario_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          is_inbox?: boolean;
+          nome: string;
+          posicao?: number;
+          updated_at?: string;
+          usuario_id: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          is_inbox?: boolean;
+          nome?: string;
+          posicao?: number;
+          updated_at?: string;
+          usuario_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tarefa_board_colunas_usuario_id_fkey",
+            columns: ["usuario_id"],
+            isOneToOne: false,
+            referencedRelation: "profiles",
+            referencedColumns: ["id"],
+          },
+        ];
+      };
+      tarefa_board_itens: {
+        Row: {
+          coluna_id: string;
+          created_at: string;
+          posicao_coluna: number;
+          posicao_lista: number;
+          tarefa_id: string;
+          updated_at: string;
+          usuario_id: string;
+        };
+        Insert: {
+          coluna_id: string;
+          created_at?: string;
+          posicao_coluna?: number;
+          posicao_lista?: number;
+          tarefa_id: string;
+          updated_at?: string;
+          usuario_id: string;
+        };
+        Update: {
+          coluna_id?: string;
+          created_at?: string;
+          posicao_coluna?: number;
+          posicao_lista?: number;
+          tarefa_id?: string;
+          updated_at?: string;
+          usuario_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tarefa_board_itens_coluna_id_fkey",
+            columns: ["coluna_id"],
+            isOneToOne: false,
+            referencedRelation: "tarefa_board_colunas",
+            referencedColumns: ["id"],
+          },
+          {
+            foreignKeyName: "tarefa_board_itens_tarefa_id_fkey",
+            columns: ["tarefa_id"],
+            isOneToOne: false,
+            referencedRelation: "tarefas",
+            referencedColumns: ["id"],
+          },
+          {
+            foreignKeyName: "tarefa_board_itens_usuario_id_fkey",
+            columns: ["usuario_id"],
+            isOneToOne: false,
+            referencedRelation: "profiles",
+            referencedColumns: ["id"],
+          },
+        ];
+      };
       tarefa_comentarios: {
         Row: {
           conteudo: string;
           created_at: string;
+          editado_em: string | null;
+          editado_por: string | null;
           id: string;
           parent_id: string | null;
           tarefa_id: string;
@@ -805,6 +913,8 @@ export type Database = {
         Insert: {
           conteudo: string;
           created_at?: string;
+          editado_em?: string | null;
+          editado_por?: string | null;
           id?: string;
           parent_id?: string | null;
           tarefa_id: string;
@@ -813,12 +923,21 @@ export type Database = {
         Update: {
           conteudo?: string;
           created_at?: string;
+          editado_em?: string | null;
+          editado_por?: string | null;
           id?: string;
           parent_id?: string | null;
           tarefa_id?: string;
           usuario_id?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "tarefa_comentarios_editado_por_fkey",
+            columns: ["editado_por"],
+            isOneToOne: false,
+            referencedRelation: "profiles",
+            referencedColumns: ["id"],
+          },
           {
             foreignKeyName: "tarefa_comentarios_parent_id_fkey",
             columns: ["parent_id"],

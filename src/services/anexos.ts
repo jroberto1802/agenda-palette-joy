@@ -1,7 +1,9 @@
 import { supabase } from "@/integrations/supabase/client";
 import {
   getCurrentActor,
+  getSubtarefaResponsavelIds,
   getTarefaStakeholderIds,
+  notifySubtarefaAnexo,
   notifyTarefaAnexo,
 } from "@/services/notificacao-events";
 import type { SubtarefaAnexo, TarefaAnexo } from "@/types";
@@ -69,7 +71,7 @@ export async function uploadAnexo(tarefaId: string, file: File): Promise<TarefaA
   ]);
 
   await notifyTarefaAnexo({
-    usuarioIds: stakeholders,
+    usuarioIds: stakeholders.filter((id) => id !== ator?.id),
     tarefaId,
     titulo: tarefa?.titulo ?? "tarefa",
     atorNome: ator?.nome ?? "Alguém",
@@ -103,7 +105,7 @@ export async function uploadSubtarefaAnexo(
 ): Promise<SubtarefaAnexo> {
   const { data: subtarefa, error: subtarefaError } = await supabase
     .from("subtarefas")
-    .select("tarefa_id")
+    .select("tarefa_id, titulo")
     .eq("id", subtarefaId)
     .single();
   if (subtarefaError) throw subtarefaError;
@@ -137,6 +139,21 @@ export async function uploadSubtarefaAnexo(
     await supabase.storage.from(BUCKET).remove([storagePath]);
     throw error;
   }
+
+  const [{ data: tarefa }, ator, responsaveis] = await Promise.all([
+    supabase.from("tarefas").select("titulo").eq("id", subtarefa.tarefa_id).single(),
+    getCurrentActor(),
+    getSubtarefaResponsavelIds(subtarefaId),
+  ]);
+
+  await notifySubtarefaAnexo({
+    usuarioIds: responsaveis.filter((id) => id !== ator?.id),
+    tarefaId: subtarefa.tarefa_id,
+    subtarefaId,
+    tarefaTitulo: tarefa?.titulo ?? "tarefa",
+    subtarefaTitulo: subtarefa.titulo ?? "subtarefa",
+    atorNome: ator?.nome ?? "Alguém",
+  }).catch(() => undefined);
 
   return data;
 }

@@ -273,7 +273,7 @@ export function AvisoDetailSheet({
                             pessoasMencionaveis={pessoasMencionaveis}
                             currentUserId={userId}
                             canComment={!readOnly}
-                            canDeleteOwn={false}
+                            allowMutate={false}
                             highlightId={highlightComentarioId}
                             idPrefix="aviso-comentario"
                             pending={createComentario.isPending}

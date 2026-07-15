@@ -1,17 +1,8 @@
 import { Pencil, Plus, Search, Trash2, UserX } from "lucide-react";
 import { useMemo, useState } from "react";
-import { ProfileAvatar } from "@/components/common/profile-avatar";
 import { toast } from "sonner";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { ConfirmDeleteDialog } from "@/components/common/confirm-delete-dialog";
+import { ProfileAvatar } from "@/components/common/profile-avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -128,6 +119,7 @@ export function CadastroPessoasPanel({ canManage }: { canManage: boolean }) {
       toast.error("Erro ao excluir pessoa", {
         description: getSupabaseErrorMessage(error as Error),
       });
+      throw error;
     }
   };
 
@@ -309,26 +301,15 @@ export function CadastroPessoasPanel({ canManage }: { canManage: boolean }) {
         />
       )}
 
-      <AlertDialog open={!!deleting} onOpenChange={(open) => !open && setDeleting(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir pessoa?</AlertDialogTitle>
-            <AlertDialogDescription>
-              A pessoa &quot;{deleting?.nome_completo}&quot; será removida permanentemente. Esta
-              ação não pode ser desfeita.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Excluir
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDeleteDialog
+        open={!!deleting}
+        onOpenChange={(open) => {
+          if (!open) setDeleting(null);
+        }}
+        itemKind="pessoa"
+        itemName={deleting?.nome_completo}
+        onConfirm={handleDelete}
+      />
     </div>
   );
 }

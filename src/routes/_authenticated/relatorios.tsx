@@ -1,4 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -8,7 +9,9 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useProfile } from "@/hooks/use-profile";
 import { useRelatorios } from "@/hooks/use-relatorios";
+import { canAccessRelatorios } from "@/utils/permissions";
 import { TAREFA_PRIORIDADE_LABELS, TAREFA_STATUS_LABELS } from "@/utils/tarefas";
 
 export const Route = createFileRoute("/_authenticated/relatorios")({
@@ -32,7 +35,24 @@ const linhaChartConfig = {
 } satisfies ChartConfig;
 
 function RelatoriosPage() {
-  const { data, isLoading, isError } = useRelatorios();
+  const navigate = useNavigate();
+  const { data: profile, isLoading: loadingProfile } = useProfile();
+  const canAccess = canAccessRelatorios(profile);
+  const { data, isLoading, isError } = useRelatorios({ enabled: canAccess });
+
+  useEffect(() => {
+    if (!loadingProfile && profile && !canAccessRelatorios(profile)) {
+      void navigate({ to: "/dashboard", replace: true });
+    }
+  }, [profile, loadingProfile, navigate]);
+
+  if (loadingProfile || !canAccess) {
+    return (
+      <div className="flex items-center justify-center py-24 text-sm text-muted-foreground">
+        Verificando permissões...
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (

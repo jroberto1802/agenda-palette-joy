@@ -2,16 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Plus, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { ConfirmDeleteDialog } from "@/components/common/confirm-delete-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -31,7 +22,7 @@ import { usePessoas } from "@/hooks/use-pessoas";
 import { useProfile } from "@/hooks/use-profile";
 import { useSetores } from "@/hooks/use-setores";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
-import { CARD_GRID_CLASS } from "@/lib/layout";
+import { DENSE_CARD_GRID_CLASS } from "@/lib/layout";
 import { isAvisoLido } from "@/services/avisos";
 import type { AvisoAba, AvisoLeituraFiltro, AvisoWithRelations } from "@/types";
 import { isAvisoAtivo, isAvisoFinalizado, matchesAvisoSearch } from "@/utils/avisos";
@@ -134,6 +125,7 @@ function AvisosPage() {
       if (detailId === deleting.id) setDetailId(null);
     } catch (error) {
       toast.error("Erro ao excluir", { description: getSupabaseErrorMessage(error as Error) });
+      throw error;
     }
   };
 
@@ -259,34 +251,24 @@ function AvisosPage() {
         }}
       />
 
-      <AlertDialog open={!!deleting} onOpenChange={(open) => !open && setDeleting(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir aviso?</AlertDialogTitle>
-            <AlertDialogDescription>
-              O aviso &quot;{deleting?.titulo}&quot; será removido permanentemente.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Excluir
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDeleteDialog
+        open={!!deleting}
+        onOpenChange={(open) => {
+          if (!open) setDeleting(null);
+        }}
+        itemKind="aviso"
+        itemName={deleting?.titulo}
+        onConfirm={handleDelete}
+      />
     </div>
   );
 
   function renderGrid() {
     if (isLoading) {
       return (
-        <div className={CARD_GRID_CLASS}>
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-36 rounded-xl" />
+        <div className={DENSE_CARD_GRID_CLASS}>
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Skeleton key={i} className="h-28 rounded-xl" />
           ))}
         </div>
       );
@@ -297,7 +279,7 @@ function AvisosPage() {
     }
 
     return (
-      <div className={CARD_GRID_CLASS}>
+      <div className={DENSE_CARD_GRID_CLASS}>
         {avisosFiltrados.map((aviso) => (
           <AvisoCard
             key={aviso.id}

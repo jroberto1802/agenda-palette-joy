@@ -1,6 +1,7 @@
 import { Download, FileIcon, Paperclip, Trash2, Upload } from "lucide-react";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
+import { ConfirmDeleteDialog } from "@/components/common/confirm-delete-dialog";
 import { Button } from "@/components/ui/button";
 import { useDeleteAnexo, useUploadAnexo } from "@/hooks/use-anexos";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
@@ -30,6 +31,7 @@ export function TarefaAnexosSection({
   const inputRef = useRef<HTMLInputElement>(null);
   const uploadAnexo = useUploadAnexo();
   const deleteAnexo = useDeleteAnexo();
+  const [deleting, setDeleting] = useState<TarefaAnexo | null>(null);
 
   const handleUpload = async (files: FileList | null) => {
     if (!files?.length) return;
@@ -123,14 +125,7 @@ export function TarefaAnexosSection({
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7 opacity-0 group-hover:opacity-100"
-                  onClick={async () => {
-                    try {
-                      await deleteAnexo.mutateAsync(anexo);
-                      toast.success("Anexo removido");
-                    } catch (error) {
-                      toast.error(getSupabaseErrorMessage(error as Error));
-                    }
-                  }}
+                  onClick={() => setDeleting(anexo)}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
@@ -139,6 +134,25 @@ export function TarefaAnexosSection({
           ))}
         </div>
       )}
+
+      <ConfirmDeleteDialog
+        open={!!deleting}
+        onOpenChange={(next) => {
+          if (!next) setDeleting(null);
+        }}
+        itemKind="anexo"
+        itemName={deleting?.nome}
+        onConfirm={async () => {
+          if (!deleting) return;
+          try {
+            await deleteAnexo.mutateAsync(deleting);
+            toast.success("Anexo removido");
+          } catch (error) {
+            toast.error(getSupabaseErrorMessage(error as Error));
+            throw error;
+          }
+        }}
+      />
     </section>
   );
 }

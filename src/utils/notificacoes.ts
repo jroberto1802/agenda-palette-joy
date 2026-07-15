@@ -23,6 +23,7 @@ export type NotificacaoAba = "comentarios" | "anexos";
 export type NotificacaoMeta = {
   comentario_id?: string;
   aba?: NotificacaoAba;
+  subtarefa_id?: string;
 };
 
 export const NOTIFICACAO_TIPO_LABELS: Record<NotificacaoTipo, string> = {
@@ -55,12 +56,34 @@ export function getNotificacaoMensagem(notificacao: {
   return labels[notificacao.tipo] ?? "Nova notificação";
 }
 
+/** Ícone Lucide sugerido por tipo de notificação (nome semântico para a UI). */
+export function getNotificacaoIconKind(
+  tipo: string | null | undefined,
+): "tarefa" | "aviso" | "comentario" | "anexo" | "sistema" {
+  if (!tipo || typeof tipo !== "string") return "sistema";
+  if (tipo.startsWith("aviso_")) return "aviso";
+  if (tipo.includes("comentario") || tipo.includes("mencao") || tipo.includes("resposta")) {
+    return "comentario";
+  }
+  if (tipo.includes("anexo")) return "anexo";
+  if (tipo === "sistema") return "sistema";
+  return "tarefa";
+}
+
+export const OPEN_NOTIFICATIONS_EVENT = "coregestor:open-notifications";
+
+export function openNotificationsPanel() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(OPEN_NOTIFICATIONS_EVENT));
+}
+
 export function parseNotificacaoMeta(meta: unknown): NotificacaoMeta {
   if (!meta || typeof meta !== "object") return {};
   const value = meta as Record<string, unknown>;
   const result: NotificacaoMeta = {};
   if (typeof value.comentario_id === "string") result.comentario_id = value.comentario_id;
   if (value.aba === "comentarios" || value.aba === "anexos") result.aba = value.aba;
+  if (typeof value.subtarefa_id === "string") result.subtarefa_id = value.subtarefa_id;
   return result;
 }
 
@@ -75,6 +98,7 @@ export function getNotificacaoNavigateTarget(notificacao: {
     avisoId?: string;
     aba?: NotificacaoAba;
     comentarioId?: string;
+    subtarefaId?: string;
   };
 } {
   const meta = parseNotificacaoMeta(notificacao.meta);
@@ -86,6 +110,7 @@ export function getNotificacaoNavigateTarget(notificacao: {
         tarefaId: notificacao.referencia_id,
         ...(meta.aba ? { aba: meta.aba } : {}),
         ...(meta.comentario_id ? { comentarioId: meta.comentario_id } : {}),
+        ...(meta.subtarefa_id ? { subtarefaId: meta.subtarefa_id } : {}),
       },
     };
   }

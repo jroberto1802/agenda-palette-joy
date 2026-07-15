@@ -48,11 +48,15 @@ Deno.serve(async (req) => {
       .eq("id", user.id)
       .single();
 
-    if (profile?.papel !== "admin") {
-      return new Response(JSON.stringify({ error: "Apenas administradores podem excluir usuários" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    const callerPapel = profile?.papel;
+    if (callerPapel !== "admin" && callerPapel !== "gerente") {
+      return new Response(
+        JSON.stringify({ error: "Apenas administradores e gestores podem excluir usuários" }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
     const body = (await req.json()) as DeleteUserBody;
@@ -82,6 +86,16 @@ Deno.serve(async (req) => {
       .select("papel, ativo")
       .eq("id", user_id)
       .single();
+
+    if (callerPapel === "gerente" && target?.papel === "admin") {
+      return new Response(
+        JSON.stringify({ error: "Gestores não podem excluir administradores." }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
 
     if (target?.papel === "admin" && target.ativo) {
       const { count } = await supabaseAdmin

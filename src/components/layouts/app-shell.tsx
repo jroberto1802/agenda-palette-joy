@@ -1,5 +1,6 @@
 import { Link, useRouterState, type LinkProps } from "@tanstack/react-router";
 import {
+  Archive,
   BarChart3,
   CalendarDays,
   ClipboardList,
@@ -42,7 +43,7 @@ import { useEmpresaConfig } from "@/hooks/use-empresa";
 import { useProfile } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
 import { EMPRESA_NOME_PADRAO } from "@/services/empresa";
-import { isAdmin } from "@/utils/permissions";
+import { isAdmin, canAccessConfiguracoes, canAccessRelatorios } from "@/utils/permissions";
 
 type NavItem = {
   to: string;
@@ -50,16 +51,28 @@ type NavItem = {
   icon: ComponentType<{ className?: string }>;
 };
 
+/**
+ * Ordem do menu:
+ * Dashboard → Avisos → Nova tarefa → Agenda → Projetos → Calendário →
+ * Equipe → Finalizados → Relatórios → Configurações → Admin
+ * ("Nova tarefa" é injetada antes de Agenda no SidebarNavItems.)
+ */
 const BASE_NAV: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/avisos", label: "Avisos", icon: Megaphone },
-  { to: "/calendario", label: "Calendário", icon: CalendarDays },
   { to: "/tarefas", label: "Agenda", icon: ClipboardList },
   { to: "/projetos", label: "Projetos", icon: FolderKanban },
+  { to: "/calendario", label: "Calendário", icon: CalendarDays },
   { to: "/equipe", label: "Equipe", icon: Users },
-  { to: "/relatorios", label: "Relatórios", icon: BarChart3 },
-  { to: "/configuracoes", label: "Configurações", icon: Settings },
+  { to: "/finalizados", label: "Finalizados", icon: Archive },
 ];
+
+const NAV_RELATORIOS: NavItem = { to: "/relatorios", label: "Relatórios", icon: BarChart3 };
+const NAV_CONFIGURACOES: NavItem = {
+  to: "/configuracoes",
+  label: "Configurações",
+  icon: Settings,
+};
 
 function SidebarNavItems({
   navItems,
@@ -83,15 +96,7 @@ function SidebarNavItems({
         const { to, label, icon: Icon } = item;
         return (
           <div key={to} className="contents">
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={isActive(to)} tooltip={label}>
-                <Link to={to as LinkProps["to"]}>
-                  <Icon />
-                  <span>{label}</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            {to === "/avisos" && (
+            {to === "/tarefas" && (
               <SidebarMenuItem>
                 <SidebarMenuButton
                   type="button"
@@ -103,6 +108,14 @@ function SidebarNavItems({
                 </SidebarMenuButton>
               </SidebarMenuItem>
             )}
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild isActive={isActive(to)} tooltip={label}>
+                <Link to={to as LinkProps["to"]}>
+                  <Icon />
+                  <span>{label}</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
           </div>
         );
       })}
@@ -125,6 +138,12 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const navItems = useMemo((): NavItem[] => {
     const items: NavItem[] = [...BASE_NAV];
+    if (canAccessRelatorios(profile)) {
+      items.push(NAV_RELATORIOS);
+    }
+    if (canAccessConfiguracoes(profile)) {
+      items.push(NAV_CONFIGURACOES);
+    }
     if (isAdmin(profile)) {
       items.push({ to: "/admin", label: "Admin", icon: Shield });
     }

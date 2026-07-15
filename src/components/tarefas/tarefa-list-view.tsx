@@ -1,10 +1,29 @@
-import { CalendarIcon, ChevronRight } from "lucide-react";
+import {
+  DndContext,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { CalendarIcon, ChevronRight, GripVertical } from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
 import { MinhaAgendaBadge } from "@/components/tarefas/subtarefa-row";
 import { Badge } from "@/components/ui/badge";
+import { useReorderTarefasLista, useSyncTarefaBoardItens, useTarefaBoardItens } from "@/hooks/use-tarefa-board";
+import { cn } from "@/lib/utils";
 import type { TarefaWithRelations } from "@/types";
 import { formatDate, getVencimentoVariant } from "@/utils/formatters";
 import {
+  TAREFA_PRIORIDADE_BAND_CLASS,
   TAREFA_PRIORIDADE_COLORS,
   TAREFA_PRIORIDADE_LABELS,
   TAREFA_STATUS_COLORS,
@@ -12,91 +31,203 @@ import {
   formatResponsaveisLabel,
   getTarefaResponsaveis,
 } from "@/utils/tarefas";
-import { cn } from "@/lib/utils";
 
-export function TarefaListView({
-  tarefas,
-  onOpenTarefa,
+function TarefaListRowContent({
+  tarefa,
+  onOpen,
+  dragHandle,
+  isDragging,
 }: {
-  tarefas: TarefaWithRelations[];
-  onOpenTarefa: (tarefa: TarefaWithRelations) => void;
+  tarefa: TarefaWithRelations;
+  onOpen: () => void;
+  dragHandle?: ReactNode;
+  isDragging?: boolean;
 }) {
+  const vencimentoVariant = getVencimentoVariant(tarefa.data_vencimento, tarefa.status);
+
   return (
-    <div className="max-h-[min(70vh,720px)] space-y-2 overflow-y-auto pr-1">
-      <ul className="space-y-2">
-        {tarefas.map((tarefa) => (
-          <TarefaListRow key={tarefa.id} tarefa={tarefa} onOpen={() => onOpenTarefa(tarefa)} />
-        ))}
-      </ul>
+    <div
+      className={cn(
+        "flex w-full items-center gap-2 rounded-xl border border-l-4 bg-card px-2 py-3 text-left shadow-sm transition-colors hover:bg-muted/40 sm:gap-3 sm:px-4",
+        TAREFA_PRIORIDADE_BAND_CLASS[tarefa.prioridade],
+        isDragging && "opacity-60 ring-2 ring-primary",
+      )}
+    >
+      {dragHandle}
+      <button type="button" onClick={onOpen} className="min-w-0 flex-1 space-y-1 text-left">
+        <p
+          className={cn(
+            "truncate text-sm font-medium",
+            tarefa.status === "concluida" && "text-muted-foreground line-through",
+          )}
+        >
+          {tarefa.titulo}
+        </p>
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <Badge
+            variant="outline"
+            className={cn("px-1.5 py-0 text-[10px]", TAREFA_STATUS_COLORS[tarefa.status])}
+          >
+            {TAREFA_STATUS_LABELS[tarefa.status]}
+          </Badge>
+          <Badge
+            variant="outline"
+            className={cn("px-1.5 py-0 text-[10px]", TAREFA_PRIORIDADE_COLORS[tarefa.prioridade])}
+          >
+            {TAREFA_PRIORIDADE_LABELS[tarefa.prioridade]}
+          </Badge>
+          <MinhaAgendaBadge tarefa={tarefa} className="px-1.5 py-0 text-[10px]" />
+          {getTarefaResponsaveis(tarefa).length > 0 && (
+            <span className="inline-flex items-center gap-1">
+              <ProfileAvatar
+                name={getTarefaResponsaveis(tarefa)[0]?.nome_completo ?? "?"}
+                avatarUrl={getTarefaResponsaveis(tarefa)[0]?.avatar_url}
+                className="h-4 w-4"
+              />
+              <span className="truncate">{formatResponsaveisLabel(tarefa)}</span>
+            </span>
+          )}
+          {tarefa.data_vencimento && (
+            <span
+              className={cn(
+                "inline-flex items-center gap-1",
+                vencimentoVariant === "destructive" && "font-medium text-destructive",
+                vencimentoVariant === "warning" &&
+                  "font-medium text-amber-600 dark:text-amber-400",
+              )}
+            >
+              <CalendarIcon className="h-3 w-3" />
+              {formatDate(tarefa.data_vencimento)}
+            </span>
+          )}
+        </div>
+      </button>
+      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
     </div>
   );
 }
 
-function TarefaListRow({
+function SortableListRow({
   tarefa,
   onOpen,
 }: {
   tarefa: TarefaWithRelations;
   onOpen: () => void;
 }) {
-  const vencimentoVariant = getVencimentoVariant(tarefa.data_vencimento, tarefa.status);
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: tarefa.id,
+  });
 
   return (
-    <li>
-      <button
-        type="button"
-        onClick={onOpen}
-        className="flex w-full items-center gap-3 rounded-xl border bg-card px-4 py-3 text-left shadow-sm transition-colors hover:bg-muted/40"
-      >
-        <div className="min-w-0 flex-1 space-y-1">
-          <p
-            className={cn(
-              "truncate text-sm font-medium",
-              tarefa.status === "concluida" && "text-muted-foreground line-through",
-            )}
+    <li ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }}>
+      <TarefaListRowContent
+        tarefa={tarefa}
+        onOpen={onOpen}
+        isDragging={isDragging}
+        dragHandle={
+          <button
+            type="button"
+            className="shrink-0 cursor-grab touch-none rounded p-1 text-muted-foreground hover:bg-muted"
+            aria-label="Arrastar para reordenar"
+            {...attributes}
+            {...listeners}
           >
-            {tarefa.titulo}
-          </p>
-          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <Badge
-              variant="outline"
-              className={cn("px-1.5 py-0 text-[10px]", TAREFA_STATUS_COLORS[tarefa.status])}
-            >
-              {TAREFA_STATUS_LABELS[tarefa.status]}
-            </Badge>
-            <Badge
-              variant="outline"
-              className={cn("px-1.5 py-0 text-[10px]", TAREFA_PRIORIDADE_COLORS[tarefa.prioridade])}
-            >
-              {TAREFA_PRIORIDADE_LABELS[tarefa.prioridade]}
-            </Badge>
-            <MinhaAgendaBadge tarefa={tarefa} className="px-1.5 py-0 text-[10px]" />
-            {getTarefaResponsaveis(tarefa).length > 0 && (
-              <span className="inline-flex items-center gap-1">
-                <ProfileAvatar
-                  name={getTarefaResponsaveis(tarefa)[0].nome_completo}
-                  avatarUrl={getTarefaResponsaveis(tarefa)[0].avatar_url}
-                  className="h-4 w-4"
-                />
-                <span className="max-w-[160px] truncate">{formatResponsaveisLabel(tarefa)}</span>
-              </span>
-            )}
-            {tarefa.data_vencimento && (
-              <span
-                className={cn(
-                  "inline-flex items-center gap-1",
-                  vencimentoVariant === "destructive" && "text-destructive font-medium",
-                  vencimentoVariant === "warning" && "font-medium text-amber-600 dark:text-amber-400",
-                )}
-              >
-                <CalendarIcon className="h-3 w-3" />
-                {formatDate(tarefa.data_vencimento)}
-              </span>
-            )}
-          </div>
-        </div>
-        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-      </button>
+            <GripVertical className="h-4 w-4" />
+          </button>
+        }
+      />
     </li>
+  );
+}
+
+export function TarefaListView({
+  tarefas,
+  onOpenTarefa,
+  enableReorder = false,
+}: {
+  tarefas: TarefaWithRelations[];
+  onOpenTarefa: (tarefa: TarefaWithRelations) => void;
+  enableReorder?: boolean;
+}) {
+  const { data: itens = [] } = useTarefaBoardItens(enableReorder);
+  const syncItens = useSyncTarefaBoardItens();
+  const reorderLista = useReorderTarefasLista();
+  const [order, setOrder] = useState<string[]>([]);
+
+  const tarefaIdsKey = useMemo(() => tarefas.map((t) => t.id).join(","), [tarefas]);
+
+  useEffect(() => {
+    if (!enableReorder || !tarefas.length) {
+      setOrder(tarefas.map((t) => t.id));
+      return;
+    }
+    void syncItens.mutateAsync(tarefas.map((t) => t.id)).catch(() => undefined);
+  }, [enableReorder, tarefaIdsKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!enableReorder) {
+      setOrder(tarefas.map((t) => t.id));
+      return;
+    }
+    const pos = new Map(itens.map((i) => [i.tarefa_id, i.posicao_lista]));
+    const sorted = [...tarefas].sort((a, b) => {
+      const pa = pos.get(a.id);
+      const pb = pos.get(b.id);
+      if (pa == null && pb == null) return 0;
+      if (pa == null) return 1;
+      if (pb == null) return -1;
+      return pa - pb;
+    });
+    setOrder(sorted.map((t) => t.id));
+  }, [enableReorder, itens, tarefaIdsKey, tarefas]);
+
+  const byId = useMemo(() => new Map(tarefas.map((t) => [t.id, t])), [tarefas]);
+  const ordered = order.map((id) => byId.get(id)).filter((t): t is TarefaWithRelations => !!t);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = order.indexOf(String(active.id));
+    const newIndex = order.indexOf(String(over.id));
+    if (oldIndex < 0 || newIndex < 0) return;
+    const next = arrayMove(order, oldIndex, newIndex);
+    setOrder(next);
+    void reorderLista.mutateAsync(next).catch(() => undefined);
+  };
+
+  if (!enableReorder) {
+    return (
+      <div className="max-h-[min(70vh,720px)] space-y-2 overflow-y-auto pr-1">
+        <ul className="space-y-2">
+          {tarefas.map((tarefa) => (
+            <li key={tarefa.id}>
+              <TarefaListRowContent tarefa={tarefa} onOpen={() => onOpenTarefa(tarefa)} />
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-h-[min(70vh,720px)] space-y-2 overflow-y-auto pr-1">
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={order} strategy={verticalListSortingStrategy}>
+          <ul className="space-y-2">
+            {ordered.map((tarefa) => (
+              <SortableListRow
+                key={tarefa.id}
+                tarefa={tarefa}
+                onOpen={() => onOpenTarefa(tarefa)}
+              />
+            ))}
+          </ul>
+        </SortableContext>
+      </DndContext>
+    </div>
   );
 }

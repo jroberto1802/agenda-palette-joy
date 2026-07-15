@@ -9,6 +9,7 @@ import { CommentsThread } from "@/components/common/comments-thread";
 import { EditableOnDoubleClick } from "@/components/common/editable-on-double-click";
 import { SubtarefaAnexosSection } from "@/components/tarefas/subtarefa-anexos-section";
 import { TarefaMetaToolbar } from "@/components/tarefas/tarefa-meta-toolbar";
+import { TarefaPeopleStrip } from "@/components/tarefas/tarefa-people-strip";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -39,6 +40,7 @@ import {
   useDeleteSubtarefaComentario,
   useSubtarefaDetail,
   useUpdateSubtarefa,
+  useUpdateSubtarefaComentario,
 } from "@/hooks/use-tarefas";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
 import { listProjetoMembros } from "@/services/projetos";
@@ -133,8 +135,9 @@ function toFormValues(
   return {
     titulo: subtarefa?.titulo ?? "",
     descricao: subtarefa?.descricao ?? "",
-    projeto_id: subtarefa?.projeto_id ?? parentTarefa?.projeto_id ?? null,
-    setor_id: subtarefa?.setor_id ?? parentTarefa?.setor_id ?? null,
+    // Sempre herda da tarefa principal — subtarefa não diverge.
+    projeto_id: parentTarefa?.projeto_id ?? subtarefa?.projeto_id ?? null,
+    setor_id: parentTarefa?.setor_id ?? subtarefa?.setor_id ?? null,
     atribuido_ids: atribuidoIds,
     prioridade: subtarefa?.prioridade ?? "P4",
     status: subtarefa?.status ?? (subtarefa?.concluida ? "concluida" : "a_fazer"),
@@ -168,12 +171,15 @@ function toRecorrenciaPayload(values: SubtarefaPanelSchema): RecorrenciaConfig |
   };
 }
 
-function toPayload(values: SubtarefaPanelSchema): SubtarefaFormData {
+function toPayload(
+  values: SubtarefaPanelSchema,
+  parentTarefa?: Pick<TarefaWithRelations, "projeto_id" | "setor_id"> | null,
+): SubtarefaFormData {
   return {
     titulo: values.titulo,
     descricao: values.descricao,
-    projeto_id: values.projeto_id,
-    setor_id: values.setor_id,
+    projeto_id: parentTarefa?.projeto_id ?? values.projeto_id,
+    setor_id: parentTarefa?.setor_id ?? values.setor_id,
     atribuido_ids: values.atribuido_ids,
     prioridade: values.prioridade,
     status: values.status,
@@ -192,12 +198,16 @@ export function SubtarefaPanelSheet({
   onOpenChange,
   parentTarefa,
   readOnly = false,
+  initialAba,
+  highlightComentarioId = null,
 }: {
   subtarefaId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   parentTarefa?: TarefaWithRelations | null;
   readOnly?: boolean;
+  initialAba?: "comentarios" | "anexos";
+  highlightComentarioId?: string | null;
 }) {
   const { data: profile } = useProfile();
   const { data: setores } = useSetores();
@@ -207,8 +217,11 @@ export function SubtarefaPanelSheet({
   const updateSubtarefa = useUpdateSubtarefa();
   const createComentario = useCreateSubtarefaComentario();
   const deleteComentario = useDeleteSubtarefaComentario();
+  const updateComentario = useUpdateSubtarefaComentario();
 
-  const [sideTab, setSideTab] = useState<"comentarios" | "anexos">("comentarios");
+  const [sideTab, setSideTab] = useState<"comentarios" | "anexos">(
+    initialAba ?? "comentarios",
+  );
   const [editingField, setEditingField] = useState<EditableField | null>(null);
   const savingRef = useRef(false);
 
@@ -260,6 +273,9 @@ export function SubtarefaPanelSheet({
   const setorId = form.watch("setor_id");
   const atribuidoIds = form.watch("atribuido_ids");
   const observadorIds = form.watch("observador_ids");
+  const visibilidade = form.watch("visibilidade");
+  const selectedProjeto = projetos?.find((p) => p.id === projetoId);
+  const selectedSetor = setores?.find((s) => s.id === setorId);
 
   const { data: projetoMembros } = useQuery({
     queryKey: ["projeto-membros", projetoId],
@@ -284,14 +300,61 @@ export function SubtarefaPanelSheet({
 
   useEffect(() => {
     if (!open) return;
-    setSideTab("comentarios");
+    setSideTab(initialAba ?? "comentarios");
     setEditingField(null);
-  }, [open, subtarefaId]);
+  }, [open, subtarefaId, initialAba]);
+
+  useEffect(() => {
+    if (!open || !highlightComentarioId) return;
+    setSideTab("comentarios");
+    const timer = window.setTimeout(() => {
+      document
+        .getElementById(`subtarefa-comentario-${highlightComentarioId}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [open, highlightComentarioId, subtarefa?.comentarios]);
 
   const comentarios = subtarefa?.comentarios ?? [];
   const anexos = subtarefa?.anexos ?? [];
   const parentTitle =
     subtarefa?.tarefa?.titulo ?? parentTarefa?.titulo ?? "Tarefa principal";
+
+  const criadorDisplay = useMemo(() => {
+    if (subtarefa?.criador) return subtarefa.criador;
+    if (profile) {
+      return {
+        id: profile.id,
+        nome_completo: profile.nome_completo,
+        avatar_url: profile.avatar_url,
+      };
+    }
+    return null;
+  }, [subtarefa?.criador, profile]);
+
+  const responsaveisDisplay = useMemo(() => {
+    const byId = new Map(pessoasAtivas.map((p) => [p.id, p]));
+    return (atribuidoIds ?? [])
+      .map((id) => byId.get(id))
+      .filter((p): p is (typeof pessoasAtivas)[number] => !!p)
+      .map((p) => ({
+        id: p.id,
+        nome_completo: p.nome_completo,
+        avatar_url: p.avatar_url,
+      }));
+  }, [atribuidoIds, pessoasAtivas]);
+
+  const visualizadoresDisplay = useMemo(() => {
+    const byId = new Map(pessoasAtivas.map((p) => [p.id, p]));
+    return (observadorIds ?? [])
+      .map((id) => byId.get(id))
+      .filter((p): p is (typeof pessoasAtivas)[number] => !!p)
+      .map((p) => ({
+        id: p.id,
+        nome_completo: p.nome_completo,
+        avatar_url: p.avatar_url,
+      }));
+  }, [observadorIds, pessoasAtivas]);
 
   const pessoasMencionaveis = useMemo(() => {
     const ids = new Set<string>([...(atribuidoIds ?? []), ...(observadorIds ?? [])]);
@@ -342,7 +405,7 @@ export function SubtarefaPanelSheet({
     try {
       await updateSubtarefa.mutateAsync({
         id: subtarefaId,
-        data: toPayload(form.getValues()),
+        data: toPayload(form.getValues(), parentTarefa),
       });
       return true;
     } catch (error) {
@@ -440,6 +503,7 @@ export function SubtarefaPanelSheet({
                       form={form as never}
                       canEdit={canEdit}
                       canEditVisibility={canEditVisibility}
+                      hideProjetoSetor
                       projetos={projetos ?? []}
                       setores={setoresPermitidos}
                       pessoasParaResponsavel={pessoasParaResponsavel}
@@ -450,6 +514,16 @@ export function SubtarefaPanelSheet({
                           ? "Defina a equipe do projeto antes de atribuir responsáveis"
                           : "Nenhuma pessoa disponível"
                       }
+                    />
+
+                    <TarefaPeopleStrip
+                      criador={criadorDisplay}
+                      createdAt={subtarefa?.created_at ?? null}
+                      responsaveis={responsaveisDisplay}
+                      visibilidade={visibilidade}
+                      visualizadores={visualizadoresDisplay}
+                      setorNome={selectedSetor?.nome}
+                      projetoNome={selectedProjeto?.nome}
                     />
 
                     {(formErrors.visibilidade ||
@@ -513,8 +587,8 @@ export function SubtarefaPanelSheet({
                               <FormControl>
                                 <Textarea
                                   placeholder="Adicione uma descrição... (duplo clique para editar)"
-                                  rows={4}
-                                  className="rounded-xl border bg-card shadow-sm"
+                                  rows={10}
+                                  className="min-h-[12rem] rounded-xl border bg-card shadow-sm"
                                   readOnly={!editable}
                                   disabled={!canEdit}
                                   {...field}
@@ -578,7 +652,9 @@ export function SubtarefaPanelSheet({
                             comentarios={comentarios}
                             pessoasMencionaveis={pessoasMencionaveis}
                             currentUserId={profile?.id}
+                            currentUserProfile={profile}
                             canComment={canEdit}
+                            highlightId={highlightComentarioId}
                             idPrefix="subtarefa-comentario"
                             pending={createComentario.isPending}
                             onSubmit={async (conteudo, parentId) => {
@@ -603,6 +679,20 @@ export function SubtarefaPanelSheet({
                                 });
                               } catch (error) {
                                 toast.error(getSupabaseErrorMessage(error as Error));
+                                throw error;
+                              }
+                            }}
+                            onEdit={async (id, conteudo) => {
+                              try {
+                                await updateComentario.mutateAsync({
+                                  id,
+                                  subtarefaId: subtarefa.id,
+                                  conteudo,
+                                });
+                              } catch (error) {
+                                toast.error("Erro ao editar comentário", {
+                                  description: getSupabaseErrorMessage(error as Error),
+                                });
                                 throw error;
                               }
                             }}

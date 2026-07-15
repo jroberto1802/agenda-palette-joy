@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { CadastroProjetosPanel } from "@/components/settings/cadastro-projetos-panel";
 import { useProfile } from "@/hooks/use-profile";
-import { canDeleteProjetos } from "@/utils/permissions";
+import { canCreateProjetos } from "@/utils/permissions";
 
 export const Route = createFileRoute("/_authenticated/projetos")({
   head: () => ({
@@ -25,8 +25,7 @@ function ProjetosPage() {
         </p>
       </div>
       <CadastroProjetosPanel
-        canManage={!!profile}
-        canDelete={canDeleteProjetos(profile)}
+        canManage={canCreateProjetos(profile)}
         compactHeader
       />
     </div>

@@ -17,6 +17,7 @@ import { Route as AuthenticatedSetoresRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated/relatorios'
 import { Route as AuthenticatedProjetosRouteImport } from './routes/_authenticated/projetos'
 import { Route as AuthenticatedPessoasRouteImport } from './routes/_authenticated/pessoas'
+import { Route as AuthenticatedFinalizadosRouteImport } from './routes/_authenticated/finalizados'
 import { Route as AuthenticatedEquipeRouteImport } from './routes/_authenticated/equipe'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authenticated/configuracoes'
@@ -65,6 +66,12 @@ const AuthenticatedPessoasRoute = AuthenticatedPessoasRouteImport.update({
   path: '/pessoas',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedFinalizadosRoute =
+  AuthenticatedFinalizadosRouteImport.update({
+    id: '/finalizados',
+    path: '/finalizados',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedEquipeRoute = AuthenticatedEquipeRouteImport.update({
   id: '/equipe',
   path: '/equipe',
@@ -118,6 +125,7 @@ export interface FileRoutesByFullPath {
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/equipe': typeof AuthenticatedEquipeRoute
+  '/finalizados': typeof AuthenticatedFinalizadosRoute
   '/pessoas': typeof AuthenticatedPessoasRoute
   '/projetos': typeof AuthenticatedProjetosRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
@@ -135,6 +143,7 @@ export interface FileRoutesByTo {
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/equipe': typeof AuthenticatedEquipeRoute
+  '/finalizados': typeof AuthenticatedFinalizadosRoute
   '/pessoas': typeof AuthenticatedPessoasRoute
   '/projetos': typeof AuthenticatedProjetosRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
@@ -154,6 +163,7 @@ export interface FileRoutesById {
   '/_authenticated/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/equipe': typeof AuthenticatedEquipeRoute
+  '/_authenticated/finalizados': typeof AuthenticatedFinalizadosRoute
   '/_authenticated/pessoas': typeof AuthenticatedPessoasRoute
   '/_authenticated/projetos': typeof AuthenticatedProjetosRoute
   '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
@@ -173,6 +183,7 @@ export interface FileRouteTypes {
     | '/configuracoes'
     | '/dashboard'
     | '/equipe'
+    | '/finalizados'
     | '/pessoas'
     | '/projetos'
     | '/relatorios'
@@ -190,6 +201,7 @@ export interface FileRouteTypes {
     | '/configuracoes'
     | '/dashboard'
     | '/equipe'
+    | '/finalizados'
     | '/pessoas'
     | '/projetos'
     | '/relatorios'
@@ -208,6 +220,7 @@ export interface FileRouteTypes {
     | '/_authenticated/configuracoes'
     | '/_authenticated/dashboard'
     | '/_authenticated/equipe'
+    | '/_authenticated/finalizados'
     | '/_authenticated/pessoas'
     | '/_authenticated/projetos'
     | '/_authenticated/relatorios'
@@ -281,6 +294,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPessoasRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/finalizados': {
+      id: '/_authenticated/finalizados'
+      path: '/finalizados'
+      fullPath: '/finalizados'
+      preLoaderRoute: typeof AuthenticatedFinalizadosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/equipe': {
       id: '/_authenticated/equipe'
       path: '/equipe'
@@ -347,6 +367,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedConfiguracoesRoute: typeof AuthenticatedConfiguracoesRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedEquipeRoute: typeof AuthenticatedEquipeRoute
+  AuthenticatedFinalizadosRoute: typeof AuthenticatedFinalizadosRoute
   AuthenticatedPessoasRoute: typeof AuthenticatedPessoasRoute
   AuthenticatedProjetosRoute: typeof AuthenticatedProjetosRoute
   AuthenticatedRelatoriosRoute: typeof AuthenticatedRelatoriosRoute
@@ -363,6 +384,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedConfiguracoesRoute: AuthenticatedConfiguracoesRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedEquipeRoute: AuthenticatedEquipeRoute,
+  AuthenticatedFinalizadosRoute: AuthenticatedFinalizadosRoute,
   AuthenticatedPessoasRoute: AuthenticatedPessoasRoute,
   AuthenticatedProjetosRoute: AuthenticatedProjetosRoute,
   AuthenticatedRelatoriosRoute: AuthenticatedRelatoriosRoute,

@@ -2,17 +2,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { ConfirmDeleteDialog } from "@/components/common/confirm-delete-dialog";
+import { AgendaEmBreveView } from "@/components/tarefas/agenda-em-breve-view";
+import { AgendaHojeView } from "@/components/tarefas/agenda-hoje-view";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   createAgendaBoardState,
   TarefaAgendaBoard,
@@ -26,6 +20,7 @@ import { useSetores } from "@/hooks/use-setores";
 import { useSoftDeleteTarefa, useUpdateTarefaStatus } from "@/hooks/use-tarefas";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
 import type { TarefaStatus, TarefaWithRelations } from "@/types";
+import { localDateAtNoon, startOfTodayLocal } from "@/utils/agenda-datas";
 import { isAdmin, isGerente } from "@/utils/permissions";
 import { canEditTarefa, TAREFA_STATUS_LABELS } from "@/utils/tarefas";
 
@@ -33,17 +28,21 @@ type AgendaSearch = {
   tarefaId?: string;
   aba?: "comentarios" | "anexos";
   comentarioId?: string;
+  subtarefaId?: string;
 };
+
+type AgendaTab = "hoje" | "em_breve" | "geral";
 
 export const Route = createFileRoute("/_authenticated/tarefas")({
   validateSearch: (search: Record<string, unknown>): AgendaSearch => ({
     tarefaId: typeof search.tarefaId === "string" ? search.tarefaId : undefined,
     aba: search.aba === "comentarios" || search.aba === "anexos" ? search.aba : undefined,
     comentarioId: typeof search.comentarioId === "string" ? search.comentarioId : undefined,
+    subtarefaId: typeof search.subtarefaId === "string" ? search.subtarefaId : undefined,
   }),
   head: () => ({
     meta: [
-      { title: "Agenda — CoreGestor" },
+      { title: "Minha Agenda — CoreGestor" },
       { name: "description", content: "Sua agenda pessoal de tarefas." },
     ],
   }),
@@ -58,11 +57,14 @@ function AgendaPage() {
   const { data: projetos } = useProjetos();
   const { data: pessoas } = usePessoas();
 
+  const [agendaTab, setAgendaTab] = useState<AgendaTab>("geral");
   const [boardState, setBoardState] = useState<AgendaBoardState>(createAgendaBoardState);
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelId, setPanelId] = useState<string | null>(null);
   const [panelAba, setPanelAba] = useState<"comentarios" | "anexos" | undefined>();
   const [highlightComentarioId, setHighlightComentarioId] = useState<string | null>(null);
+  const [panelSubtarefaId, setPanelSubtarefaId] = useState<string | null>(null);
+  const [defaultDataInicio, setDefaultDataInicio] = useState<Date | null>(null);
   const [deleting, setDeleting] = useState<TarefaWithRelations | null>(null);
 
   useEffect(() => {
@@ -70,8 +72,10 @@ function AgendaPage() {
     setPanelId(search.tarefaId);
     setPanelAba(search.aba);
     setHighlightComentarioId(search.comentarioId ?? null);
+    setPanelSubtarefaId(search.subtarefaId ?? null);
+    setDefaultDataInicio(null);
     setPanelOpen(true);
-  }, [search.tarefaId, search.aba, search.comentarioId]);
+  }, [search.tarefaId, search.aba, search.comentarioId, search.subtarefaId]);
 
   const updateStatus = useUpdateTarefaStatus();
   const softDelete = useSoftDeleteTarefa();
@@ -79,6 +83,11 @@ function AgendaPage() {
   const pessoasAtivas = useMemo(
     () => (pessoas ?? []).filter((p) => p.ativo),
     [pessoas],
+  );
+
+  const defaultAtribuidoIds = useMemo(
+    () => (profile?.id ? [profile.id] : undefined),
+    [profile?.id],
   );
 
   const canDeleteTarefa = (tarefa: TarefaWithRelations) => {
@@ -89,10 +98,12 @@ function AgendaPage() {
   const canEdit = (tarefa: TarefaWithRelations) =>
     canEditTarefa(tarefa, profile?.id, isAdmin(profile), isGerente(profile), profile?.setor_id);
 
-  const openCreate = () => {
+  const openCreate = (dataInicio?: Date | null) => {
     setPanelId(null);
     setPanelAba(undefined);
     setHighlightComentarioId(null);
+    setPanelSubtarefaId(null);
+    setDefaultDataInicio(dataInicio ? localDateAtNoon(dataInicio) : null);
     setPanelOpen(true);
   };
 
@@ -100,6 +111,8 @@ function AgendaPage() {
     setPanelId(tarefa.id);
     setPanelAba(undefined);
     setHighlightComentarioId(null);
+    setPanelSubtarefaId(null);
+    setDefaultDataInicio(null);
     setPanelOpen(true);
   };
 
@@ -128,6 +141,7 @@ function AgendaPage() {
       toast.error("Erro ao excluir tarefa", {
         description: getSupabaseErrorMessage(error as Error),
       });
+      throw error;
     }
   };
 
@@ -152,47 +166,92 @@ function AgendaPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Agenda</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Suas tarefas atribuídas em cards, lista ou Kanban.
-          </p>
-        </div>
-        <Button onClick={openCreate} className="shrink-0 gap-2">
+        <h1 className="text-2xl font-semibold tracking-tight">Minha Agenda</h1>
+        <Button
+          onClick={() =>
+            openCreate(agendaTab === "hoje" ? startOfTodayLocal() : null)
+          }
+          className="shrink-0 gap-2"
+        >
           <Plus className="h-4 w-4" />
           Nova tarefa
         </Button>
       </div>
 
-      <TarefaAgendaBoard
-        state={scopedBoardState}
-        onStateChange={(next) => {
-          setBoardState({
-            ...next,
-            filters: {
-              ...next.filters,
-              atribuido_ids: [],
-              atribuido_a: "all",
-            },
-            debouncedFilters: {
-              ...next.debouncedFilters,
-              atribuido_ids: [],
-              atribuido_a: "all",
-            },
-          });
-        }}
-        setores={setores ?? []}
-        projetos={projetos ?? []}
-        pessoas={pessoasAtivas}
-        hideResponsavel
-        emptyMessage="Nenhuma tarefa atribuída a você."
-        canEdit={canEdit}
-        canDeleteTarefa={canDeleteTarefa}
-        onOpenTarefa={openTarefa}
-        onCreate={openCreate}
-        onStatusChange={handleStatusChange}
-        onDelete={setDeleting}
-      />
+      <Tabs
+        value={agendaTab}
+        onValueChange={(value) => setAgendaTab(value as AgendaTab)}
+        className="space-y-4"
+      >
+        <TabsList className="h-9 w-full justify-start gap-1 bg-transparent p-0 sm:w-auto">
+          <TabsTrigger
+            value="geral"
+            className="rounded-none border-b-2 border-transparent px-3 pb-2 pt-1 shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+          >
+            Agenda geral
+          </TabsTrigger>
+          <TabsTrigger
+            value="hoje"
+            className="rounded-none border-b-2 border-transparent px-3 pb-2 pt-1 shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+          >
+            Hoje
+          </TabsTrigger>
+          <TabsTrigger
+            value="em_breve"
+            className="rounded-none border-b-2 border-transparent px-3 pb-2 pt-1 shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+          >
+            Em breve
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="geral" className="mt-0 focus-visible:ring-0">
+          <TarefaAgendaBoard
+            state={scopedBoardState}
+            onStateChange={(next) => {
+              setBoardState({
+                ...next,
+                filters: {
+                  ...next.filters,
+                  atribuido_ids: [],
+                  atribuido_a: "all",
+                },
+                debouncedFilters: {
+                  ...next.debouncedFilters,
+                  atribuido_ids: [],
+                  atribuido_a: "all",
+                },
+              });
+            }}
+            setores={setores ?? []}
+            projetos={projetos ?? []}
+            pessoas={pessoasAtivas}
+            hideResponsavel
+            emptyMessage="Nenhuma tarefa atribuída a você."
+            canEdit={canEdit}
+            canDeleteTarefa={canDeleteTarefa}
+            onOpenTarefa={openTarefa}
+            onCreate={() => openCreate(null)}
+            onStatusChange={handleStatusChange}
+            onDelete={setDeleting}
+          />
+        </TabsContent>
+
+        <TabsContent value="hoje" className="mt-0 focus-visible:ring-0">
+          <AgendaHojeView
+            usuarioId={profile?.id}
+            onOpenTarefa={openTarefa}
+            onCreate={() => openCreate(startOfTodayLocal())}
+          />
+        </TabsContent>
+
+        <TabsContent value="em_breve" className="mt-0 focus-visible:ring-0">
+          <AgendaEmBreveView
+            usuarioId={profile?.id}
+            onOpenTarefa={openTarefa}
+            onCreateForDate={(date) => openCreate(date)}
+          />
+        </TabsContent>
+      </Tabs>
 
       <TarefaPanelSheet
         tarefaId={panelId}
@@ -203,7 +262,9 @@ function AgendaPage() {
             setPanelId(null);
             setPanelAba(undefined);
             setHighlightComentarioId(null);
-            if (search.tarefaId || search.aba || search.comentarioId) {
+            setPanelSubtarefaId(null);
+            setDefaultDataInicio(null);
+            if (search.tarefaId || search.aba || search.comentarioId || search.subtarefaId) {
               navigate({
                 to: "/tarefas",
                 search: {},
@@ -213,29 +274,27 @@ function AgendaPage() {
           }
         }}
         onSaved={(id) => setPanelId(id)}
+        defaultDataInicio={defaultDataInicio}
+        defaultAtribuidoIds={defaultAtribuidoIds}
         initialAba={panelAba}
         highlightComentarioId={highlightComentarioId}
+        initialSubtarefaId={panelSubtarefaId}
       />
 
-      <AlertDialog open={!!deleting} onOpenChange={(open) => !open && setDeleting(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir tarefa?</AlertDialogTitle>
-            <AlertDialogDescription>
-              A tarefa &quot;{deleting?.titulo}&quot; será removida da listagem (exclusão lógica).
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Excluir
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDeleteDialog
+        open={!!deleting}
+        onOpenChange={(open) => {
+          if (!open) setDeleting(null);
+        }}
+        itemKind="tarefa"
+        itemName={deleting?.titulo}
+        description={
+          deleting
+            ? `Excluir a tarefa "${deleting.titulo}"? Ela será removida da listagem (exclusão lógica). Esta ação não pode ser desfeita.`
+            : undefined
+        }
+        onConfirm={handleDelete}
+      />
     </div>
   );
 }

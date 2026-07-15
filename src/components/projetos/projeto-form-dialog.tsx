@@ -63,6 +63,7 @@ export function ProjetoFormDialog({
   pessoas,
   onSubmit,
   loading,
+  canManageEquipe = true,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -70,6 +71,8 @@ export function ProjetoFormDialog({
   pessoas: ProfileWithSetor[];
   onSubmit: (data: ProjetoFormData) => Promise<void>;
   loading?: boolean;
+  /** Em edição: false bloqueia alteração da equipe (use a tela de equipe do projeto). */
+  canManageEquipe?: boolean;
 }) {
   const form = useForm<ProjetoSchema>({
     resolver: zodResolver(projetoSchema),
@@ -196,8 +199,21 @@ export function ProjetoFormDialog({
                       onChange={field.onChange}
                       placeholder="Selecione os membros da equipe"
                       showSelectAll
+                      disabled={!!projeto && !canManageEquipe}
                     />
                   </FormControl>
+                  {projeto && !canManageEquipe ? (
+                    <p className="text-xs text-muted-foreground">
+                      Somente o criador, gestores ou administradores podem alterar a equipe.
+                      Remoções com atividades devem ser feitas na tela do projeto (com
+                      transferência).
+                    </p>
+                  ) : projeto ? (
+                    <p className="text-xs text-muted-foreground">
+                      Para remover alguém com tarefas/subtarefas, use a equipe na tela do
+                      projeto (há fluxo de transferência).
+                    </p>
+                  ) : null}
                   <FormMessage />
                 </FormItem>
               )}

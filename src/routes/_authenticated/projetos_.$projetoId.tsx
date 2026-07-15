@@ -2,16 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { ConfirmDeleteDialog } from "@/components/common/confirm-delete-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -30,7 +21,7 @@ import { useSetores } from "@/hooks/use-setores";
 import { useSoftDeleteTarefa, useUpdateTarefaStatus } from "@/hooks/use-tarefas";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
 import type { TarefaStatus, TarefaWithRelations } from "@/types";
-import { isAdmin, isGerente } from "@/utils/permissions";
+import { canManageProjetoMembros, isAdmin, isGerente } from "@/utils/permissions";
 import { PROJETO_STATUS_BADGE_CLASS, PROJETO_STATUS_LABELS } from "@/utils/projetos";
 import { canEditTarefa, TAREFA_STATUS_LABELS } from "@/utils/tarefas";
 import { cn } from "@/lib/utils";
@@ -112,6 +103,7 @@ function ProjetoDetailPage() {
       toast.error("Erro ao excluir tarefa", {
         description: getSupabaseErrorMessage(error as Error),
       });
+      throw error;
     }
   };
 
@@ -164,7 +156,7 @@ function ProjetoDetailPage() {
                 </Badge>
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
-                Tarefas do projeto em cards, lista ou Kanban.
+                Tarefas do projeto em cards, lista ou colunas.
               </p>
             </div>
 
@@ -217,28 +209,23 @@ function ProjetoDetailPage() {
         projetoNome={projeto.nome}
         membros={membros}
         pessoas={pessoasAtivas}
-        canManage={!!profile}
+        canManage={canManageProjetoMembros(profile, projeto)}
       />
 
-      <AlertDialog open={!!deleting} onOpenChange={(open) => !open && setDeleting(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir tarefa?</AlertDialogTitle>
-            <AlertDialogDescription>
-              A tarefa &quot;{deleting?.titulo}&quot; será removida da listagem (exclusão lógica).
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Excluir
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDeleteDialog
+        open={!!deleting}
+        onOpenChange={(open) => {
+          if (!open) setDeleting(null);
+        }}
+        itemKind="tarefa"
+        itemName={deleting?.titulo}
+        description={
+          deleting
+            ? `Excluir a tarefa "${deleting.titulo}"? Ela será removida da listagem (exclusão lógica). Esta ação não pode ser desfeita.`
+            : undefined
+        }
+        onConfirm={handleDelete}
+      />
     </div>
   );
 }

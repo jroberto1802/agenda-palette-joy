@@ -14,15 +14,26 @@ import {
   listRecentTarefas,
   listTarefas,
   listTarefasCalendario,
+  reorderSubtarefas,
   softDeleteTarefa,
   toggleSubtarefa,
   updateSubtarefa,
+  updateSubtarefaComentario,
   updateSubtarefaMeta,
   updateSubtarefaTitulo,
   updateTarefa,
+  updateTarefaComentario,
   updateTarefaStatus,
 } from "@/services/tarefas";
-import type { SubtarefaFormData, TarefaFilters, TarefaFormData, TarefaStatus } from "@/types";
+import type {
+  SubtarefaDetail,
+  SubtarefaFormData,
+  TarefaDetail,
+  TarefaFilters,
+  TarefaFormData,
+  TarefaStatus,
+} from "@/types";
+import { sortSubtarefasList } from "@/utils/tarefas";
 
 function invalidateTarefas(queryClient: ReturnType<typeof useQueryClient>) {
   queryClient.invalidateQueries({ queryKey: tarefaKeys.all });
@@ -42,6 +53,12 @@ export function useTarefas(
     atribuido_a: filters.atribuido_a ?? "all",
     atribuido_ids: [...(filters.atribuido_ids ?? [])].sort().join(","),
     tag: filters.tag ?? "",
+    somente_finalizadas: filters.somente_finalizadas ? "1" : "0",
+    excluir_finalizadas: filters.excluir_finalizadas ? "1" : "0",
+    periodo_inicio: filters.periodo_inicio ?? "",
+    periodo_fim: filters.periodo_fim ?? "",
+    data_inicio_de: filters.data_inicio_de ?? "",
+    data_inicio_ate: filters.data_inicio_ate ?? "",
   };
 
   return useQuery({
@@ -122,12 +139,79 @@ export function useCreateSubtarefa() {
   });
 }
 
+export function useReorderSubtarefas() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      tarefaId,
+      orderedIds,
+    }: {
+      tarefaId: string;
+      orderedIds: string[];
+    }) => reorderSubtarefas(tarefaId, orderedIds),
+    onSuccess: () => invalidateTarefas(queryClient),
+  });
+}
+
 export function useToggleSubtarefa() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, concluida }: { id: string; concluida: boolean }) =>
       toggleSubtarefa(id, concluida),
-    onSuccess: () => invalidateTarefas(queryClient),
+    onMutate: async ({ id, concluida }) => {
+      await queryClient.cancelQueries({ queryKey: tarefaKeys.all });
+      await queryClient.cancelQueries({ queryKey: subtarefaKeys.detail(id) });
+
+      const previousTarefas = queryClient.getQueriesData<TarefaDetail>({
+        queryKey: [...tarefaKeys.all, "detail"],
+      });
+      const previousSubtarefa = queryClient.getQueryData<SubtarefaDetail>(
+        subtarefaKeys.detail(id),
+      );
+
+      queryClient.setQueriesData<TarefaDetail>(
+        { queryKey: [...tarefaKeys.all, "detail"] },
+        (old) => {
+          if (!old?.subtarefas?.some((s) => s.id === id)) return old;
+          const subtarefas = sortSubtarefasList(
+            old.subtarefas.map((s) => {
+              if (s.id !== id) return s;
+              const nextStatus: TarefaStatus = concluida
+                ? "concluida"
+                : s.status === "concluida"
+                  ? "a_fazer"
+                  : s.status;
+              return { ...s, concluida, status: nextStatus };
+            }),
+          );
+          return { ...old, subtarefas };
+        },
+      );
+
+      queryClient.setQueryData<SubtarefaDetail>(subtarefaKeys.detail(id), (old) => {
+        if (!old) return old;
+        const nextStatus: TarefaStatus = concluida
+          ? "concluida"
+          : old.status === "concluida"
+            ? "a_fazer"
+            : old.status;
+        return { ...old, concluida, status: nextStatus };
+      });
+
+      return { previousTarefas, previousSubtarefa, id };
+    },
+    onError: (_error, _vars, context) => {
+      for (const [key, data] of context?.previousTarefas ?? []) {
+        queryClient.setQueryData(key, data);
+      }
+      if (context?.id) {
+        queryClient.setQueryData(
+          subtarefaKeys.detail(context.id),
+          context.previousSubtarefa,
+        );
+      }
+    },
+    onSettled: () => invalidateTarefas(queryClient),
   });
 }
 
@@ -217,6 +301,25 @@ export function useDeleteSubtarefaComentario() {
   });
 }
 
+export function useUpdateSubtarefaComentario() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      subtarefaId,
+      conteudo,
+    }: {
+      id: string;
+      subtarefaId: string;
+      conteudo: string;
+    }) => updateSubtarefaComentario(id, conteudo).then(() => subtarefaId),
+    onSuccess: (_data, { subtarefaId }) => {
+      invalidateTarefas(queryClient);
+      queryClient.invalidateQueries({ queryKey: subtarefaKeys.detail(subtarefaId) });
+    },
+  });
+}
+
 export function useCreateTarefaComentario() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -237,6 +340,15 @@ export function useDeleteTarefaComentario() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => deleteTarefaComentario(id),
+    onSuccess: () => invalidateTarefas(queryClient),
+  });
+}
+
+export function useUpdateTarefaComentario() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, conteudo }: { id: string; conteudo: string }) =>
+      updateTarefaComentario(id, conteudo),
     onSuccess: () => invalidateTarefas(queryClient),
   });
 }

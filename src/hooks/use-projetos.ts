@@ -5,10 +5,13 @@ import {
   createProjeto,
   deleteProjeto,
   getProjeto,
+  listAtividadesDoMembroNoProjeto,
   listProjetoMembros,
   listProjetos,
   removeProjetoMembro,
+  removeProjetoMembroComTransferencia,
   updateProjeto,
+  type ProjetoMembroTransferInput,
 } from "@/services/projetos";
 import type { ProjetoFormData } from "@/types";
 
@@ -88,6 +91,42 @@ export function useRemoveProjetoMembro() {
     onSuccess: (_data, vars) => {
       queryClient.invalidateQueries({ queryKey: projetoKeys.all });
       queryClient.invalidateQueries({ queryKey: projetoKeys.detail(vars.projetoId) });
+      queryClient.invalidateQueries({ queryKey: tarefaKeys.all });
     },
+  });
+}
+
+export function useRemoveProjetoMembroComTransferencia() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      projetoId,
+      usuarioId,
+      transfer,
+    }: {
+      projetoId: string;
+      usuarioId: string;
+      transfer: ProjetoMembroTransferInput;
+    }) => removeProjetoMembroComTransferencia(projetoId, usuarioId, transfer),
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: projetoKeys.all });
+      queryClient.invalidateQueries({ queryKey: projetoKeys.detail(vars.projetoId) });
+      queryClient.invalidateQueries({ queryKey: tarefaKeys.all });
+    },
+  });
+}
+
+export function useAtividadesDoMembroNoProjeto(
+  projetoId: string | undefined,
+  usuarioId: string | undefined,
+) {
+  return useQuery({
+    queryKey: [
+      ...projetoKeys.detail(projetoId ?? ""),
+      "atividades-membro",
+      usuarioId ?? "",
+    ] as const,
+    queryFn: () => listAtividadesDoMembroNoProjeto(projetoId!, usuarioId!),
+    enabled: !!projetoId && !!usuarioId,
   });
 }

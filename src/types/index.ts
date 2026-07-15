@@ -144,6 +144,21 @@ export type TarefaFilters = {
   /** Filtro multi: tarefa aparece se qualquer um destes for responsável */
   atribuido_ids?: string[];
   tag?: string;
+  /**
+   * Menu Finalizados: restringe a concluída/cancelada.
+   * Com status "all", lista ambos; com concluida/cancelada, refina.
+   */
+  somente_finalizadas?: boolean;
+  /** Agenda/Projeto/Calendário: omite concluída e cancelada (vão para Finalizados). */
+  excluir_finalizadas?: boolean;
+  /** YYYY-MM-DD — início do intervalo por data_conclusao */
+  periodo_inicio?: string;
+  /** YYYY-MM-DD — fim do intervalo por data_conclusao */
+  periodo_fim?: string;
+  /** YYYY-MM-DD — início do intervalo por campo Data (`data_inicio`) */
+  data_inicio_de?: string;
+  /** YYYY-MM-DD — fim do intervalo por campo Data (`data_inicio`) */
+  data_inicio_ate?: string;
 };
 
 export type Subtarefa = Tables<"subtarefas">;
@@ -181,7 +196,8 @@ export type SubtarefaFormData = {
 };
 
 export type SubtarefaComentario = Tables<"subtarefa_comentarios"> & {
-  usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
+  usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url" | "papel"> | null;
+  editor?: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
 };
 
 export type SubtarefaDetail = SubtarefaWithAuthors & {
@@ -195,7 +211,8 @@ export type SubtarefaDetail = SubtarefaWithAuthors & {
 };
 
 export type TarefaComentario = Tables<"tarefa_comentarios"> & {
-  usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
+  usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url" | "papel"> | null;
+  editor?: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
 };
 
 export type TarefaDetail = TarefaWithRelations & {

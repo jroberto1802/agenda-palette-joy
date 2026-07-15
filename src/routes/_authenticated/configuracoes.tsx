@@ -1,6 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ShieldCheck, ShieldOff } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { CadastroPessoasPanel } from "@/components/settings/cadastro-pessoas-panel";
 import { CadastroSetoresPanel } from "@/components/settings/cadastro-setores-panel";
@@ -20,7 +20,15 @@ import {
 } from "@/hooks/use-mfa";
 import { useProfile } from "@/hooks/use-profile";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
-import { canManagePessoas, canManageSetores, isAdmin, PAPEL_LABELS } from "@/utils/permissions";
+import {
+  canAccessConfiguracoes,
+  canAccessConfiguracoesAdminSections,
+  canManageAparencia,
+  canManagePessoas,
+  canManageSetores,
+  isAdmin,
+  PAPEL_LABELS,
+} from "@/utils/permissions";
 
 export const Route = createFileRoute("/_authenticated/configuracoes")({
   head: () => ({
@@ -36,6 +44,7 @@ export const Route = createFileRoute("/_authenticated/configuracoes")({
 });
 
 function ConfiguracoesPage() {
+  const navigate = useNavigate();
   const { data: profile, isLoading: loadingProfile, error: profileError } = useProfile();
   const { data: factors, isLoading } = useMfaFactors();
   const enrollTotp = useEnrollTotp();
@@ -51,8 +60,17 @@ function ConfiguracoesPage() {
 
   const verifiedFactor = factors?.totp.find((f) => f.status === "verified") ?? null;
   const has2FA = !!verifiedFactor;
-  const showCadastros = isAdmin(profile);
-  const canManage = canManageSetores(profile) && canManagePessoas(profile);
+  const canAccess = canAccessConfiguracoes(profile);
+  const showAdminSections = canAccessConfiguracoesAdminSections(profile);
+  const showCadastros = canManageSetores(profile) && canManagePessoas(profile);
+  const canManageCadastros = showCadastros;
+  const showAparencia = canManageAparencia(profile);
+
+  useEffect(() => {
+    if (!loadingProfile && profile && !canAccessConfiguracoes(profile)) {
+      void navigate({ to: "/dashboard", replace: true });
+    }
+  }, [profile, loadingProfile, navigate]);
 
   const handleStartEnroll = async () => {
     try {
@@ -101,6 +119,41 @@ function ConfiguracoesPage() {
     }
   };
 
+  if (loadingProfile || !profile || !canAccess) {
+    return (
+      <div className="flex items-center justify-center py-24 text-sm text-muted-foreground">
+        Verificando permissões...
+      </div>
+    );
+  }
+
+  // Gestor: somente Setores e Pessoas
+  if (!showAdminSections) {
+    return (
+      <div className="space-y-6 max-w-5xl">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Configurações</h1>
+          <p className="text-muted-foreground">
+            Cadastre e gerencie setores e pessoas da organização.
+          </p>
+        </div>
+
+        <Tabs defaultValue="setores">
+          <TabsList>
+            <TabsTrigger value="setores">Setores</TabsTrigger>
+            <TabsTrigger value="pessoas">Pessoas</TabsTrigger>
+          </TabsList>
+          <TabsContent value="setores" className="mt-4">
+            <CadastroSetoresPanel canManage={canManageCadastros} />
+          </TabsContent>
+          <TabsContent value="pessoas" className="mt-4">
+            <CadastroPessoasPanel canManage={canManageCadastros} />
+          </TabsContent>
+        </Tabs>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 max-w-5xl">
       <div>
@@ -125,10 +178,10 @@ function ConfiguracoesPage() {
                 <TabsTrigger value="pessoas">Pessoas</TabsTrigger>
               </TabsList>
               <TabsContent value="setores" className="mt-4">
-                <CadastroSetoresPanel canManage={canManage} />
+                <CadastroSetoresPanel canManage={canManageCadastros} />
               </TabsContent>
               <TabsContent value="pessoas" className="mt-4">
-                <CadastroPessoasPanel canManage={canManage} />
+                <CadastroPessoasPanel canManage={canManageCadastros} />
               </TabsContent>
             </Tabs>
           </TabsContent>
@@ -164,7 +217,7 @@ function ConfiguracoesPage() {
             </CardContent>
           </Card>
 
-          <ThemeSettingsCard />
+          {showAparencia && <ThemeSettingsCard />}
         </TabsContent>
 
         <TabsContent value="seguranca" className="mt-6 max-w-2xl">

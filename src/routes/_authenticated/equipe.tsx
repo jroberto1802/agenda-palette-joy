@@ -14,17 +14,8 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import { ConfirmDeleteDialog } from "@/components/common/confirm-delete-dialog";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -440,6 +431,7 @@ function EquipePage() {
       toast.error("Erro ao excluir grupo", {
         description: getSupabaseErrorMessage(error as Error),
       });
+      throw error;
     }
   };
 
@@ -608,31 +600,20 @@ function EquipePage() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog
+      <ConfirmDeleteDialog
         open={!!deleteTarget}
         onOpenChange={(open) => {
           if (!open) setDeleteTarget(null);
         }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir grupo?</AlertDialogTitle>
-            <AlertDialogDescription>
-              O grupo &quot;{deleteTarget?.nome}&quot; será removido. As pessoas voltam para a
-              seção Outros. O setor de cada pessoa não é alterado.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => void handleDelete()}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Excluir
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        itemKind="grupo"
+        itemName={deleteTarget?.nome}
+        description={
+          deleteTarget
+            ? `Excluir o grupo "${deleteTarget.nome}"? As pessoas voltam para a seção Outros. O setor de cada pessoa não é alterado. Esta ação não pode ser desfeita.`
+            : undefined
+        }
+        onConfirm={handleDelete}
+      />
     </div>
   );
 }

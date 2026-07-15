@@ -2,11 +2,15 @@ import { endOfDay, startOfDay } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import {
   getCurrentActor,
+  getSubtarefaStakeholderIds,
   getTarefaStakeholderIds,
+  listSubtarefaMencionaveis,
   listTarefaMencionaveis,
+  notifySubtarefaMencao,
   notifyTarefaComentario,
   notifyTarefaMencao,
   notifyTarefaResposta,
+  notifyTarefaSubtarefaConcluida,
   resolveMentionIds,
 } from "@/services/notificacao-events";
 import { notifyUsers } from "@/services/notificacoes";
@@ -16,6 +20,8 @@ import {
   parseRecorrencia,
   serializeRecorrencia,
 } from "@/utils/recorrencia";
+import { localDateRangeToIsoBounds } from "@/utils/agenda-datas";
+import { sortSubtarefasList } from "@/utils/tarefas";
 import type {
   DashboardKpis,
   Profile,
@@ -165,14 +171,23 @@ async function listResponsavelIds(tarefaId: string): Promise<string[]> {
 }
 
 export async function listTarefas(filters: TarefaFilters = {}): Promise<TarefaWithRelations[]> {
-  let query = supabase
-    .from("tarefas")
-    .select(TAREFA_SELECT)
-    .is("deleted_at", null)
-    .order("created_at", { ascending: false });
+  let query = supabase.from("tarefas").select(TAREFA_SELECT).is("deleted_at", null);
 
-  if (filters.status && filters.status !== "all") {
-    query = query.eq("status", filters.status);
+  if (filters.somente_finalizadas) {
+    if (filters.status === "concluida" || filters.status === "cancelada") {
+      query = query.eq("status", filters.status);
+    } else {
+      query = query.in("status", ["concluida", "cancelada"]);
+    }
+    query = query.order("data_conclusao", { ascending: false, nullsFirst: false });
+  } else {
+    if (filters.excluir_finalizadas) {
+      query = query.not("status", "in", "(concluida,cancelada)");
+    }
+    query = query.order("created_at", { ascending: false });
+    if (filters.status && filters.status !== "all") {
+      query = query.eq("status", filters.status);
+    }
   }
 
   if (filters.prioridade && filters.prioridade !== "all") {
@@ -214,6 +229,24 @@ export async function listTarefas(filters: TarefaFilters = {}): Promise<TarefaWi
     query = query.contains("tags", [filters.tag.trim()]);
   }
 
+  if (filters.periodo_inicio?.trim()) {
+    query = query.gte("data_conclusao", `${filters.periodo_inicio.trim()}T00:00:00.000Z`);
+  }
+
+  if (filters.periodo_fim?.trim()) {
+    query = query.lte("data_conclusao", `${filters.periodo_fim.trim()}T23:59:59.999Z`);
+  }
+
+  const dataInicioDe = filters.data_inicio_de?.trim();
+  const dataInicioAte = filters.data_inicio_ate?.trim();
+  if (dataInicioDe || dataInicioAte) {
+    query = query.not("data_inicio", "is", null);
+    const de = dataInicioDe || dataInicioAte!;
+    const ate = dataInicioAte || dataInicioDe!;
+    const { startIso, endIso } = localDateRangeToIsoBounds(de, ate);
+    query = query.gte("data_inicio", startIso).lte("data_inicio", endIso);
+  }
+
   const { data, error } = await query;
   if (error) throw error;
   return (data ?? []) as TarefaWithRelations[];
@@ -252,6 +285,7 @@ export async function listTarefasCalendario(
     .from("tarefas")
     .select(TAREFA_SELECT)
     .is("deleted_at", null)
+    .not("status", "in", "(concluida,cancelada)")
     .not("data_vencimento", "is", null)
     .gte("data_vencimento", inicio)
     .lte("data_vencimento", fim)
@@ -446,7 +480,7 @@ export async function updateTarefa(
     lembretes: serializeLembretes(payload.lembretes),
   };
 
-  if (payload.status === "concluida") {
+  if (payload.status === "concluida" || payload.status === "cancelada") {
     updateData.data_conclusao = new Date().toISOString();
   } else {
     updateData.data_conclusao = null;
@@ -506,7 +540,7 @@ export async function updateTarefaStatus(
 
   const updateData: TablesUpdate<"tarefas"> = { status };
 
-  if (status === "concluida") {
+  if (status === "concluida" || status === "cancelada") {
     updateData.data_conclusao = new Date().toISOString();
   } else {
     updateData.data_conclusao = null;
@@ -552,7 +586,8 @@ export async function softDeleteTarefa(id: string): Promise<void> {
 
 const COMENTARIO_SELECT = `
   *,
-  usuario:profiles!usuario_id(id, nome_completo, avatar_url)
+  usuario:profiles!usuario_id(id, nome_completo, avatar_url, papel),
+  editor:profiles!editado_por(id, nome_completo, avatar_url)
 `;
 
 export async function getTarefaDetail(id: string): Promise<TarefaDetail> {
@@ -561,7 +596,7 @@ export async function getTarefaDetail(id: string): Promise<TarefaDetail> {
     .select(
       `${TAREFA_SELECT},
       subtarefas(
-        id, tarefa_id, titulo, concluida, created_at, criado_por, concluido_por,
+        id, tarefa_id, titulo, concluida, posicao, created_at, criado_por, concluido_por,
         data_inicio, data_vencimento, descricao, prioridade, status, lembretes,
         recorrencia, projeto_id, setor_id, visibilidade, updated_at,
         criador:profiles!subtarefas_criado_por_fkey(id, nome_completo, avatar_url),
@@ -576,16 +611,23 @@ export async function getTarefaDetail(id: string): Promise<TarefaDetail> {
     )
     .eq("id", id)
     .is("deleted_at", null)
+    .order("concluida", { referencedTable: "subtarefas", ascending: true })
+    .order("posicao", { referencedTable: "subtarefas", ascending: true })
     .order("created_at", { referencedTable: "subtarefas", ascending: true })
     .order("created_at", { referencedTable: "tarefa_comentarios", ascending: true })
     .single();
 
   if (error) throw error;
-  return data as unknown as TarefaDetail;
+
+  const detail = data as unknown as TarefaDetail;
+  if (detail.subtarefas?.length) {
+    detail.subtarefas = sortSubtarefasList(detail.subtarefas);
+  }
+  return detail;
 }
 
 const SUBTAREFA_SELECT = `
-  id, tarefa_id, titulo, concluida, created_at, criado_por, concluido_por,
+  id, tarefa_id, titulo, concluida, posicao, created_at, criado_por, concluido_por,
   data_inicio, data_vencimento, descricao, prioridade, status, lembretes,
   recorrencia, projeto_id, setor_id, visibilidade, updated_at,
   criador:profiles!subtarefas_criado_por_fkey(id, nome_completo, avatar_url),
@@ -683,14 +725,57 @@ export async function createSubtarefa(
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Usuário não autenticado");
 
+  const { data: existing, error: existingError } = await supabase
+    .from("subtarefas")
+    .select("posicao")
+    .eq("tarefa_id", tarefaId)
+    .order("posicao", { ascending: false })
+    .limit(1);
+  if (existingError) throw existingError;
+
+  const nextPosicao = (existing?.[0]?.posicao ?? -1) + 1;
+
   const { data, error } = await supabase
     .from("subtarefas")
-    .insert({ tarefa_id: tarefaId, titulo, criado_por: user.id })
+    .insert({
+      tarefa_id: tarefaId,
+      titulo,
+      criado_por: user.id,
+      posicao: nextPosicao,
+    })
     .select(SUBTAREFA_SELECT)
     .single();
 
   if (error) throw error;
   return data as unknown as SubtarefaWithAuthors;
+}
+
+/** Reordena subtarefas da mesma tarefa (ordem compartilhada). */
+export async function reorderSubtarefas(
+  tarefaId: string,
+  orderedIds: string[],
+): Promise<void> {
+  if (!orderedIds.length) return;
+
+  const { data: rows, error: fetchError } = await supabase
+    .from("subtarefas")
+    .select("id")
+    .eq("tarefa_id", tarefaId)
+    .in("id", orderedIds);
+  if (fetchError) throw fetchError;
+
+  const allowed = new Set((rows ?? []).map((r) => r.id));
+  const payload = orderedIds
+    .filter((id) => allowed.has(id))
+    .map((id, index) => ({ id, posicao: index }));
+
+  const results = await Promise.all(
+    payload.map(({ id, posicao }) =>
+      supabase.from("subtarefas").update({ posicao }).eq("id", id).eq("tarefa_id", tarefaId),
+    ),
+  );
+  const failed = results.find((r) => r.error);
+  if (failed?.error) throw failed.error;
 }
 
 export async function toggleSubtarefa(
@@ -704,7 +789,7 @@ export async function toggleSubtarefa(
 
   const { data: current, error: currentError } = await supabase
     .from("subtarefas")
-    .select("status")
+    .select("status, concluida, titulo, tarefa_id")
     .eq("id", id)
     .single();
   if (currentError) throw currentError;
@@ -728,6 +813,23 @@ export async function toggleSubtarefa(
     .single();
 
   if (error) throw error;
+
+  if (concluida && !current.concluida) {
+    const [ator, stakeholders, { data: tarefa }] = await Promise.all([
+      getCurrentActor(),
+      getSubtarefaStakeholderIds(id),
+      supabase.from("tarefas").select("titulo").eq("id", current.tarefa_id).single(),
+    ]);
+    await notifyTarefaSubtarefaConcluida({
+      usuarioIds: stakeholders.filter((uid) => uid !== user.id),
+      tarefaId: current.tarefa_id,
+      titulo: tarefa?.titulo ?? "tarefa",
+      atorNome: ator?.nome ?? "Alguém",
+      subtarefaId: id,
+      subtarefaTitulo: current.titulo,
+    }).catch(() => undefined);
+  }
+
   return data as unknown as SubtarefaWithAuthors;
 }
 
@@ -793,7 +895,7 @@ export async function updateSubtarefa(
   const concluida = payload.status === "concluida";
   const { data: current, error: currentError } = await supabase
     .from("subtarefas")
-    .select("concluida, concluido_por")
+    .select("concluida, concluido_por, titulo, tarefa_id")
     .eq("id", id)
     .single();
   if (currentError) throw currentError;
@@ -825,6 +927,22 @@ export async function updateSubtarefa(
     await syncSubtarefaObservadores(id, payload.observador_ids);
   } else {
     await syncSubtarefaObservadores(id, []);
+  }
+
+  if (concluida && !current.concluida) {
+    const [ator, stakeholders, { data: tarefa }] = await Promise.all([
+      getCurrentActor(),
+      getSubtarefaStakeholderIds(id),
+      supabase.from("tarefas").select("titulo").eq("id", current.tarefa_id).single(),
+    ]);
+    await notifyTarefaSubtarefaConcluida({
+      usuarioIds: stakeholders.filter((uid) => uid !== user.id),
+      tarefaId: current.tarefa_id,
+      titulo: tarefa?.titulo ?? "tarefa",
+      atorNome: ator?.nome ?? "Alguém",
+      subtarefaId: id,
+      subtarefaTitulo: payload.titulo.trim() || current.titulo,
+    }).catch(() => undefined);
   }
 
   return getSubtarefaDetail(id);
@@ -870,12 +988,69 @@ export async function createSubtarefaComentario(
     .single();
 
   if (error) throw error;
-  return data as SubtarefaComentario;
+  const comentario = data as SubtarefaComentario;
+
+  const [{ data: subtarefa }, ator, mencionaveis] = await Promise.all([
+    supabase.from("subtarefas").select("titulo, tarefa_id").eq("id", subtarefaId).single(),
+    getCurrentActor(),
+    listSubtarefaMencionaveis(subtarefaId),
+  ]);
+
+  const mentionedIds = (await resolveMentionIds(conteudo, mencionaveis)).filter(
+    (id) => id !== user.id,
+  );
+
+  if (mentionedIds.length > 0 && subtarefa) {
+    const { data: tarefa } = await supabase
+      .from("tarefas")
+      .select("titulo")
+      .eq("id", subtarefa.tarefa_id)
+      .single();
+
+    await notifySubtarefaMencao({
+      usuarioIds: mentionedIds,
+      tarefaId: subtarefa.tarefa_id,
+      subtarefaId,
+      comentarioId: comentario.id,
+      tarefaTitulo: tarefa?.titulo ?? "tarefa",
+      subtarefaTitulo: subtarefa.titulo ?? "subtarefa",
+      atorNome: ator?.nome ?? "Alguém",
+    }).catch(() => undefined);
+  }
+
+  return comentario;
 }
 
 export async function deleteSubtarefaComentario(id: string): Promise<void> {
   const { error } = await supabase.from("subtarefa_comentarios").delete().eq("id", id);
   if (error) throw error;
+}
+
+export async function updateSubtarefaComentario(
+  id: string,
+  conteudo: string,
+): Promise<SubtarefaComentario> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Usuário não autenticado");
+
+  const trimmed = conteudo.trim();
+  if (!trimmed) throw new Error("Comentário não pode ficar vazio.");
+
+  const { data, error } = await supabase
+    .from("subtarefa_comentarios")
+    .update({
+      conteudo: trimmed,
+      editado_em: new Date().toISOString(),
+      editado_por: user.id,
+    })
+    .eq("id", id)
+    .select(COMENTARIO_SELECT)
+    .single();
+
+  if (error) throw error;
+  return data as SubtarefaComentario;
 }
 
 export async function createTarefaComentario(
@@ -981,6 +1156,33 @@ export async function createTarefaComentario(
 export async function deleteTarefaComentario(id: string): Promise<void> {
   const { error } = await supabase.from("tarefa_comentarios").delete().eq("id", id);
   if (error) throw error;
+}
+
+export async function updateTarefaComentario(
+  id: string,
+  conteudo: string,
+): Promise<TarefaComentario> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Usuário não autenticado");
+
+  const trimmed = conteudo.trim();
+  if (!trimmed) throw new Error("Comentário não pode ficar vazio.");
+
+  const { data, error } = await supabase
+    .from("tarefa_comentarios")
+    .update({
+      conteudo: trimmed,
+      editado_em: new Date().toISOString(),
+      editado_por: user.id,
+    })
+    .eq("id", id)
+    .select(COMENTARIO_SELECT)
+    .single();
+
+  if (error) throw error;
+  return data as TarefaComentario;
 }
 
 export async function getDashboardKpis(): Promise<DashboardKpis> {

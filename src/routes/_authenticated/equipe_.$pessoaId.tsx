@@ -2,16 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft, Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { ConfirmDeleteDialog } from "@/components/common/confirm-delete-dialog";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -113,6 +104,7 @@ function EquipePessoaAgendaPage() {
       toast.error("Erro ao excluir tarefa", {
         description: getSupabaseErrorMessage(error as Error),
       });
+      throw error;
     }
   };
 
@@ -197,8 +189,8 @@ function EquipePessoaAgendaPage() {
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
               {cargoSetor
-                ? `${cargoSetor}. Tarefas atribuídas em cards, lista ou Kanban.`
-                : "Tarefas atribuídas em cards, lista ou Kanban."}
+                ? `${cargoSetor}. Tarefas atribuídas em cards, lista ou colunas.`
+                : "Tarefas atribuídas em cards, lista ou colunas."}
             </p>
           </div>
         </div>
@@ -248,25 +240,20 @@ function EquipePessoaAgendaPage() {
         onSaved={(id) => setPanelId(id)}
       />
 
-      <AlertDialog open={!!deleting} onOpenChange={(open) => !open && setDeleting(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir tarefa?</AlertDialogTitle>
-            <AlertDialogDescription>
-              A tarefa &quot;{deleting?.titulo}&quot; será removida da listagem (exclusão lógica).
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Excluir
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDeleteDialog
+        open={!!deleting}
+        onOpenChange={(open) => {
+          if (!open) setDeleting(null);
+        }}
+        itemKind="tarefa"
+        itemName={deleting?.titulo}
+        description={
+          deleting
+            ? `Excluir a tarefa "${deleting.titulo}"? Ela será removida da listagem (exclusão lógica). Esta ação não pode ser desfeita.`
+            : undefined
+        }
+        onConfirm={handleDelete}
+      />
     </div>
   );
 }

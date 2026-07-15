@@ -1,6 +1,7 @@
 import { Building2, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { ConfirmDeleteDialog } from "@/components/common/confirm-delete-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -18,6 +19,7 @@ export function EmpresaSettingsCard({ canEdit }: { canEdit: boolean }) {
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [removeLogo, setRemoveLogo] = useState(false);
+  const [confirmRemoveLogo, setConfirmRemoveLogo] = useState(false);
 
   useEffect(() => {
     if (!empresa) return;
@@ -117,11 +119,7 @@ export function EmpresaSettingsCard({ canEdit }: { canEdit: boolean }) {
                       variant="ghost"
                       size="sm"
                       className="gap-2 px-0 text-muted-foreground"
-                      onClick={() => {
-                        setLogoFile(null);
-                        setRemoveLogo(true);
-                        setLogoPreview(null);
-                      }}
+                      onClick={() => setConfirmRemoveLogo(true)}
                     >
                       <Trash2 className="h-4 w-4" />
                       Remover logo
@@ -145,6 +143,20 @@ export function EmpresaSettingsCard({ canEdit }: { canEdit: boolean }) {
           </>
         )}
       </CardContent>
+
+      <ConfirmDeleteDialog
+        open={confirmRemoveLogo}
+        onOpenChange={setConfirmRemoveLogo}
+        itemKind="logo"
+        title="Remover logo?"
+        description='Excluir a logo da empresa? A remoção será aplicada ao salvar. Esta ação não pode ser desfeita após o salvamento.'
+        confirmLabel="Remover"
+        onConfirm={() => {
+          setLogoFile(null);
+          setRemoveLogo(true);
+          setLogoPreview(null);
+        }}
+      />
     </Card>
   );
 }

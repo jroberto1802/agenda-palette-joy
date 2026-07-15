@@ -150,6 +150,7 @@ export function TarefaMetaToolbar({
   canEdit,
   canEditVisibility,
   lockProjeto,
+  hideProjetoSetor = false,
   projetos,
   setores,
   pessoasParaResponsavel,
@@ -161,6 +162,8 @@ export function TarefaMetaToolbar({
   canEdit: boolean;
   canEditVisibility: boolean;
   lockProjeto?: boolean;
+  /** Oculta Projeto e Setor (ex.: drawer da subtarefa, que herda da tarefa pai). */
+  hideProjetoSetor?: boolean;
   projetos: Pick<Projeto, "id" | "nome">[];
   setores: SetorWithGerente[];
   pessoasParaResponsavel: ProfileWithSetor[];
@@ -186,6 +189,7 @@ export function TarefaMetaToolbar({
     <TooltipProvider delayDuration={200}>
       <div className="flex flex-wrap items-center gap-1 rounded-xl border bg-muted/30 p-1.5">
         {/* Projeto */}
+        {!hideProjetoSetor && (
         <FormField
           control={form.control}
           name="projeto_id"
@@ -237,8 +241,10 @@ export function TarefaMetaToolbar({
             </FormItem>
           )}
         />
+        )}
 
         {/* Setor */}
+        {!hideProjetoSetor && (
         <FormField
           control={form.control}
           name="setor_id"
@@ -283,6 +289,7 @@ export function TarefaMetaToolbar({
             </FormItem>
           )}
         />
+        )}
 
         {/* Responsável */}
         <FormField
@@ -380,32 +387,15 @@ export function TarefaMetaToolbar({
                       render={({ field: obsField }) => (
                         <FormItem className="space-y-2">
                           <p className="text-xs text-muted-foreground">Pessoas com acesso</p>
-                          <div className="max-h-40 space-y-1 overflow-y-auto rounded-md border p-2">
-                            {pessoasAtivas.map((pessoa) => {
-                              const checked = obsField.value.includes(pessoa.id);
-                              return (
-                                <label
-                                  key={pessoa.id}
-                                  className="flex cursor-pointer items-center gap-2 rounded-md px-1 py-1 text-sm hover:bg-muted/50"
-                                >
-                                  <Checkbox
-                                    checked={checked}
-                                    disabled={!canEditVisibility}
-                                    onCheckedChange={(v) => {
-                                      if (v) {
-                                        obsField.onChange([...obsField.value, pessoa.id]);
-                                      } else {
-                                        obsField.onChange(
-                                          obsField.value.filter((id) => id !== pessoa.id),
-                                        );
-                                      }
-                                    }}
-                                  />
-                                  <span className="truncate">{pessoa.nome_completo}</span>
-                                </label>
-                              );
-                            })}
-                          </div>
+                          <PessoasMultiSelect
+                            pessoas={pessoasAtivas}
+                            value={obsField.value}
+                            onChange={obsField.onChange}
+                            disabled={!canEditVisibility}
+                            placeholder="Selecione visualizadores"
+                            emptyLabel="Nenhuma pessoa disponível"
+                            searchPlaceholder="Buscar visualizador..."
+                          />
                           <FormMessage />
                         </FormItem>
                       )}

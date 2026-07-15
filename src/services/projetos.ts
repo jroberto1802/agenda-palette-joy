@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { ProjetoFormData, ProjetoMembro, ProjetoWithResponsavel } from "@/types";
+import { PROJETO_OPEN_ACTIVITY_STATUSES } from "@/utils/projetos";
 
 const PROJETO_SELECT = `
   *,
@@ -9,6 +10,24 @@ const PROJETO_SELECT = `
     usuario:profiles!projeto_membros_usuario_id_fkey(id, nome_completo, avatar_url, cargo, papel)
   )
 `;
+
+export type ProjetoAtividadeTransferivel = {
+  kind: "tarefa" | "subtarefa";
+  id: string;
+  titulo: string;
+  status: string;
+};
+
+export type ProjetoMembroTransferInput =
+  | { mode: "bulk"; novoResponsavelId: string }
+  | {
+      mode: "individual";
+      assignments: Array<{
+        kind: "tarefa" | "subtarefa";
+        id: string;
+        novoResponsavelId: string;
+      }>;
+    };
 
 async function syncProjetoMembros(projetoId: string, usuarioIds: string[]): Promise<void> {
   const unique = [...new Set(usuarioIds.filter(Boolean))];
@@ -111,6 +130,19 @@ export async function updateProjeto(
   id: string,
   payload: ProjetoFormData,
 ): Promise<ProjetoWithResponsavel> {
+  const atuais = await listProjetoMembros(id);
+  const nextIds = new Set(payload.membro_ids);
+  const removidos = atuais.filter((m) => !nextIds.has(m.id));
+
+  for (const removido of removidos) {
+    const atividades = await listAtividadesDoMembroNoProjeto(id, removido.id);
+    if (atividades.length > 0) {
+      throw new Error(
+        `Não é possível remover ${removido.nome_completo} pelo formulário: há atividades sob responsabilidade. Remova a pessoa pela equipe do projeto e transfira as responsabilidades.`,
+      );
+    }
+  }
+
   const { data, error } = await supabase
     .from("projetos")
     .update({
@@ -145,6 +177,13 @@ export async function addProjetoMembro(projetoId: string, usuarioId: string): Pr
 }
 
 export async function removeProjetoMembro(projetoId: string, usuarioId: string): Promise<void> {
+  const atividades = await listAtividadesDoMembroNoProjeto(projetoId, usuarioId);
+  if (atividades.length > 0) {
+    throw new Error(
+      "Esta pessoa possui atividades no projeto. Transfira as responsabilidades antes de remover.",
+    );
+  }
+
   const { error } = await supabase
     .from("projeto_membros")
     .delete()
@@ -165,26 +204,293 @@ export async function countTarefasPorProjeto(projetoId: string): Promise<number>
   return count ?? 0;
 }
 
-export async function countTarefasAbertasPorProjeto(projetoId: string): Promise<number> {
-  const { count, error } = await supabase
+/** Conta tarefas/subtarefas abertas (a_fazer / em_andamento) no projeto. */
+export async function countAtividadesAbertasPorProjeto(projetoId: string): Promise<number> {
+  const { count: tarefasCount, error: tarefasError } = await supabase
     .from("tarefas")
     .select("id", { count: "exact", head: true })
     .eq("projeto_id", projetoId)
     .is("deleted_at", null)
-    .neq("status", "concluida");
+    .in("status", PROJETO_OPEN_ACTIVITY_STATUSES);
 
-  if (error) throw error;
-  return count ?? 0;
+  if (tarefasError) throw tarefasError;
+
+  const { data: tarefasDoProjeto, error: tarefasIdsError } = await supabase
+    .from("tarefas")
+    .select("id")
+    .eq("projeto_id", projetoId)
+    .is("deleted_at", null);
+
+  if (tarefasIdsError) throw tarefasIdsError;
+
+  const tarefaIds = (tarefasDoProjeto ?? []).map((t) => t.id);
+  let subtarefasCount = 0;
+
+  if (tarefaIds.length > 0) {
+    const { count, error } = await supabase
+      .from("subtarefas")
+      .select("id", { count: "exact", head: true })
+      .in("tarefa_id", tarefaIds)
+      .in("status", PROJETO_OPEN_ACTIVITY_STATUSES);
+    if (error) throw error;
+    subtarefasCount += count ?? 0;
+  }
+
+  // Subtarefas com projeto_id próprio (herdado/legado), fora das tarefas já contadas acima
+  const { count: subtarefasDiretas, error: subtarefasDiretasError } = await supabase
+    .from("subtarefas")
+    .select("id", { count: "exact", head: true })
+    .eq("projeto_id", projetoId)
+    .in("status", PROJETO_OPEN_ACTIVITY_STATUSES);
+
+  if (subtarefasDiretasError) throw subtarefasDiretasError;
+
+  // Evita dupla contagem: só as diretas cuja tarefa pai não é deste projeto
+  // (aproximação: usamos o máximo simples — se projeto_id bate e tarefa_id está no set, já contou)
+  if (tarefaIds.length === 0) {
+    subtarefasCount += subtarefasDiretas ?? 0;
+  } else if ((subtarefasDiretas ?? 0) > 0) {
+    const { data: diretas, error } = await supabase
+      .from("subtarefas")
+      .select("id, tarefa_id")
+      .eq("projeto_id", projetoId)
+      .in("status", PROJETO_OPEN_ACTIVITY_STATUSES);
+    if (error) throw error;
+    const tarefaSet = new Set(tarefaIds);
+    const extras = (diretas ?? []).filter((s) => !tarefaSet.has(s.tarefa_id)).length;
+    subtarefasCount += extras;
+  }
+
+  return (tarefasCount ?? 0) + subtarefasCount;
+}
+
+/** @deprecated Use countAtividadesAbertasPorProjeto */
+export async function countTarefasAbertasPorProjeto(projetoId: string): Promise<number> {
+  return countAtividadesAbertasPorProjeto(projetoId);
 }
 
 export async function deleteProjeto(id: string): Promise<void> {
-  const abertas = await countTarefasAbertasPorProjeto(id);
-  if (abertas > 0) {
-    throw new Error(
-      "Não é possível excluir o projeto enquanto houver tarefas em aberto vinculadas a ele.",
-    );
+  // Permissão e regra de abertas ficam no RLS/trigger; aqui só executa a exclusão.
+  const { error } = await supabase.from("projetos").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function listAtividadesDoMembroNoProjeto(
+  projetoId: string,
+  usuarioId: string,
+): Promise<ProjetoAtividadeTransferivel[]> {
+  const { data: tarefasDoProjeto, error: tarefasError } = await supabase
+    .from("tarefas")
+    .select("id, titulo, status")
+    .eq("projeto_id", projetoId)
+    .is("deleted_at", null);
+
+  if (tarefasError) throw tarefasError;
+
+  const tarefas = tarefasDoProjeto ?? [];
+  const tarefaIds = tarefas.map((t) => t.id);
+  const result: ProjetoAtividadeTransferivel[] = [];
+
+  if (tarefaIds.length > 0) {
+    const { data: links, error: linksError } = await supabase
+      .from("tarefa_responsaveis")
+      .select("tarefa_id")
+      .eq("usuario_id", usuarioId)
+      .in("tarefa_id", tarefaIds);
+    if (linksError) throw linksError;
+
+    const linked = new Set((links ?? []).map((l) => l.tarefa_id));
+    for (const t of tarefas) {
+      if (linked.has(t.id)) {
+        result.push({ kind: "tarefa", id: t.id, titulo: t.titulo, status: t.status });
+      }
+    }
+
+    const { data: subtarefas, error: subtarefasError } = await supabase
+      .from("subtarefas")
+      .select(
+        "id, titulo, status, tarefa_id, responsaveis:subtarefa_responsaveis(usuario_id)",
+      )
+      .in("tarefa_id", tarefaIds);
+    if (subtarefasError) throw subtarefasError;
+
+    for (const s of subtarefas ?? []) {
+      const isResp = (s.responsaveis ?? []).some(
+        (r: { usuario_id: string }) => r.usuario_id === usuarioId,
+      );
+      if (isResp) {
+        result.push({
+          kind: "subtarefa",
+          id: s.id,
+          titulo: s.titulo,
+          status: s.status,
+        });
+      }
+    }
   }
 
-  const { error } = await supabase.from("projetos").delete().eq("id", id);
+  return result.sort((a, b) => a.titulo.localeCompare(b.titulo, "pt-BR"));
+}
+
+async function transferResponsavelTarefa(
+  tarefaId: string,
+  fromUserId: string,
+  toUserId: string,
+): Promise<void> {
+  const { data: atuais, error: listError } = await supabase
+    .from("tarefa_responsaveis")
+    .select("usuario_id")
+    .eq("tarefa_id", tarefaId);
+  if (listError) throw listError;
+
+  const next = [
+    ...new Set(
+      (atuais ?? [])
+        .map((r) => r.usuario_id)
+        .filter((id) => id !== fromUserId)
+        .concat(toUserId),
+    ),
+  ];
+  if (next.length === 0) next.push(toUserId);
+
+  const { error: deleteError } = await supabase
+    .from("tarefa_responsaveis")
+    .delete()
+    .eq("tarefa_id", tarefaId);
+  if (deleteError) throw deleteError;
+
+  const { error: insertError } = await supabase.from("tarefa_responsaveis").insert(
+    next.map((usuario_id) => ({ tarefa_id: tarefaId, usuario_id })),
+  );
+  if (insertError) throw insertError;
+
+  const { error: updateError } = await supabase
+    .from("tarefas")
+    .update({ atribuido_a: next[0] ?? toUserId })
+    .eq("id", tarefaId);
+  if (updateError) throw updateError;
+}
+
+async function transferResponsavelSubtarefa(
+  subtarefaId: string,
+  fromUserId: string,
+  toUserId: string,
+): Promise<void> {
+  const { data: atuais, error: listError } = await supabase
+    .from("subtarefa_responsaveis")
+    .select("usuario_id")
+    .eq("subtarefa_id", subtarefaId);
+  if (listError) throw listError;
+
+  const next = [
+    ...new Set(
+      (atuais ?? [])
+        .map((r) => r.usuario_id)
+        .filter((id) => id !== fromUserId)
+        .concat(toUserId),
+    ),
+  ];
+
+  const { error: deleteError } = await supabase
+    .from("subtarefa_responsaveis")
+    .delete()
+    .eq("subtarefa_id", subtarefaId);
+  if (deleteError) throw deleteError;
+
+  if (next.length > 0) {
+    const { error: insertError } = await supabase.from("subtarefa_responsaveis").insert(
+      next.map((usuario_id) => ({ subtarefa_id: subtarefaId, usuario_id })),
+    );
+    if (insertError) throw insertError;
+  }
+}
+
+async function assertNovoResponsavelEhMembroDoProjeto(
+  projetoId: string,
+  usuarioRemovidoId: string,
+  novoResponsavelId: string,
+): Promise<void> {
+  if (!novoResponsavelId || novoResponsavelId === usuarioRemovidoId) {
+    throw new Error("Selecione um novo responsável válido.");
+  }
+
+  const { data, error } = await supabase
+    .from("projeto_membros")
+    .select("usuario_id")
+    .eq("projeto_id", projetoId)
+    .eq("usuario_id", novoResponsavelId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) {
+    throw new Error(
+      "O novo responsável precisa ser um membro atual do projeto.",
+    );
+  }
+}
+
+export async function removeProjetoMembroComTransferencia(
+  projetoId: string,
+  usuarioId: string,
+  transfer: ProjetoMembroTransferInput,
+): Promise<void> {
+  const atividades = await listAtividadesDoMembroNoProjeto(projetoId, usuarioId);
+
+  if (atividades.length > 0) {
+    if (transfer.mode === "bulk") {
+      await assertNovoResponsavelEhMembroDoProjeto(
+        projetoId,
+        usuarioId,
+        transfer.novoResponsavelId,
+      );
+      for (const atividade of atividades) {
+        if (atividade.kind === "tarefa") {
+          await transferResponsavelTarefa(
+            atividade.id,
+            usuarioId,
+            transfer.novoResponsavelId,
+          );
+        } else {
+          await transferResponsavelSubtarefa(
+            atividade.id,
+            usuarioId,
+            transfer.novoResponsavelId,
+          );
+        }
+      }
+    } else {
+      const map = new Map(
+        transfer.assignments.map((a) => [`${a.kind}:${a.id}`, a.novoResponsavelId] as const),
+      );
+      const novosUnicos = new Set<string>();
+      for (const atividade of atividades) {
+        const novo = map.get(`${atividade.kind}:${atividade.id}`);
+        if (!novo || novo === usuarioId) {
+          throw new Error(
+            `Defina um novo responsável para "${atividade.titulo}" antes de remover.`,
+          );
+        }
+        novosUnicos.add(novo);
+      }
+      for (const novo of novosUnicos) {
+        await assertNovoResponsavelEhMembroDoProjeto(projetoId, usuarioId, novo);
+      }
+      for (const atividade of atividades) {
+        const novo = map.get(`${atividade.kind}:${atividade.id}`)!;
+        if (atividade.kind === "tarefa") {
+          await transferResponsavelTarefa(atividade.id, usuarioId, novo);
+        } else {
+          await transferResponsavelSubtarefa(atividade.id, usuarioId, novo);
+        }
+      }
+    }
+  }
+
+  const { error } = await supabase
+    .from("projeto_membros")
+    .delete()
+    .eq("projeto_id", projetoId)
+    .eq("usuario_id", usuarioId);
+
   if (error) throw error;
 }

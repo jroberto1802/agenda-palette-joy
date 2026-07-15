@@ -2,16 +2,7 @@ import { ClipboardList, Pencil, Plus, Search, Trash2, Users } from "lucide-react
 import { useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { ConfirmDeleteDialog } from "@/components/common/confirm-delete-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProjetoFormDialog } from "@/components/projetos/projeto-form-dialog";
 import { usePessoas } from "@/hooks/use-pessoas";
+import { useProfile } from "@/hooks/use-profile";
 import {
   useCreateProjeto,
   useDeleteProjeto,
@@ -27,22 +19,27 @@ import {
 } from "@/hooks/use-projetos";
 import { useTarefas } from "@/hooks/use-tarefas";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
-import { CARD_GRID_CLASS } from "@/lib/layout";
+import { DENSE_CARD_GRID_CLASS } from "@/lib/layout";
+import { countAtividadesAbertasPorProjeto } from "@/services/projetos";
 import type { ProjetoFormData, ProjetoWithResponsavel } from "@/types";
-import { PROJETO_STATUS_BADGE_CLASS, PROJETO_STATUS_LABELS } from "@/utils/projetos";
+import { canDeleteProjeto, canManageProjetoMembros, isAdmin, isGerente } from "@/utils/permissions";
+import {
+  isProjetoOpenActivityStatus,
+  PROJETO_STATUS_BADGE_CLASS,
+  PROJETO_STATUS_LABELS,
+} from "@/utils/projetos";
 import { cn } from "@/lib/utils";
 
 export function CadastroProjetosPanel({
   canManage,
-  canDelete,
   compactHeader = false,
 }: {
   canManage: boolean;
-  canDelete: boolean;
   /** Oculta o título interno quando a página já exibe o cabeçalho. */
   compactHeader?: boolean;
 }) {
   const navigate = useNavigate();
+  const { data: profile } = useProfile();
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const { data: projetos, isLoading } = useProjetos(debouncedSearch);
@@ -55,6 +52,7 @@ export function CadastroProjetosPanel({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<ProjetoWithResponsavel | null>(null);
   const [deleting, setDeleting] = useState<ProjetoWithResponsavel | null>(null);
+  const [deletingHasOpen, setDeletingHasOpen] = useState(false);
 
   const handleSearch = useMemo(() => {
     let timeout: ReturnType<typeof setTimeout>;
@@ -76,10 +74,11 @@ export function CadastroProjetosPanel({
     return map;
   }, [tarefas]);
 
+  /** Estimativa na listagem (tarefas pai); a confirmação usa contagem completa no servidor. */
   const tarefasAbertasPorProjeto = useMemo(() => {
     const map = new Map<string, number>();
     for (const tarefa of tarefas ?? []) {
-      if (!tarefa.projeto_id || tarefa.status === "concluida") continue;
+      if (!tarefa.projeto_id || !isProjetoOpenActivityStatus(tarefa.status)) continue;
       map.set(tarefa.projeto_id, (map.get(tarefa.projeto_id) ?? 0) + 1);
     }
     return map;
@@ -113,19 +112,38 @@ export function CadastroProjetosPanel({
       toast.error("Erro ao excluir projeto", {
         description: getSupabaseErrorMessage(error as Error),
       });
+      throw error;
     }
   };
 
-  const requestDelete = (projeto: ProjetoWithResponsavel) => {
-    const abertas = tarefasAbertasPorProjeto.get(projeto.id) ?? 0;
-    if (abertas > 0) {
-      toast.error("Não é possível excluir o projeto", {
-        description:
-          "Há tarefas em aberto vinculadas a este projeto. Conclua ou mova as tarefas antes de excluir.",
+  const maybeShowDelete = (projeto: ProjetoWithResponsavel) => {
+    // Ícone visível para quem potencialmente pode excluir (criador/gestor/admin).
+    return (
+      isAdmin(profile) ||
+      isGerente(profile) ||
+      projeto.criado_por === profile?.id
+    );
+  };
+
+  const requestDelete = async (projeto: ProjetoWithResponsavel) => {
+    try {
+      const abertas = await countAtividadesAbertasPorProjeto(projeto.id);
+      const hasOpen = abertas > 0;
+      if (!canDeleteProjeto(profile, projeto, hasOpen)) {
+        toast.error("Sem permissão para excluir", {
+          description: hasOpen
+            ? "Com atividades abertas, apenas o administrador pode excluir o projeto."
+            : "Apenas o criador, gestores ou administradores podem excluir este projeto.",
+        });
+        return;
+      }
+      setDeletingHasOpen(hasOpen);
+      setDeleting(projeto);
+    } catch (error) {
+      toast.error("Erro ao verificar atividades do projeto", {
+        description: getSupabaseErrorMessage(error as Error),
       });
-      return;
     }
-    setDeleting(projeto);
   };
 
   return (
@@ -176,9 +194,9 @@ export function CadastroProjetosPanel({
       )}
 
       {isLoading ? (
-        <div className={CARD_GRID_CLASS}>
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-32 rounded-xl" />
+        <div className={DENSE_CARD_GRID_CLASS}>
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Skeleton key={i} className="h-28 rounded-xl" />
           ))}
         </div>
       ) : !projetos?.length ? (
@@ -199,10 +217,13 @@ export function CadastroProjetosPanel({
           )}
         </div>
       ) : (
-        <div className={CARD_GRID_CLASS}>
+        <div className={DENSE_CARD_GRID_CLASS}>
           {projetos.map((projeto) => {
             const tarefasCount = tarefasPorProjeto.get(projeto.id) ?? 0;
             const membrosCount = projeto.membros?.length ?? 0;
+            const abertasEst = tarefasAbertasPorProjeto.get(projeto.id) ?? 0;
+            const showDelete = maybeShowDelete(projeto);
+            const canEditEquipe = canManageProjetoMembros(profile, projeto);
             return (
               <Card
                 key={projeto.id}
@@ -225,69 +246,87 @@ export function CadastroProjetosPanel({
                   }
                 }}
               >
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 space-y-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <CardTitle className="truncate text-base">{projeto.nome}</CardTitle>
+                <CardHeader className="space-y-0 p-3 pb-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 space-y-1.5">
+                      <div className="flex flex-wrap items-center gap-1">
+                        <CardTitle className="truncate text-sm font-semibold leading-snug">
+                          {projeto.nome}
+                        </CardTitle>
                         <Badge
                           variant="outline"
-                          className={cn("text-xs", PROJETO_STATUS_BADGE_CLASS[projeto.status])}
+                          className={cn(
+                            "px-1.5 py-0 text-[10px]",
+                            PROJETO_STATUS_BADGE_CLASS[projeto.status],
+                          )}
                         >
                           {PROJETO_STATUS_LABELS[projeto.status]}
                         </Badge>
                       </div>
                       {projeto.descricao && (
-                        <p className="line-clamp-2 text-sm text-muted-foreground">
+                        <p className="line-clamp-2 text-xs leading-snug text-muted-foreground">
                           {projeto.descricao}
                         </p>
                       )}
                     </div>
-                    {canManage && (
+                    {(canManage || showDelete) && (
                       <div
-                        className="flex shrink-0 gap-1"
+                        className="flex shrink-0 gap-0.5"
                         onClick={(e) => e.stopPropagation()}
                         onKeyDown={(e) => e.stopPropagation()}
                       >
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditing(projeto);
-                            setDialogOpen(true);
-                          }}
-                          aria-label="Editar projeto"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        {canDelete && (
+                        {canManage && (
                           <Button
                             variant="ghost"
                             size="icon"
+                            className="h-7 w-7"
                             onClick={(e) => {
                               e.stopPropagation();
-                              requestDelete(projeto);
+                              setEditing(projeto);
+                              setDialogOpen(true);
+                            }}
+                            aria-label="Editar projeto"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                        {showDelete && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive hover:text-destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void requestDelete(projeto);
                             }}
                             aria-label="Excluir projeto"
-                            className="text-destructive hover:text-destructive"
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         )}
                       </div>
                     )}
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-1 text-sm text-muted-foreground">
-                  <p>Responsável: {projeto.responsavel?.nome_completo ?? "Não definido"}</p>
-                  <p className="flex items-center gap-1.5">
-                    <Users className="h-3.5 w-3.5" />
-                    {membrosCount} {membrosCount === 1 ? "pessoa na equipe" : "pessoas na equipe"}
+                <CardContent className="space-y-1 p-3 pt-0 text-xs text-muted-foreground">
+                  <p className="truncate">
+                    Responsável: {projeto.responsavel?.nome_completo ?? "Não definido"}
                   </p>
-                  <p className="flex items-center gap-1.5">
-                    <ClipboardList className="h-3.5 w-3.5" />
-                    {tarefasCount} {tarefasCount === 1 ? "tarefa vinculada" : "tarefas vinculadas"}
+                  <p className="flex items-center gap-1">
+                    <Users className="h-3 w-3 shrink-0" />
+                    <span className="truncate">
+                      {membrosCount}{" "}
+                      {membrosCount === 1 ? "pessoa na equipe" : "pessoas na equipe"}
+                      {!canEditEquipe && " · somente leitura"}
+                    </span>
+                  </p>
+                  <p className="flex items-center gap-1">
+                    <ClipboardList className="h-3 w-3 shrink-0" />
+                    <span className="truncate">
+                      {tarefasCount}{" "}
+                      {tarefasCount === 1 ? "tarefa vinculada" : "tarefas vinculadas"}
+                      {abertasEst > 0 ? ` · ${abertasEst} aberta(s)` : ""}
+                    </span>
                   </p>
                 </CardContent>
               </Card>
@@ -307,28 +346,30 @@ export function CadastroProjetosPanel({
           pessoas={pessoasAtivas}
           onSubmit={handleSave}
           loading={createProjeto.isPending || updateProjeto.isPending}
+          canManageEquipe={
+            editing ? canManageProjetoMembros(profile, editing) : true
+          }
         />
       )}
 
-      <AlertDialog open={!!deleting} onOpenChange={(open) => !open && setDeleting(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir projeto?</AlertDialogTitle>
-            <AlertDialogDescription>
-              O projeto &quot;{deleting?.nome}&quot; será removido permanentemente.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Excluir
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDeleteDialog
+        open={!!deleting}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleting(null);
+            setDeletingHasOpen(false);
+          }
+        }}
+        itemKind="projeto"
+        itemName={deleting?.nome}
+        description={
+          deletingHasOpen
+            ? `Excluir o projeto "${deleting?.nome}"? Há tarefas ou subtarefas abertas. Somente administradores podem concluir esta exclusão. Esta ação não pode ser desfeita.`
+            : undefined
+        }
+        requireTypedConfirmation={deletingHasOpen ? "CONFIRMAR" : undefined}
+        onConfirm={handleDelete}
+      />
     </div>
   );
 }

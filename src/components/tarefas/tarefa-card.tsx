@@ -1,4 +1,4 @@
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
 import { MinhaAgendaBadge } from "@/components/tarefas/subtarefa-row";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,7 @@ import {
 import type { TarefaStatus, TarefaWithRelations } from "@/types";
 import { formatDate, getVencimentoVariant } from "@/utils/formatters";
 import {
+  TAREFA_PRIORIDADE_BAND_CLASS,
   TAREFA_PRIORIDADE_COLORS,
   TAREFA_STATUS_COLORS,
   TAREFA_STATUS_LABELS,
@@ -20,7 +21,6 @@ import {
   getTarefaResponsaveis,
 } from "@/utils/tarefas";
 import { cn } from "@/lib/utils";
-import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 
 export function TarefaCard({
   tarefa,
@@ -44,6 +44,8 @@ export function TarefaCard({
   return (
     <Card
       className={cn(
+        "overflow-hidden border-l-4",
+        TAREFA_PRIORIDADE_BAND_CLASS[tarefa.prioridade],
         tarefa.status === "concluida" && "opacity-75",
         onOpen && "cursor-pointer transition-colors hover:bg-muted/40",
       )}
@@ -61,19 +63,26 @@ export function TarefaCard({
           : undefined
       }
     >
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline" className={TAREFA_PRIORIDADE_COLORS[tarefa.prioridade]}>
+      <CardHeader className="space-y-0 p-3 pb-2">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 space-y-1.5">
+            <div className="flex flex-wrap items-center gap-1">
+              <Badge
+                variant="outline"
+                className={cn("px-1.5 py-0 text-[10px]", TAREFA_PRIORIDADE_COLORS[tarefa.prioridade])}
+              >
                 {tarefa.prioridade}
               </Badge>
-              <Badge variant="secondary" className={TAREFA_STATUS_COLORS[tarefa.status]}>
+              <Badge
+                variant="secondary"
+                className={cn("px-1.5 py-0 text-[10px]", TAREFA_STATUS_COLORS[tarefa.status])}
+              >
                 {TAREFA_STATUS_LABELS[tarefa.status]}
               </Badge>
               {tarefa.setor && (
                 <Badge
                   variant="outline"
+                  className="px-1.5 py-0 text-[10px]"
                   style={{
                     borderColor: tarefa.setor.cor ?? undefined,
                     color: tarefa.setor.cor ?? undefined,
@@ -82,16 +91,16 @@ export function TarefaCard({
                   {tarefa.setor.nome}
                 </Badge>
               )}
-              <MinhaAgendaBadge tarefa={tarefa} />
+              <MinhaAgendaBadge tarefa={tarefa} className="px-1.5 py-0 text-[10px]" />
               {tarefa.projeto && (
-                <Badge variant="outline" className="text-xs">
+                <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
                   {tarefa.projeto.nome}
                 </Badge>
               )}
             </div>
             <CardTitle
               className={cn(
-                "text-base leading-snug",
+                "text-sm font-semibold leading-snug",
                 tarefa.status === "concluida" && "line-through text-muted-foreground",
               )}
             >
@@ -105,11 +114,11 @@ export function TarefaCard({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="shrink-0"
+                  className="h-7 w-7 shrink-0"
                   aria-label="Ações da tarefa"
                   onClick={(event) => event.stopPropagation()}
                 >
-                  <MoreHorizontal className="h-4 w-4" />
+                  <MoreHorizontal className="h-3.5 w-3.5" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -153,15 +162,15 @@ export function TarefaCard({
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-3 text-sm">
+      <CardContent className="space-y-2 p-3 pt-0 text-xs">
         {tarefa.descricao && (
-          <p className="text-muted-foreground line-clamp-2">{tarefa.descricao}</p>
+          <p className="text-muted-foreground line-clamp-2 leading-snug">{tarefa.descricao}</p>
         )}
 
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground">
+        <div className="flex flex-wrap gap-x-3 gap-y-1 text-muted-foreground">
           {getTarefaResponsaveis(tarefa).length > 0 && (
-            <span className="flex items-center gap-1.5">
-              <div className="flex -space-x-1.5">
+            <span className="flex items-center gap-1">
+              <div className="flex -space-x-1">
                 {getTarefaResponsaveis(tarefa)
                   .slice(0, 3)
                   .map((pessoa) => (
@@ -169,22 +178,22 @@ export function TarefaCard({
                       key={pessoa.id}
                       name={pessoa.nome_completo}
                       avatarUrl={pessoa.avatar_url}
-                      className="h-5 w-5 ring-1 ring-background"
+                      className="h-4 w-4 ring-1 ring-background"
                     />
                   ))}
               </div>
-              {formatResponsaveisLabel(tarefa)}
+              <span className="truncate">{formatResponsaveisLabel(tarefa)}</span>
             </span>
           )}
           {tarefa.data_vencimento && (
             <span
               className={cn(
-                "flex items-center gap-1.5",
+                "flex items-center gap-1",
                 vencimentoVariant === "destructive" && "text-destructive font-medium",
                 vencimentoVariant === "warning" && "text-amber-600 dark:text-amber-400 font-medium",
               )}
             >
-              <CalendarIcon className="h-3.5 w-3.5" />
+              <CalendarIcon className="h-3 w-3 shrink-0" />
               {formatDate(tarefa.data_vencimento)}
             </span>
           )}
@@ -193,7 +202,7 @@ export function TarefaCard({
         {tarefa.tags.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {tarefa.tags.map((tag) => (
-              <Badge key={tag} variant="outline" className="text-xs">
+              <Badge key={tag} variant="outline" className="px-1.5 py-0 text-[10px]">
                 {tag}
               </Badge>
             ))}

@@ -1,5 +1,20 @@
+import {
+  DndContext,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ChevronRight, MessageSquare, Paperclip, Plus, Save } from "lucide-react";
+import { ChevronRight, GripVertical, MessageSquare, Paperclip, Plus, Save } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -10,6 +25,7 @@ import { SubtarefaPanelSheet } from "@/components/tarefas/subtarefa-panel-sheet"
 import { SubtarefaRow } from "@/components/tarefas/subtarefa-row";
 import { TarefaAnexosSection } from "@/components/tarefas/tarefa-anexos-section";
 import { TarefaMetaToolbar } from "@/components/tarefas/tarefa-meta-toolbar";
+import { TarefaPeopleStrip } from "@/components/tarefas/tarefa-people-strip";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -44,15 +60,19 @@ import {
   useCreateTarefaComentario,
   useDeleteSubtarefa,
   useDeleteTarefaComentario,
+  useReorderSubtarefas,
   useTarefaDetail,
   useToggleSubtarefa,
   useUpdateSubtarefaMeta,
   useUpdateTarefa,
+  useUpdateTarefaComentario,
 } from "@/hooks/use-tarefas";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
 import type {
+  ProfileWithSetor,
   RecorrenciaConfig,
   RecorrenciaTipo,
+  SubtarefaWithAuthors,
   TarefaFormData,
   TarefaVisibilidade,
   TarefaWithRelations,
@@ -67,6 +87,8 @@ import {
   canEditVisibilidade,
   getSetoresPermitidos,
   parseLembretes,
+  partitionSubtarefaIdsByConclusao,
+  sortSubtarefasList,
 } from "@/utils/tarefas";
 
 const tarefaPanelSchema = z
@@ -130,9 +152,69 @@ function parseTags(input: string): string[] {
     .filter(Boolean);
 }
 
+function SortableSubtarefaRow({
+  subtarefa,
+  canEdit,
+  pessoasDisponiveis,
+  onOpen,
+  onToggle,
+  onDelete,
+  onUpdateMeta,
+}: {
+  subtarefa: SubtarefaWithAuthors;
+  canEdit: boolean;
+  pessoasDisponiveis: ProfileWithSetor[];
+  onOpen: () => void;
+  onToggle: (concluida: boolean) => Promise<void>;
+  onDelete: () => Promise<void>;
+  onUpdateMeta: (meta: {
+    data_vencimento?: string | null;
+    atribuido_ids?: string[];
+    visibilidade?: SubtarefaWithAuthors["visibilidade"];
+  }) => Promise<void>;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: subtarefa.id,
+    disabled: !canEdit,
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+    >
+      <SubtarefaRow
+        subtarefa={subtarefa}
+        canEdit={canEdit}
+        pessoasDisponiveis={pessoasDisponiveis}
+        onOpen={onOpen}
+        onToggle={onToggle}
+        onDelete={onDelete}
+        onUpdateMeta={onUpdateMeta}
+        isDragging={isDragging}
+        dragHandle={
+          canEdit ? (
+            <button
+              type="button"
+              className="mt-0.5 shrink-0 cursor-grab touch-none rounded p-1 text-muted-foreground hover:bg-muted"
+              aria-label="Arrastar para reordenar"
+              {...attributes}
+              {...listeners}
+            >
+              <GripVertical className="h-4 w-4" />
+            </button>
+          ) : undefined
+        }
+      />
+    </div>
+  );
+}
+
 function toFormValues(
   tarefa?: TarefaWithRelations | null,
   defaultProjetoId?: string | null,
+  defaultDataInicio?: Date | null,
+  defaultAtribuidoIds?: string[],
 ): TarefaPanelSchema {
   const rec = parseRecorrencia(tarefa?.recorrencia);
   const atribuidoIds =
@@ -144,13 +226,19 @@ function toFormValues(
     descricao: tarefa?.descricao ?? "",
     projeto_id: tarefa?.projeto_id ?? defaultProjetoId ?? null,
     setor_id: tarefa?.setor_id ?? null,
-    atribuido_ids: atribuidoIds,
+    atribuido_ids: atribuidoIds.length
+      ? atribuidoIds
+      : (defaultAtribuidoIds ?? []),
     prioridade: tarefa?.prioridade ?? "P4",
     status:
       (tarefa?.status as string | undefined) === "bloqueada"
         ? "cancelada"
         : (tarefa?.status ?? "a_fazer"),
-    data_inicio: tarefa?.data_inicio ? new Date(tarefa.data_inicio) : null,
+    data_inicio: tarefa?.data_inicio
+      ? new Date(tarefa.data_inicio)
+      : defaultDataInicio
+        ? new Date(defaultDataInicio)
+        : null,
     data_vencimento: tarefa?.data_vencimento ? new Date(tarefa.data_vencimento) : null,
     tagsInput: tarefa?.tags?.join(", ") ?? "",
     visibilidade: (tarefa?.visibilidade as TarefaVisibilidade | undefined) ?? "somente_para_mim",
@@ -201,9 +289,12 @@ export function TarefaPanelSheet({
   readOnly = false,
   onSaved,
   defaultProjetoId = null,
+  defaultDataInicio = null,
+  defaultAtribuidoIds,
   lockProjeto = false,
   initialAba,
   highlightComentarioId = null,
+  initialSubtarefaId = null,
 }: {
   tarefaId: string | null;
   open: boolean;
@@ -211,9 +302,14 @@ export function TarefaPanelSheet({
   readOnly?: boolean;
   onSaved?: (tarefaId: string) => void;
   defaultProjetoId?: string | null;
+  /** Pré-preenche o campo Data ao criar tarefa. */
+  defaultDataInicio?: Date | null;
+  /** Pré-preenche responsáveis ao criar tarefa. */
+  defaultAtribuidoIds?: string[];
   lockProjeto?: boolean;
   initialAba?: "comentarios" | "anexos";
   highlightComentarioId?: string | null;
+  initialSubtarefaId?: string | null;
 }) {
   const isCreate = !tarefaId;
   const { data: profile } = useProfile();
@@ -228,10 +324,13 @@ export function TarefaPanelSheet({
   const toggleSubtarefa = useToggleSubtarefa();
   const updateSubtarefaMeta = useUpdateSubtarefaMeta();
   const deleteSubtarefa = useDeleteSubtarefa();
+  const reorderSubtarefas = useReorderSubtarefas();
   const createComentario = useCreateTarefaComentario();
   const deleteComentario = useDeleteTarefaComentario();
+  const updateComentario = useUpdateTarefaComentario();
 
   const [novaSubtarefa, setNovaSubtarefa] = useState("");
+  const [subtarefaOrder, setSubtarefaOrder] = useState<string[]>([]);
   const [subtarefaDrawerId, setSubtarefaDrawerId] = useState<string | null>(null);
   const [sideTab, setSideTab] = useState<"comentarios" | "anexos">(
     initialAba ?? "comentarios",
@@ -253,7 +352,12 @@ export function TarefaPanelSheet({
   }, [open, initialAba, tarefaId]);
 
   useEffect(() => {
-    if (!open || !highlightComentarioId) return;
+    if (!open || !initialSubtarefaId) return;
+    setSubtarefaDrawerId(initialSubtarefaId);
+  }, [open, initialSubtarefaId, tarefaId]);
+
+  useEffect(() => {
+    if (!open || !highlightComentarioId || initialSubtarefaId) return;
     setSideTab("comentarios");
     const timer = window.setTimeout(() => {
       document
@@ -261,7 +365,7 @@ export function TarefaPanelSheet({
         ?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [open, highlightComentarioId, tarefa?.comentarios]);
+  }, [open, highlightComentarioId, initialSubtarefaId, tarefa?.comentarios]);
 
   const pessoasAtivas = useMemo(
     () => (pessoas ?? []).filter((p) => p.ativo),
@@ -306,12 +410,19 @@ export function TarefaPanelSheet({
 
   const form = useForm<TarefaPanelSchema>({
     resolver: zodResolver(tarefaPanelSchema),
-    defaultValues: toFormValues(null, defaultProjetoId),
+    defaultValues: toFormValues(
+      null,
+      defaultProjetoId,
+      defaultDataInicio,
+      defaultAtribuidoIds,
+    ),
   });
 
   const projetoId = form.watch("projeto_id");
   const setorId = form.watch("setor_id");
   const atribuidoIds = form.watch("atribuido_ids");
+  const observadorIds = form.watch("observador_ids");
+  const visibilidade = form.watch("visibilidade");
   const selectedProjeto = projetos?.find((p) => p.id === projetoId);
   const selectedSetor = setores?.find((s) => s.id === setorId);
 
@@ -331,9 +442,24 @@ export function TarefaPanelSheet({
 
   useEffect(() => {
     if (!open) return;
-    form.reset(toFormValues(tarefa ?? null, defaultProjetoId));
+    form.reset(
+      toFormValues(
+        tarefa ?? null,
+        defaultProjetoId,
+        tarefaId ? null : defaultDataInicio,
+        tarefaId ? undefined : defaultAtribuidoIds,
+      ),
+    );
     setNovaSubtarefa("");
-  }, [open, tarefa, defaultProjetoId, form]);
+  }, [
+    open,
+    tarefa,
+    tarefaId,
+    defaultProjetoId,
+    defaultDataInicio,
+    defaultAtribuidoIds,
+    form,
+  ]);
 
   const criadorDisplay = useMemo(() => {
     if (tarefa?.criador) return tarefa.criador;
@@ -347,12 +473,83 @@ export function TarefaPanelSheet({
     return null;
   }, [tarefa, profile]);
 
+  const responsaveisDisplay = useMemo(() => {
+    const byId = new Map(pessoasAtivas.map((p) => [p.id, p]));
+    return (atribuidoIds ?? [])
+      .map((id) => byId.get(id))
+      .filter((p): p is (typeof pessoasAtivas)[number] => !!p)
+      .map((p) => ({
+        id: p.id,
+        nome_completo: p.nome_completo,
+        avatar_url: p.avatar_url,
+      }));
+  }, [atribuidoIds, pessoasAtivas]);
+
+  const visualizadoresDisplay = useMemo(() => {
+    const byId = new Map(pessoasAtivas.map((p) => [p.id, p]));
+    return (observadorIds ?? [])
+      .map((id) => byId.get(id))
+      .filter((p): p is (typeof pessoasAtivas)[number] => !!p)
+      .map((p) => ({
+        id: p.id,
+        nome_completo: p.nome_completo,
+        avatar_url: p.avatar_url,
+      }));
+  }, [observadorIds, pessoasAtivas]);
+
   const subtarefas = tarefa?.subtarefas ?? [];
   const comentarios = tarefa?.comentarios ?? [];
   const anexos = tarefa?.anexos ?? [];
   const concluidas = subtarefas.filter((s) => s.concluida).length;
 
-  const observadorIds = form.watch("observador_ids");
+  const subtarefaOrderKey = useMemo(
+    () =>
+      subtarefas
+        .map((s) => `${s.id}:${s.concluida ? 1 : 0}:${s.posicao ?? 0}`)
+        .join(","),
+    [subtarefas],
+  );
+
+  useEffect(() => {
+    setSubtarefaOrder(sortSubtarefasList(subtarefas).map((s) => s.id));
+  }, [subtarefaOrderKey, subtarefas]);
+
+  const subtarefasById = useMemo(
+    () => new Map(subtarefas.map((s) => [s.id, s])),
+    [subtarefas],
+  );
+  const orderedSubtarefas = subtarefaOrder
+    .map((id) => subtarefasById.get(id))
+    .filter((s): s is SubtarefaWithAuthors => !!s);
+
+  const subtarefaSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+  );
+
+  const applySubtarefaConclusaoOrder = (subtarefaId: string, concluida: boolean) => {
+    const optimistic = subtarefas.map((s) =>
+      s.id === subtarefaId ? { ...s, concluida } : s,
+    );
+    setSubtarefaOrder(sortSubtarefasList(optimistic).map((s) => s.id));
+  };
+
+  const handleSubtarefaDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || !tarefaId || active.id === over.id || !canEdit) return;
+    const oldIndex = subtarefaOrder.indexOf(String(active.id));
+    const newIndex = subtarefaOrder.indexOf(String(over.id));
+    if (oldIndex < 0 || newIndex < 0) return;
+    const moved = arrayMove(subtarefaOrder, oldIndex, newIndex);
+    const next = partitionSubtarefaIdsByConclusao(moved, subtarefasById);
+    setSubtarefaOrder(next);
+    void reorderSubtarefas
+      .mutateAsync({ tarefaId, orderedIds: next })
+      .catch((error) => {
+        toast.error("Erro ao reordenar subtarefas", {
+          description: getSupabaseErrorMessage(error as Error),
+        });
+      });
+  };
 
   const pessoasMencionaveis = useMemo(() => {
     const ids = new Set<string>([...(atribuidoIds ?? []), ...(observadorIds ?? [])]);
@@ -550,6 +747,16 @@ export function TarefaPanelSheet({
                       }
                     />
 
+                    <TarefaPeopleStrip
+                      criador={criadorDisplay}
+                      createdAt={tarefa?.created_at ?? null}
+                      responsaveis={responsaveisDisplay}
+                      visibilidade={visibilidade}
+                      visualizadores={visualizadoresDisplay}
+                      setorNome={selectedSetor?.nome}
+                      projetoNome={selectedProjeto?.nome}
+                    />
+
                     {(formErrors.atribuido_ids ||
                       formErrors.visibilidade ||
                       formErrors.setor_id ||
@@ -640,45 +847,61 @@ export function TarefaPanelSheet({
                         </p>
                       ) : (
                         <>
-                          <div className="space-y-2">
-                            {subtarefas.map((sub) => (
-                              <SubtarefaRow
-                                key={sub.id}
-                                subtarefa={sub}
-                                canEdit={canEdit}
-                                pessoasDisponiveis={pessoasMencionaveis}
-                                onOpen={() => setSubtarefaDrawerId(sub.id)}
-                                onToggle={async (concluida) => {
-                                  try {
-                                    await toggleSubtarefa.mutateAsync({
-                                      id: sub.id,
-                                      concluida,
-                                    });
-                                  } catch (error) {
-                                    toast.error(getSupabaseErrorMessage(error as Error));
-                                  }
-                                }}
-                                onUpdateMeta={async (meta) => {
-                                  try {
-                                    await updateSubtarefaMeta.mutateAsync({
-                                      id: sub.id,
-                                      data: meta,
-                                    });
-                                  } catch (error) {
-                                    toast.error(getSupabaseErrorMessage(error as Error));
-                                    throw error;
-                                  }
-                                }}
-                                onDelete={async () => {
-                                  try {
-                                    await deleteSubtarefa.mutateAsync(sub.id);
-                                  } catch (error) {
-                                    toast.error(getSupabaseErrorMessage(error as Error));
-                                  }
-                                }}
-                              />
-                            ))}
-                          </div>
+                          <DndContext
+                            sensors={subtarefaSensors}
+                            collisionDetection={closestCenter}
+                            onDragEnd={handleSubtarefaDragEnd}
+                          >
+                            <SortableContext
+                              items={subtarefaOrder}
+                              strategy={verticalListSortingStrategy}
+                            >
+                              <div className="space-y-2.5">
+                                {orderedSubtarefas.map((sub) => (
+                                  <SortableSubtarefaRow
+                                    key={sub.id}
+                                    subtarefa={sub}
+                                    canEdit={canEdit}
+                                    pessoasDisponiveis={pessoasMencionaveis}
+                                    onOpen={() => setSubtarefaDrawerId(sub.id)}
+                                    onToggle={async (concluida) => {
+                                      applySubtarefaConclusaoOrder(sub.id, concluida);
+                                      try {
+                                        await toggleSubtarefa.mutateAsync({
+                                          id: sub.id,
+                                          concluida,
+                                        });
+                                      } catch (error) {
+                                        setSubtarefaOrder(
+                                          sortSubtarefasList(subtarefas).map((s) => s.id),
+                                        );
+                                        toast.error(getSupabaseErrorMessage(error as Error));
+                                      }
+                                    }}
+                                    onUpdateMeta={async (meta) => {
+                                      try {
+                                        await updateSubtarefaMeta.mutateAsync({
+                                          id: sub.id,
+                                          data: meta,
+                                        });
+                                      } catch (error) {
+                                        toast.error(getSupabaseErrorMessage(error as Error));
+                                        throw error;
+                                      }
+                                    }}
+                                    onDelete={async () => {
+                                      try {
+                                        await deleteSubtarefa.mutateAsync(sub.id);
+                                      } catch (error) {
+                                        toast.error(getSupabaseErrorMessage(error as Error));
+                                        throw error;
+                                      }
+                                    }}
+                                  />
+                                ))}
+                              </div>
+                            </SortableContext>
+                          </DndContext>
                           {canEdit && (
                             <div className="mt-3 flex gap-2">
                               <Input
@@ -768,6 +991,7 @@ export function TarefaPanelSheet({
                               comentarios={comentarios}
                               pessoasMencionaveis={pessoasMencionaveis}
                               currentUserId={profile?.id}
+                              currentUserProfile={profile}
                               canComment={canEdit}
                               highlightId={highlightComentarioId}
                               idPrefix="tarefa-comentario"
@@ -794,6 +1018,16 @@ export function TarefaPanelSheet({
                                   throw error;
                                 }
                               }}
+                              onEdit={async (id, conteudo) => {
+                                try {
+                                  await updateComentario.mutateAsync({ id, conteudo });
+                                } catch (error) {
+                                  toast.error("Erro ao editar comentário", {
+                                    description: getSupabaseErrorMessage(error as Error),
+                                  });
+                                  throw error;
+                                }
+                              }}
                             />
                           )}
                         </div>
@@ -816,6 +1050,12 @@ export function TarefaPanelSheet({
       }}
       parentTarefa={tarefa ?? null}
       readOnly={readOnly}
+      initialAba={initialSubtarefaId && subtarefaDrawerId === initialSubtarefaId ? initialAba : undefined}
+      highlightComentarioId={
+        initialSubtarefaId && subtarefaDrawerId === initialSubtarefaId
+          ? highlightComentarioId
+          : null
+      }
     />
     </>
   );
