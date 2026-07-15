@@ -61,18 +61,23 @@ export function NotificationBell() {
     if (nextOpen) setTab("nao_lidas");
   };
 
-  const handleClick = async (notificacao: Notificacao) => {
+  const handleSelect = async (notificacao: Notificacao) => {
+    // Marca como lida antes de fechar/navegar (update otimista no cache).
     if (!notificacao.lida) {
-      await markLida.mutateAsync(notificacao.id);
+      try {
+        await markLida.mutateAsync(notificacao.id);
+      } catch {
+        // Ainda navega; a invalidação no onSettled tenta re-sincronizar.
+      }
     }
 
     setOpen(false);
 
     const target = getNotificacaoNavigateTarget(notificacao);
     if (target.search) {
-      navigate({ to: target.to, search: target.search });
+      void navigate({ to: target.to, search: target.search });
     } else {
-      navigate({ to: target.to });
+      void navigate({ to: target.to });
     }
   };
 
@@ -84,7 +89,7 @@ export function NotificationBell() {
           {unreadCount > 0 && (
             <Badge
               variant="destructive"
-              className="absolute -top-1 -right-1 h-5 min-w-5 px-1 text-[10px] flex items-center justify-center"
+              className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center px-1 text-[10px]"
             >
               {unreadCount > 9 ? "9+" : unreadCount}
             </Badge>
@@ -98,7 +103,7 @@ export function NotificationBell() {
             <Button
               variant="ghost"
               size="sm"
-              className="h-auto p-1 text-xs gap-1"
+              className="h-auto gap-1 p-1 text-xs"
               onClick={(event) => {
                 event.preventDefault();
                 markAll.mutate();
@@ -125,7 +130,7 @@ export function NotificationBell() {
               >
                 Não lidas
                 {unreadCount > 0 && (
-                  <span className="ml-1 text-muted-foreground tabular-nums">
+                  <span className="ml-1 tabular-nums text-muted-foreground">
                     ({unreadCount > 9 ? "9+" : unreadCount})
                   </span>
                 )}
@@ -145,7 +150,7 @@ export function NotificationBell() {
               items={naoLidas}
               emptyMessage="Nenhuma notificação não lida"
               unreadStyle
-              onSelect={handleClick}
+              onSelect={handleSelect}
             />
           </TabsContent>
 
@@ -153,7 +158,7 @@ export function NotificationBell() {
             <NotificacoesList
               items={lidas}
               emptyMessage="Nenhuma notificação lida"
-              onSelect={handleClick}
+              onSelect={handleSelect}
             />
           </TabsContent>
         </Tabs>
@@ -185,7 +190,11 @@ function NotificacoesList({
               "flex cursor-pointer flex-col items-start gap-1 rounded-none px-3 py-3",
               unreadStyle && "bg-primary/5",
             )}
-            onClick={() => void onSelect(n)}
+            onSelect={(event) => {
+              // Evita fechar o menu antes da marcação assíncrona concluir.
+              event.preventDefault();
+              void onSelect(n);
+            }}
           >
             <span className="text-sm font-medium leading-snug">{getNotificacaoMensagem(n)}</span>
             <span className="text-xs text-muted-foreground">

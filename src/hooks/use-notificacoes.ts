@@ -9,6 +9,7 @@ import {
   markAllNotificacoesLidas,
   markNotificacaoLida,
 } from "@/services/notificacoes";
+import type { Notificacao } from "@/types";
 
 export function useNotificacoes() {
   const { user } = useAuth();
@@ -59,7 +60,37 @@ export function useMarkNotificacaoLida() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => markNotificacaoLida(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: notificacaoKeys.all }),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: notificacaoKeys.all });
+
+      const previousList = queryClient.getQueryData<Notificacao[]>(notificacaoKeys.list());
+      const previousUnread = queryClient.getQueryData<number>(notificacaoKeys.unread());
+
+      const wasUnread = previousList?.some((n) => n.id === id && !n.lida) ?? false;
+
+      queryClient.setQueryData<Notificacao[]>(notificacaoKeys.list(), (old) =>
+        (old ?? []).map((n) => (n.id === id ? { ...n, lida: true } : n)),
+      );
+
+      if (wasUnread) {
+        queryClient.setQueryData<number>(notificacaoKeys.unread(), (old) =>
+          Math.max(0, (old ?? 0) - 1),
+        );
+      }
+
+      return { previousList, previousUnread };
+    },
+    onError: (_error, _id, context) => {
+      if (context?.previousList) {
+        queryClient.setQueryData(notificacaoKeys.list(), context.previousList);
+      }
+      if (context?.previousUnread !== undefined) {
+        queryClient.setQueryData(notificacaoKeys.unread(), context.previousUnread);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: notificacaoKeys.all });
+    },
   });
 }
 
@@ -67,6 +98,29 @@ export function useMarkAllNotificacoesLidas() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: () => markAllNotificacoesLidas(),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: notificacaoKeys.all }),
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: notificacaoKeys.all });
+
+      const previousList = queryClient.getQueryData<Notificacao[]>(notificacaoKeys.list());
+      const previousUnread = queryClient.getQueryData<number>(notificacaoKeys.unread());
+
+      queryClient.setQueryData<Notificacao[]>(notificacaoKeys.list(), (old) =>
+        (old ?? []).map((n) => (n.lida ? n : { ...n, lida: true })),
+      );
+      queryClient.setQueryData<number>(notificacaoKeys.unread(), 0);
+
+      return { previousList, previousUnread };
+    },
+    onError: (_error, _vars, context) => {
+      if (context?.previousList) {
+        queryClient.setQueryData(notificacaoKeys.list(), context.previousList);
+      }
+      if (context?.previousUnread !== undefined) {
+        queryClient.setQueryData(notificacaoKeys.unread(), context.previousUnread);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: notificacaoKeys.all });
+    },
   });
 }

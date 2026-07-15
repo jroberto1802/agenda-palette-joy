@@ -36,8 +36,16 @@ export async function countNotificacoesNaoLidas(): Promise<number> {
 }
 
 export async function markNotificacaoLida(id: string): Promise<void> {
-  const { error } = await supabase.from("notificacoes").update({ lida: true }).eq("id", id);
+  const { data, error } = await supabase
+    .from("notificacoes")
+    .update({ lida: true })
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
+
   if (error) throw error;
+  // Já estava lida ou RLS/registro inexistente: trata como sucesso idempotente.
+  void data;
 }
 
 export async function markAllNotificacoesLidas(): Promise<void> {
@@ -50,7 +58,8 @@ export async function markAllNotificacoesLidas(): Promise<void> {
     .from("notificacoes")
     .update({ lida: true })
     .eq("usuario_id", user.id)
-    .eq("lida", false);
+    .eq("lida", false)
+    .select("id");
 
   if (error) throw error;
 }
