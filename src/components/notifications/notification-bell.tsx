@@ -48,11 +48,11 @@ export function NotificationBell() {
   }, []);
 
   const naoLidas = useMemo(
-    () => (notificacoes ?? []).filter((n) => !n.lida),
+    () => (notificacoes ?? []).filter((n) => n.lida !== true),
     [notificacoes],
   );
   const lidas = useMemo(
-    () => (notificacoes ?? []).filter((n) => n.lida),
+    () => (notificacoes ?? []).filter((n) => n.lida === true),
     [notificacoes],
   );
 
@@ -121,13 +121,15 @@ export function NotificationBell() {
           onValueChange={(value) => setTab(value as NotificacoesTab)}
           className="gap-0"
         >
-          <div className="px-3 pt-2">
+          <div
+            className="px-3 pt-2"
+            onPointerDown={(event) => {
+              // Evita que o DropdownMenu capture o pointer e feche/bloqueie a troca de aba.
+              event.stopPropagation();
+            }}
+          >
             <TabsList className="grid h-8 w-full grid-cols-2">
-              <TabsTrigger
-                value="nao_lidas"
-                className="h-7 text-xs"
-                onPointerDown={(event) => event.preventDefault()}
-              >
+              <TabsTrigger value="nao_lidas" className="h-7 text-xs">
                 Não lidas
                 {unreadCount > 0 && (
                   <span className="ml-1 tabular-nums text-muted-foreground">
@@ -135,17 +137,13 @@ export function NotificationBell() {
                   </span>
                 )}
               </TabsTrigger>
-              <TabsTrigger
-                value="lidas"
-                className="h-7 text-xs"
-                onPointerDown={(event) => event.preventDefault()}
-              >
+              <TabsTrigger value="lidas" className="h-7 text-xs">
                 Lidas
               </TabsTrigger>
             </TabsList>
           </div>
 
-          <TabsContent value="nao_lidas" className="mt-0">
+          <TabsContent value="nao_lidas" className="mt-0 focus-visible:outline-none">
             <NotificacoesList
               items={naoLidas}
               emptyMessage="Nenhuma notificação não lida"
@@ -154,7 +152,7 @@ export function NotificationBell() {
             />
           </TabsContent>
 
-          <TabsContent value="lidas" className="mt-0">
+          <TabsContent value="lidas" className="mt-0 focus-visible:outline-none">
             <NotificacoesList
               items={lidas}
               emptyMessage="Nenhuma notificação lida"
