@@ -347,6 +347,8 @@ export type Database = {
           id: string;
           nome_completo: string;
           papel: "admin" | "gerente" | "usuario" | "visualizador";
+          senha_temporaria: boolean;
+          senha_temporaria_expira_em: string | null;
           setor_id: string | null;
           updated_at: string;
         };
@@ -360,6 +362,8 @@ export type Database = {
           id: string;
           nome_completo: string;
           papel?: "admin" | "gerente" | "usuario" | "visualizador";
+          senha_temporaria?: boolean;
+          senha_temporaria_expira_em?: string | null;
           setor_id?: string | null;
           updated_at?: string;
         };
@@ -373,6 +377,8 @@ export type Database = {
           id?: string;
           nome_completo?: string;
           papel?: "admin" | "gerente" | "usuario" | "visualizador";
+          senha_temporaria?: boolean;
+          senha_temporaria_expira_em?: string | null;
           setor_id?: string | null;
           updated_at?: string;
         };

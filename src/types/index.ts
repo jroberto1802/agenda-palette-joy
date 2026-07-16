@@ -263,3 +263,8 @@ export type AdminCreateUserData = {
   setor_id: string | null;
   gestor_id?: string | null;
 };
+
+export type AdminRestaurarSenhaData = {
+  user_id: string;
+  password: string;
+};

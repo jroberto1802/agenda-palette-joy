@@ -1,4 +1,4 @@
-import { Pencil, Plus, Search, Trash2, UserX } from "lucide-react";
+import { KeyRound, Pencil, Plus, Search, Trash2, UserX } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ConfirmDeleteDialog } from "@/components/common/confirm-delete-dialog";
@@ -16,16 +16,23 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PessoaFormDialog } from "@/components/pessoas/pessoa-form-dialog";
+import { RestaurarSenhaDialog } from "@/components/pessoas/restaurar-senha-dialog";
+import { useRestaurarSenhaUsuario } from "@/hooks/use-admin";
 import {
   useCreatePessoa,
   useDeletePessoa,
   usePessoas,
   useUpdatePessoa,
 } from "@/hooks/use-pessoas";
+import { useProfile } from "@/hooks/use-profile";
 import { useSetores } from "@/hooks/use-setores";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
 import type { ProfileFormData, ProfileWithSetor } from "@/types";
-import { PAPEL_LABELS } from "@/utils/permissions";
+import {
+  PAPEL_LABELS,
+  canRestaurarSenha,
+  hasSenhaTemporaria,
+} from "@/utils/permissions";
 
 export function CadastroPessoasPanel({ canManage }: { canManage: boolean }) {
   const [search, setSearch] = useState("");
@@ -33,13 +40,16 @@ export function CadastroPessoasPanel({ canManage }: { canManage: boolean }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<ProfileWithSetor | null>(null);
   const [deleting, setDeleting] = useState<ProfileWithSetor | null>(null);
+  const [restaurando, setRestaurando] = useState<ProfileWithSetor | null>(null);
 
+  const { data: profile } = useProfile();
   const { data: pessoas, isLoading } = usePessoas(debouncedSearch);
   const { data: todasPessoas } = usePessoas();
   const { data: setores } = useSetores();
   const createPessoa = useCreatePessoa();
   const updatePessoa = useUpdatePessoa();
   const deletePessoa = useDeletePessoa();
+  const restaurarSenha = useRestaurarSenhaUsuario();
 
   const handleSearch = useMemo(() => {
     let timeout: ReturnType<typeof setTimeout>;
@@ -131,9 +141,28 @@ export function CadastroPessoasPanel({ canManage }: { canManage: boolean }) {
     setDeleting(pessoa);
   };
 
+  const handleRestaurarSenha = async (password: string) => {
+    if (!restaurando) return;
+    try {
+      await restaurarSenha.mutateAsync({
+        user_id: restaurando.id,
+        password,
+      });
+      toast.success("Senha restaurada", {
+        description: `${restaurando.nome_completo} deverá definir uma nova senha em até 3 dias.`,
+      });
+      setRestaurando(null);
+    } catch (error) {
+      toast.error("Erro ao restaurar senha", {
+        description: getSupabaseErrorMessage(error as Error),
+      });
+      throw error;
+    }
+  };
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold tracking-tight">Pessoas</h2>
           <p className="text-sm text-muted-foreground">
@@ -146,7 +175,7 @@ export function CadastroPessoasPanel({ canManage }: { canManage: boolean }) {
               setEditing(null);
               setDialogOpen(true);
             }}
-            className="gap-2 shrink-0"
+            className="shrink-0 gap-2"
           >
             <Plus className="h-4 w-4" />
             Nova pessoa
@@ -184,7 +213,7 @@ export function CadastroPessoasPanel({ canManage }: { canManage: boolean }) {
           )}
         </div>
       ) : (
-        <div className="rounded-xl border overflow-x-auto">
+        <div className="overflow-x-auto rounded-xl border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -200,15 +229,15 @@ export function CadastroPessoasPanel({ canManage }: { canManage: boolean }) {
               {pessoas.map((pessoa) => (
                 <TableRow key={pessoa.id} className={!pessoa.ativo ? "opacity-60" : undefined}>
                   <TableCell>
-                    <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex min-w-0 items-center gap-3">
                       <ProfileAvatar
                         name={pessoa.nome_completo}
                         avatarUrl={pessoa.avatar_url}
                         className="h-9 w-9"
                       />
                       <div className="min-w-0">
-                        <p className="font-medium truncate">{pessoa.nome_completo}</p>
-                        <p className="text-xs text-muted-foreground truncate">
+                        <p className="truncate font-medium">{pessoa.nome_completo}</p>
+                        <p className="truncate text-xs text-muted-foreground">
                           {pessoa.email || "—"}
                         </p>
                       </div>
@@ -228,11 +257,20 @@ export function CadastroPessoasPanel({ canManage }: { canManage: boolean }) {
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge variant="secondary">{PAPEL_LABELS[pessoa.papel]}</Badge>
+                    <div className="flex flex-wrap items-center gap-1">
+                      <Badge variant="secondary">{PAPEL_LABELS[pessoa.papel]}</Badge>
+                      {hasSenhaTemporaria(pessoa) && (
+                        <Badge variant="outline" className="border-amber-500 text-amber-700">
+                          Senha temporária
+                        </Badge>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     {(pessoa.gestor?.nome_completo ??
-                      (pessoa.gestor_id ? pessoasById.get(pessoa.gestor_id)?.nome_completo : null)) ?? (
+                      (pessoa.gestor_id
+                        ? pessoasById.get(pessoa.gestor_id)?.nome_completo
+                        : null)) ?? (
                       <span className="text-muted-foreground">—</span>
                     )}
                   </TableCell>
@@ -248,6 +286,17 @@ export function CadastroPessoasPanel({ canManage }: { canManage: boolean }) {
                   {canManage && (
                     <TableCell className="text-right">
                       <div className="inline-flex gap-1">
+                        {canRestaurarSenha(profile, pessoa) && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setRestaurando(pessoa)}
+                            aria-label="Restaurar senha"
+                            title="Restaurar senha"
+                          >
+                            <KeyRound className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"
@@ -300,6 +349,16 @@ export function CadastroPessoasPanel({ canManage }: { canManage: boolean }) {
           loading={createPessoa.isPending || updatePessoa.isPending}
         />
       )}
+
+      <RestaurarSenhaDialog
+        open={!!restaurando}
+        onOpenChange={(open) => {
+          if (!open) setRestaurando(null);
+        }}
+        pessoaNome={restaurando?.nome_completo}
+        onSubmit={handleRestaurarSenha}
+        loading={restaurarSenha.isPending}
+      />
 
       <ConfirmDeleteDialog
         open={!!deleting}
