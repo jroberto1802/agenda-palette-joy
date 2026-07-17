@@ -846,6 +846,29 @@ export function TarefaPanelSheet({
                         </p>
                       ) : (
                         <>
+                          {canEdit && (
+                            <div className="mb-3 flex gap-2">
+                              <Input
+                                placeholder="Nova subtarefa"
+                                value={novaSubtarefa}
+                                onChange={(e) => setNovaSubtarefa(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    handleAddSubtarefa();
+                                  }
+                                }}
+                              />
+                              <Button
+                                type="button"
+                                size="icon"
+                                onClick={handleAddSubtarefa}
+                                disabled={!novaSubtarefa.trim()}
+                              >
+                                <Plus className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          )}
                           <DndContext
                             sensors={subtarefaSensors}
                             collisionDetection={closestCenter}
@@ -901,29 +924,6 @@ export function TarefaPanelSheet({
                               </div>
                             </SortableContext>
                           </DndContext>
-                          {canEdit && (
-                            <div className="mt-3 flex gap-2">
-                              <Input
-                                placeholder="Nova subtarefa"
-                                value={novaSubtarefa}
-                                onChange={(e) => setNovaSubtarefa(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") {
-                                    e.preventDefault();
-                                    handleAddSubtarefa();
-                                  }
-                                }}
-                              />
-                              <Button
-                                type="button"
-                                size="icon"
-                                onClick={handleAddSubtarefa}
-                                disabled={!novaSubtarefa.trim()}
-                              >
-                                <Plus className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          )}
                         </>
                       )}
                     </section>
