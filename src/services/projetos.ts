@@ -109,21 +109,20 @@ export async function createProjeto(payload: ProjetoFormData): Promise<ProjetoWi
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Usuário não autenticado");
 
-  // Select mínimo no RETURNING: select com embeds pode falhar no RLS
-  // logo após o insert e mascarar a criação com erro falso.
-  const { data, error } = await supabase
-    .from("projetos")
-    .insert({
-      nome: payload.nome.trim(),
-      descricao: payload.descricao?.trim() || null,
-      responsavel_id: payload.responsavel_id || null,
-      data_inicio: payload.data_inicio,
-      data_termino_prevista: payload.data_termino_prevista,
-      status: payload.status,
-      criado_por: user.id,
-    })
-    .select("id")
-    .single();
+  // Gera o id no cliente para poder inserir sem depender de RETURNING
+  // (evita falha de RLS no SELECT imediato após o INSERT).
+  const id = crypto.randomUUID();
+
+  const { error } = await supabase.from("projetos").insert({
+    id,
+    nome: payload.nome.trim(),
+    descricao: payload.descricao?.trim() || null,
+    responsavel_id: payload.responsavel_id || null,
+    data_inicio: payload.data_inicio,
+    data_termino_prevista: payload.data_termino_prevista,
+    status: payload.status,
+    criado_por: user.id,
+  });
 
   if (error) {
     if (error.code === "23505") {
@@ -135,9 +134,8 @@ export async function createProjeto(payload: ProjetoFormData): Promise<ProjetoWi
   // Participantes: somente quem foi adicionado manualmente como membro.
   // O criador já tem visibilidade via criado_por (não precisa estar em projeto_membros).
   try {
-    await syncProjetoMembros(data.id, payload.membro_ids);
+    await syncProjetoMembros(id, payload.membro_ids);
   } catch (membrosError) {
-    // Projeto já existe; não deixar o usuário sem feedback claro.
     throw new Error(
       `Projeto criado, mas não foi possível salvar a equipe: ${
         membrosError instanceof Error ? membrosError.message : "erro de permissão"
@@ -145,7 +143,7 @@ export async function createProjeto(payload: ProjetoFormData): Promise<ProjetoWi
     );
   }
 
-  return getProjeto(data.id);
+  return getProjeto(id);
 }
 
 export async function updateProjeto(
