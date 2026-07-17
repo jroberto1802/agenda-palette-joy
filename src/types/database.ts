@@ -1215,6 +1215,17 @@ export type Database = {
         };
         Returns: void;
       };
+      buscar_conteudo: {
+        Args: {
+          p_termo: string;
+          p_limite?: number;
+        };
+        Returns: Json;
+      };
+      fold_search_text: {
+        Args: { t: string };
+        Returns: string;
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

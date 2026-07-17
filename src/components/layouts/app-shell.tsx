@@ -10,6 +10,7 @@ import {
   Megaphone,
   Moon,
   Plus,
+  Search,
   Settings,
   Shield,
   Sun,
@@ -53,9 +54,9 @@ type NavItem = {
 
 /**
  * Ordem do menu:
- * Dashboard → Avisos → Nova tarefa → Agenda → Projetos → Calendário →
+ * Dashboard → Avisos → Nova tarefa → Buscar → Agenda → Projetos → Calendário →
  * Equipe → Finalizados → Relatórios → Configurações → Admin
- * ("Nova tarefa" é injetada antes de Agenda no SidebarNavItems.)
+ * ("Nova tarefa" e "Buscar" são injetadas antes de Agenda no SidebarNavItems.)
  */
 const BASE_NAV: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -97,16 +98,30 @@ function SidebarNavItems({
         return (
           <div key={to} className="contents">
             {to === "/tarefas" && (
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  type="button"
-                  tooltip="Nova tarefa"
-                  onClick={handleNovaTarefa}
-                >
-                  <Plus />
-                  <span>Nova tarefa</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+              <>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    type="button"
+                    tooltip="Nova tarefa"
+                    onClick={handleNovaTarefa}
+                  >
+                    <Plus />
+                    <span>Nova tarefa</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive("/buscar")}
+                    tooltip="Buscar"
+                  >
+                    <Link to="/buscar">
+                      <Search />
+                      <span>Buscar</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </>
             )}
             <SidebarMenuItem>
               <SidebarMenuButton asChild isActive={isActive(to)} tooltip={label}>
