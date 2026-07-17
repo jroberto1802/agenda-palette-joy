@@ -32,23 +32,36 @@ export type ProjetoMembroTransferInput =
 async function syncProjetoMembros(projetoId: string, usuarioIds: string[]): Promise<void> {
   const unique = [...new Set(usuarioIds.filter(Boolean))];
 
-  const { error: deleteError } = await supabase
+  const { data: atuais, error: listError } = await supabase
     .from("projeto_membros")
-    .delete()
+    .select("usuario_id")
     .eq("projeto_id", projetoId);
 
-  if (deleteError) throw deleteError;
+  if (listError) throw listError;
 
-  if (unique.length === 0) return;
+  const atualSet = new Set((atuais ?? []).map((row) => row.usuario_id));
+  const nextSet = new Set(unique);
+  const toRemove = [...atualSet].filter((id) => !nextSet.has(id));
+  const toAdd = [...nextSet].filter((id) => !atualSet.has(id));
 
-  const { error: insertError } = await supabase.from("projeto_membros").insert(
-    unique.map((usuario_id) => ({
-      projeto_id: projetoId,
-      usuario_id,
-    })),
-  );
+  if (toRemove.length > 0) {
+    const { error: deleteError } = await supabase
+      .from("projeto_membros")
+      .delete()
+      .eq("projeto_id", projetoId)
+      .in("usuario_id", toRemove);
+    if (deleteError) throw deleteError;
+  }
 
-  if (insertError) throw insertError;
+  if (toAdd.length > 0) {
+    const { error: insertError } = await supabase.from("projeto_membros").insert(
+      toAdd.map((usuario_id) => ({
+        projeto_id: projetoId,
+        usuario_id,
+      })),
+    );
+    if (insertError) throw insertError;
+  }
 }
 
 export async function listProjetoMembros(projetoId: string): Promise<ProjetoMembro[]> {
@@ -96,18 +109,20 @@ export async function createProjeto(payload: ProjetoFormData): Promise<ProjetoWi
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Usuário não autenticado");
 
+  // Select mínimo no RETURNING: select com embeds pode falhar no RLS
+  // logo após o insert e mascarar a criação com erro falso.
   const { data, error } = await supabase
     .from("projetos")
     .insert({
       nome: payload.nome.trim(),
       descricao: payload.descricao?.trim() || null,
-      responsavel_id: payload.responsavel_id,
+      responsavel_id: payload.responsavel_id || null,
       data_inicio: payload.data_inicio,
       data_termino_prevista: payload.data_termino_prevista,
       status: payload.status,
       criado_por: user.id,
     })
-    .select(PROJETO_SELECT)
+    .select("id")
     .single();
 
   if (error) {
@@ -118,7 +133,18 @@ export async function createProjeto(payload: ProjetoFormData): Promise<ProjetoWi
   }
 
   // Participantes: somente quem foi adicionado manualmente como membro.
-  await syncProjetoMembros(data.id, payload.membro_ids);
+  // O criador já tem visibilidade via criado_por (não precisa estar em projeto_membros).
+  try {
+    await syncProjetoMembros(data.id, payload.membro_ids);
+  } catch (membrosError) {
+    // Projeto já existe; não deixar o usuário sem feedback claro.
+    throw new Error(
+      `Projeto criado, mas não foi possível salvar a equipe: ${
+        membrosError instanceof Error ? membrosError.message : "erro de permissão"
+      }`,
+    );
+  }
+
   return getProjeto(data.id);
 }
 
@@ -144,7 +170,7 @@ export async function updateProjeto(
     .update({
       nome: payload.nome.trim(),
       descricao: payload.descricao?.trim() || null,
-      responsavel_id: payload.responsavel_id,
+      responsavel_id: payload.responsavel_id || null,
       data_inicio: payload.data_inicio,
       data_termino_prevista: payload.data_termino_prevista,
       status: payload.status,
