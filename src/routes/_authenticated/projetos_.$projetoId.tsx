@@ -1,8 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { ArrowLeft, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ConfirmDeleteDialog } from "@/components/common/confirm-delete-dialog";
+import { ProfileAvatar } from "@/components/common/profile-avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -165,14 +168,28 @@ function ProjetoDetailPage() {
                   {PROJETO_STATUS_LABELS[projeto.status]}
                 </Badge>
               </div>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Criador: {projeto.criador?.nome_completo ?? "Não informado"}
-                {projeto.responsavel?.nome_completo
-                  ? ` · Responsável: ${projeto.responsavel.nome_completo}`
-                  : ""}
-              </p>
+              <div className="mt-3 flex items-center gap-2">
+                <ProfileAvatar
+                  name={projeto.criador?.nome_completo ?? "Não informado"}
+                  avatarUrl={projeto.criador?.avatar_url}
+                  className="h-8 w-8"
+                />
+                <div>
+                  <p className="text-sm font-medium">
+                    {projeto.criador?.nome_completo ?? "Não informado"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {format(new Date(projeto.created_at), "dd 'de' MMMM 'de' yyyy", {
+                      locale: ptBR,
+                    })}
+                    {projeto.responsavel?.nome_completo
+                      ? ` · Responsável: ${projeto.responsavel.nome_completo}`
+                      : ""}
+                  </p>
+                </div>
+              </div>
               {projeto.descricao ? (
-                <p className="mt-1 text-sm text-muted-foreground">{projeto.descricao}</p>
+                <p className="mt-2 text-sm text-muted-foreground">{projeto.descricao}</p>
               ) : null}
             </div>
 

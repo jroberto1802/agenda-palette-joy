@@ -131,7 +131,8 @@ export function ProjetoEquipeSection({
 
       {!canManage && (
         <p className="text-xs text-muted-foreground">
-          Somente o criador do projeto, gestores ou administradores podem alterar a equipe.
+          Somente o criador do projeto, gestores participantes ou administradores podem
+          alterar a equipe.
         </p>
       )}
 

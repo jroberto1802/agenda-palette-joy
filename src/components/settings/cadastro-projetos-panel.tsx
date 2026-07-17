@@ -1,8 +1,11 @@
 import { ClipboardList, Pencil, Plus, Search, Trash2, Users } from "lucide-react";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { ConfirmDeleteDialog } from "@/components/common/confirm-delete-dialog";
+import { ProfileAvatar } from "@/components/common/profile-avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -127,7 +130,7 @@ export function CadastroProjetosPanel({
         toast.error("Sem permissão para excluir", {
           description: hasOpen
             ? "Com atividades abertas, apenas o administrador pode excluir o projeto."
-            : "Apenas o criador, gestores ou administradores podem excluir este projeto.",
+            : "Apenas o criador, gestores participantes ou administradores podem excluir este projeto.",
         });
         return;
       }
@@ -303,10 +306,23 @@ export function CadastroProjetosPanel({
                     )}
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-1 p-3 pt-0 text-xs text-muted-foreground">
-                  <p className="truncate">
-                    Criador: {projeto.criador?.nome_completo ?? "Não informado"}
-                  </p>
+                <CardContent className="space-y-1.5 p-3 pt-0 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-1.5">
+                    <ProfileAvatar
+                      name={projeto.criador?.nome_completo ?? "Não informado"}
+                      avatarUrl={projeto.criador?.avatar_url}
+                      className="h-4 w-4"
+                      fallbackClassName="text-[8px]"
+                    />
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-medium leading-tight text-foreground">
+                        {projeto.criador?.nome_completo ?? "Não informado"}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {format(new Date(projeto.created_at), "dd MMM yyyy", { locale: ptBR })}
+                      </p>
+                    </div>
+                  </div>
                   <p className="truncate">
                     Responsável: {projeto.responsavel?.nome_completo ?? "Não definido"}
                   </p>
@@ -345,7 +361,7 @@ export function CadastroProjetosPanel({
           onSubmit={handleSave}
           loading={createProjeto.isPending || updateProjeto.isPending}
           canManageEquipe={
-            editing ? canManageProjetoMembros(profile, editing) : canManageProjetoMembros(profile)
+            editing ? canManageProjetoMembros(profile, editing) : true
           }
         />
       )}

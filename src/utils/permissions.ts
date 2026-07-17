@@ -89,6 +89,24 @@ export function canCreateProjetos(profile: Profile | null | undefined): boolean 
   return !!profile;
 }
 
+type ProjetoEscopo = {
+  criado_por: string | null;
+  membros?: Array<{ usuario_id?: string; usuario?: { id: string } | null } | null> | null;
+};
+
+/** Criador ou membro adicionado manualmente. */
+export function isProjetoParticipante(
+  profile: Profile | null | undefined,
+  projeto: ProjetoEscopo | null | undefined,
+): boolean {
+  if (!profile || !projeto) return false;
+  if (projeto.criado_por === profile.id) return true;
+  return (projeto.membros ?? []).some((m) => {
+    if (!m) return false;
+    return m.usuario_id === profile.id || m.usuario?.id === profile.id;
+  });
+}
+
 /**
  * Visibilidade no menu Projetos:
  * - Administrador: todos os projetos
@@ -98,44 +116,38 @@ export function canCreateProjetos(profile: Profile | null | undefined): boolean 
  */
 export function canSeeProjeto(
   profile: Profile | null | undefined,
-  projeto: {
-    criado_por: string | null;
-    membros?: Array<{ usuario_id?: string; usuario?: { id: string } | null } | null> | null;
-  } | null | undefined,
+  projeto: ProjetoEscopo | null | undefined,
 ): boolean {
   if (!profile || !projeto) return false;
   if (isAdmin(profile)) return true;
-  if (projeto.criado_por === profile.id) return true;
-  return (projeto.membros ?? []).some((m) => {
-    if (!m) return false;
-    return m.usuario_id === profile.id || m.usuario?.id === profile.id;
-  });
+  return isProjetoParticipante(profile, projeto);
 }
 
 /**
  * Edição / gestão do projeto (dados do formulário):
- * criador, gestor ou administrador.
+ * - Administrador: qualquer projeto
+ * - Criador: o próprio projeto
+ * - Gestor: apenas projetos em que participa
  */
 export function canManageProjeto(
   profile: Profile | null | undefined,
-  projeto: { criado_por: string | null } | null | undefined,
+  projeto: ProjetoEscopo | null | undefined,
 ): boolean {
   if (!profile || !projeto) return false;
-  return (
-    isAdmin(profile) ||
-    isGerente(profile) ||
-    projeto.criado_por === profile.id
-  );
+  if (isAdmin(profile)) return true;
+  if (projeto.criado_por === profile.id) return true;
+  if (isGerente(profile)) return isProjetoParticipante(profile, projeto);
+  return false;
 }
 
 /**
  * Exclusão de projeto:
  * - com atividades abertas (não concluídas): somente administrador;
- * - sem abertas: criador, gestor ou administrador.
+ * - sem abertas: criador, gestor participante ou administrador.
  */
 export function canDeleteProjeto(
   profile: Profile | null | undefined,
-  projeto: { criado_por: string | null } | null | undefined,
+  projeto: ProjetoEscopo | null | undefined,
   hasOpenActivities: boolean,
 ): boolean {
   if (!profile || !projeto) return false;
@@ -149,13 +161,21 @@ export function canDeleteProjetos(profile: Profile | null | undefined): boolean 
 }
 
 /**
- * Adicionar/remover participantes: somente Administrador e Gestor.
+ * Adicionar/remover participantes:
+ * - Criador: sempre (qualquer perfil)
+ * - Administrador: qualquer projeto
+ * - Gestor: apenas projetos em que participa (criador ou membro)
+ * - Usuário não criador: não
  */
 export function canManageProjetoMembros(
   profile: Profile | null | undefined,
-  _projeto?: { criado_por: string | null } | null,
+  projeto: ProjetoEscopo | null | undefined,
 ): boolean {
-  return isAdminOrGerente(profile);
+  if (!profile || !projeto) return false;
+  if (isAdmin(profile)) return true;
+  if (projeto.criado_por === profile.id) return true;
+  if (isGerente(profile)) return isProjetoParticipante(profile, projeto);
+  return false;
 }
 
 export const PAPEL_LABELS: Record<Papel, string> = {

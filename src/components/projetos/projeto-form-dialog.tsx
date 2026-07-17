@@ -204,8 +204,8 @@ export function ProjetoFormDialog({
                   </FormControl>
                   {!canManageEquipe ? (
                     <p className="text-xs text-muted-foreground">
-                      Somente gestores ou administradores podem adicionar ou remover
-                      participantes do projeto.
+                      Somente o criador do projeto, gestores participantes ou administradores
+                      podem adicionar ou remover pessoas.
                     </p>
                   ) : projeto ? (
                     <p className="text-xs text-muted-foreground">
