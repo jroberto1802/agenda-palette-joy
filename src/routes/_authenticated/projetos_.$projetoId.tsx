@@ -166,8 +166,14 @@ function ProjetoDetailPage() {
                 </Badge>
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
-                Tarefas do projeto em cards, lista ou colunas.
+                Criador: {projeto.criador?.nome_completo ?? "Não informado"}
+                {projeto.responsavel?.nome_completo
+                  ? ` · Responsável: ${projeto.responsavel.nome_completo}`
+                  : ""}
               </p>
+              {projeto.descricao ? (
+                <p className="mt-1 text-sm text-muted-foreground">{projeto.descricao}</p>
+              ) : null}
             </div>
 
             <ProjetoEquipeAvatars

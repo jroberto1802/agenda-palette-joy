@@ -84,7 +84,7 @@ export function canAccessConfiguracoesAdminSections(
   return isAdmin(profile);
 }
 
-/** Qualquer usuário autenticado pode criar projeto. */
+/** Qualquer perfil autenticado pode criar projeto. */
 export function canCreateProjetos(profile: Profile | null | undefined): boolean {
   return !!profile;
 }
@@ -92,11 +92,9 @@ export function canCreateProjetos(profile: Profile | null | undefined): boolean 
 /**
  * Visibilidade no menu Projetos:
  * - Administrador: todos os projetos
- * - Gestor / Usuário: apenas onde for criador, responsável por alguma tarefa,
- *   ou membro/visualizador (projeto_membros)
+ * - Gestor / Usuário: apenas se for criador ou membro adicionado manualmente
  *
- * A filtragem efetiva é feita no RLS (`can_see_projeto`); este helper documenta
- * a regra para a UI quando o projeto já está carregado.
+ * A filtragem efetiva é feita no RLS (`can_see_projeto`).
  */
 export function canSeeProjeto(
   profile: Profile | null | undefined,
@@ -104,16 +102,30 @@ export function canSeeProjeto(
     criado_por: string | null;
     membros?: Array<{ usuario_id?: string; usuario?: { id: string } | null } | null> | null;
   } | null | undefined,
-  options?: { isResponsavelDeTarefa?: boolean },
 ): boolean {
   if (!profile || !projeto) return false;
   if (isAdmin(profile)) return true;
   if (projeto.criado_por === profile.id) return true;
-  if (options?.isResponsavelDeTarefa) return true;
   return (projeto.membros ?? []).some((m) => {
     if (!m) return false;
     return m.usuario_id === profile.id || m.usuario?.id === profile.id;
   });
+}
+
+/**
+ * Edição / gestão do projeto (dados do formulário):
+ * criador, gestor ou administrador.
+ */
+export function canManageProjeto(
+  profile: Profile | null | undefined,
+  projeto: { criado_por: string | null } | null | undefined,
+): boolean {
+  if (!profile || !projeto) return false;
+  return (
+    isAdmin(profile) ||
+    isGerente(profile) ||
+    projeto.criado_por === profile.id
+  );
 }
 
 /**
@@ -128,11 +140,7 @@ export function canDeleteProjeto(
 ): boolean {
   if (!profile || !projeto) return false;
   if (hasOpenActivities) return isAdmin(profile);
-  return (
-    isAdmin(profile) ||
-    isGerente(profile) ||
-    projeto.criado_por === profile.id
-  );
+  return canManageProjeto(profile, projeto);
 }
 
 /** @deprecated Prefira `canDeleteProjeto` com contexto do projeto. */
@@ -140,17 +148,14 @@ export function canDeleteProjetos(profile: Profile | null | undefined): boolean 
   return isAdminOrGerente(profile);
 }
 
-/** Adicionar/remover membros: criador, gestor ou administrador. */
+/**
+ * Adicionar/remover participantes: somente Administrador e Gestor.
+ */
 export function canManageProjetoMembros(
   profile: Profile | null | undefined,
-  projeto: { criado_por: string | null } | null | undefined,
+  _projeto?: { criado_por: string | null } | null,
 ): boolean {
-  if (!profile || !projeto) return false;
-  return (
-    isAdmin(profile) ||
-    isGerente(profile) ||
-    projeto.criado_por === profile.id
-  );
+  return isAdminOrGerente(profile);
 }
 
 export const PAPEL_LABELS: Record<Papel, string> = {

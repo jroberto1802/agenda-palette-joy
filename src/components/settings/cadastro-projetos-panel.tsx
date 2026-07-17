@@ -22,7 +22,7 @@ import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
 import { DENSE_CARD_GRID_CLASS } from "@/lib/layout";
 import { countAtividadesAbertasPorProjeto } from "@/services/projetos";
 import type { ProjetoFormData, ProjetoWithResponsavel } from "@/types";
-import { canDeleteProjeto, canManageProjetoMembros, isAdmin, isGerente } from "@/utils/permissions";
+import { canDeleteProjeto, canManageProjeto, canManageProjetoMembros } from "@/utils/permissions";
 import { PROJETO_STATUS_BADGE_CLASS, PROJETO_STATUS_LABELS } from "@/utils/projetos";
 import { cn } from "@/lib/utils";
 
@@ -113,13 +113,11 @@ export function CadastroProjetosPanel({
   };
 
   const maybeShowDelete = (projeto: ProjetoWithResponsavel) => {
-    // Ícone visível para quem potencialmente pode excluir (criador/gestor/admin).
-    return (
-      isAdmin(profile) ||
-      isGerente(profile) ||
-      projeto.criado_por === profile?.id
-    );
+    return canManageProjeto(profile, projeto);
   };
+
+  const canEditProjeto = (projeto: ProjetoWithResponsavel) =>
+    canManageProjeto(profile, projeto);
 
   const requestDelete = async (projeto: ProjetoWithResponsavel) => {
     try {
@@ -219,6 +217,7 @@ export function CadastroProjetosPanel({
             const membrosCount = projeto.membros?.length ?? 0;
             const abertasEst = tarefasAbertasPorProjeto.get(projeto.id) ?? 0;
             const showDelete = maybeShowDelete(projeto);
+            const canEdit = canEditProjeto(projeto);
             const canEditEquipe = canManageProjetoMembros(profile, projeto);
             return (
               <Card
@@ -265,13 +264,13 @@ export function CadastroProjetosPanel({
                         </p>
                       )}
                     </div>
-                    {(canManage || showDelete) && (
+                    {(canEdit || showDelete) && (
                       <div
                         className="flex shrink-0 gap-0.5"
                         onClick={(e) => e.stopPropagation()}
                         onKeyDown={(e) => e.stopPropagation()}
                       >
-                        {canManage && (
+                        {canEdit && (
                           <Button
                             variant="ghost"
                             size="icon"
@@ -305,6 +304,9 @@ export function CadastroProjetosPanel({
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-1 p-3 pt-0 text-xs text-muted-foreground">
+                  <p className="truncate">
+                    Criador: {projeto.criador?.nome_completo ?? "Não informado"}
+                  </p>
                   <p className="truncate">
                     Responsável: {projeto.responsavel?.nome_completo ?? "Não definido"}
                   </p>
@@ -343,7 +345,7 @@ export function CadastroProjetosPanel({
           onSubmit={handleSave}
           loading={createProjeto.isPending || updateProjeto.isPending}
           canManageEquipe={
-            editing ? canManageProjetoMembros(profile, editing) : true
+            editing ? canManageProjetoMembros(profile, editing) : canManageProjetoMembros(profile)
           }
         />
       )}

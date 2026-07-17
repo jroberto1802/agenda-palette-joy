@@ -3,6 +3,7 @@ import type { ProjetoFormData, ProjetoMembro, ProjetoWithResponsavel } from "@/t
 
 const PROJETO_SELECT = `
   *,
+  criador:profiles!projetos_criado_por_fkey(id, nome_completo, avatar_url),
   responsavel:profiles!projetos_responsavel_id_fkey(id, nome_completo, avatar_url),
   membros:projeto_membros(
     usuario_id,
@@ -116,12 +117,8 @@ export async function createProjeto(payload: ProjetoFormData): Promise<ProjetoWi
     throw error;
   }
 
-  const membroIds = [...payload.membro_ids];
-  if (payload.responsavel_id && !membroIds.includes(payload.responsavel_id)) {
-    membroIds.push(payload.responsavel_id);
-  }
-
-  await syncProjetoMembros(data.id, membroIds);
+  // Participantes: somente quem foi adicionado manualmente como membro.
+  await syncProjetoMembros(data.id, payload.membro_ids);
   return getProjeto(data.id);
 }
 

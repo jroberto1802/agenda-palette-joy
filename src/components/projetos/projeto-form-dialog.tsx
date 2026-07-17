@@ -199,14 +199,13 @@ export function ProjetoFormDialog({
                       onChange={field.onChange}
                       placeholder="Selecione os membros da equipe"
                       showSelectAll
-                      disabled={!!projeto && !canManageEquipe}
+                      disabled={!canManageEquipe}
                     />
                   </FormControl>
-                  {projeto && !canManageEquipe ? (
+                  {!canManageEquipe ? (
                     <p className="text-xs text-muted-foreground">
-                      Somente o criador, gestores ou administradores podem alterar a equipe.
-                      Remoções com atividades devem ser feitas na tela do projeto (com
-                      transferência).
+                      Somente gestores ou administradores podem adicionar ou remover
+                      participantes do projeto.
                     </p>
                   ) : projeto ? (
                     <p className="text-xs text-muted-foreground">

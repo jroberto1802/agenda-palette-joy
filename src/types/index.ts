@@ -29,6 +29,7 @@ export type Projeto = Tables<"projetos">;
 export type ProjetoStatus = Projeto["status"];
 
 export type ProjetoWithResponsavel = Projeto & {
+  criador: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
   responsavel: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
   membros?: {
     usuario_id: string;
