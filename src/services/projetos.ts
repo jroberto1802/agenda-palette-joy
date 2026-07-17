@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { buscarProjetoIds } from "@/services/busca";
 import type { ProjetoFormData, ProjetoMembro, ProjetoWithResponsavel } from "@/types";
 
 const PROJETO_SELECT = `
@@ -94,8 +95,11 @@ export async function getProjeto(id: string): Promise<ProjetoWithResponsavel> {
 export async function listProjetos(search?: string): Promise<ProjetoWithResponsavel[]> {
   let query = supabase.from("projetos").select(PROJETO_SELECT).order("nome");
 
-  if (search?.trim()) {
-    query = query.ilike("nome", `%${search.trim()}%`);
+  const searchTerm = search?.trim() ?? "";
+  if (searchTerm.length >= 2) {
+    const projetoIds = await buscarProjetoIds(searchTerm);
+    if (projetoIds.length === 0) return [];
+    query = query.in("id", projetoIds);
   }
 
   const { data, error } = await query;

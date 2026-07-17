@@ -44,10 +44,10 @@ export function TarefaFiltersBar({
   return (
     <div className="-mx-1 overflow-x-auto pb-1">
       <div className="flex w-max min-w-full items-center gap-3 px-1">
-        <div className="relative w-[220px] shrink-0 grow basis-[200px] sm:w-[240px]">
+        <div className="relative w-[280px] shrink-0 grow basis-[220px] sm:w-[320px]">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder={isFinalizados ? "Buscar por título..." : "Buscar tarefas..."}
+            placeholder="Buscar título, descrição ou comentário..."
             className="pl-9"
             value={filters.search ?? ""}
             onChange={(e) => onChange({ ...filters, search: e.target.value })}

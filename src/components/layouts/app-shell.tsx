@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState, type ComponentType, type ReactNode } from "react";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
+import { BuscaDialog } from "@/components/busca/busca-dialog";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { TarefaPanelSheet } from "@/components/tarefas/tarefa-panel-sheet";
 import {
@@ -56,7 +57,7 @@ type NavItem = {
  * Ordem do menu:
  * Dashboard → Avisos → Nova tarefa → Buscar → Agenda → Projetos → Calendário →
  * Equipe → Finalizados → Relatórios → Configurações → Admin
- * ("Nova tarefa" e "Buscar" são injetadas antes de Agenda no SidebarNavItems.)
+ * ("Nova tarefa" e "Buscar" são ações injetadas antes de Agenda.)
  */
 const BASE_NAV: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -79,16 +80,23 @@ function SidebarNavItems({
   navItems,
   isActive,
   onNovaTarefa,
+  onBuscar,
 }: {
   navItems: NavItem[];
   isActive: (to: string) => boolean;
   onNovaTarefa: () => void;
+  onBuscar: () => void;
 }) {
   const { isMobile, setOpenMobile } = useSidebar();
 
   const handleNovaTarefa = () => {
     if (isMobile) setOpenMobile(false);
     onNovaTarefa();
+  };
+
+  const handleBuscar = () => {
+    if (isMobile) setOpenMobile(false);
+    onBuscar();
   };
 
   return (
@@ -110,15 +118,9 @@ function SidebarNavItems({
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={isActive("/buscar")}
-                    tooltip="Buscar"
-                  >
-                    <Link to="/buscar">
-                      <Search />
-                      <span>Buscar</span>
-                    </Link>
+                  <SidebarMenuButton type="button" tooltip="Buscar" onClick={handleBuscar}>
+                    <Search />
+                    <span>Buscar</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </>
@@ -147,6 +149,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const [novaTarefaOpen, setNovaTarefaOpen] = useState(false);
   const [novaTarefaId, setNovaTarefaId] = useState<string | null>(null);
+  const [buscaOpen, setBuscaOpen] = useState(false);
 
   const displayName = profile?.nome_completo ?? user?.email ?? "Usuário";
   const empresaNome = empresa?.nome?.trim() || EMPRESA_NOME_PADRAO;
@@ -218,6 +221,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   navItems={navItems}
                   isActive={isActive}
                   onNovaTarefa={openNovaTarefa}
+                  onBuscar={() => setBuscaOpen(true)}
                 />
               </SidebarMenu>
             </SidebarGroupContent>
@@ -266,6 +270,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <main className="flex-1 p-4 sm:p-6">{children}</main>
       </SidebarInset>
+
+      <BuscaDialog open={buscaOpen} onOpenChange={setBuscaOpen} />
 
       <TarefaPanelSheet
         tarefaId={novaTarefaId}

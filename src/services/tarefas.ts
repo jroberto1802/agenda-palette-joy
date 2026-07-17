@@ -1,5 +1,6 @@
 import { endOfDay, startOfDay } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
+import { buscarTarefaIds } from "@/services/busca";
 import {
   getCurrentActor,
   getSubtarefaStakeholderIds,
@@ -195,6 +196,16 @@ export async function listTarefas(filters: TarefaFilters = {}): Promise<TarefaWi
     query = query.eq("projeto_id", filters.projeto_id);
   }
 
+  /** Interseção de IDs (busca local + responsáveis) — evita dois `.in("id")` conflitantes. */
+  let allowedIds: string[] | null = null;
+
+  const searchTerm = filters.search?.trim() ?? "";
+  if (searchTerm.length >= 2) {
+    const searchIds = await buscarTarefaIds(searchTerm);
+    if (searchIds.length === 0) return [];
+    allowedIds = searchIds;
+  }
+
   const atribuidoIds = [
     ...(filters.atribuido_ids ?? []),
     ...(filters.atribuido_a && filters.atribuido_a !== "all" ? [filters.atribuido_a] : []),
@@ -210,12 +221,18 @@ export async function listTarefas(filters: TarefaFilters = {}): Promise<TarefaWi
 
     const tarefaIds = [...new Set((links ?? []).map((row) => row.tarefa_id))];
     if (tarefaIds.length === 0) return [];
-    query = query.in("id", tarefaIds);
+
+    if (allowedIds) {
+      const atribuidoSet = new Set(tarefaIds);
+      allowedIds = allowedIds.filter((id) => atribuidoSet.has(id));
+      if (allowedIds.length === 0) return [];
+    } else {
+      allowedIds = tarefaIds;
+    }
   }
 
-  if (filters.search?.trim()) {
-    const term = filters.search.trim();
-    query = query.or(`titulo.ilike.%${term}%,descricao.ilike.%${term}%`);
+  if (allowedIds) {
+    query = query.in("id", allowedIds);
   }
 
   if (filters.tag?.trim()) {

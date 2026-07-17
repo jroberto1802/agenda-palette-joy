@@ -85,3 +85,29 @@ export async function buscarConteudo(termo: string): Promise<BuscaResultados> {
     comentarios: asArray<BuscaComentarioResult>(payload.comentarios),
   };
 }
+
+/** IDs de tarefas para filtros locais (Agenda / Finalizados / detalhe de projeto). */
+export async function buscarTarefaIds(termo: string): Promise<string[]> {
+  const trimmed = termo.trim();
+  if (trimmed.length < 2) return [];
+
+  const { data, error } = await supabase.rpc("buscar_tarefa_ids", {
+    p_termo: trimmed,
+  });
+
+  if (error) throw error;
+  return Array.isArray(data) ? (data as string[]) : [];
+}
+
+/** IDs de projetos para filtro local do menu Projetos. */
+export async function buscarProjetoIds(termo: string): Promise<string[]> {
+  const trimmed = termo.trim();
+  if (trimmed.length < 2) return [];
+
+  const { data, error } = await supabase.rpc("buscar_projeto_ids", {
+    p_termo: trimmed,
+  });
+
+  if (error) throw error;
+  return Array.isArray(data) ? (data as string[]) : [];
+}
