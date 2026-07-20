@@ -8,6 +8,8 @@ import {
   deleteSubtarefa,
   deleteSubtarefaComentario,
   deleteTarefaComentario,
+  duplicateSubtarefa,
+  duplicateTarefa,
   getDashboardKpis,
   getSubtarefaDetail,
   getTarefaDetail,
@@ -15,6 +17,8 @@ import {
   listSubtarefasAgenda,
   listTarefas,
   listTarefasCalendario,
+  moveSubtarefa,
+  moveTarefa,
   reorderSubtarefas,
   softDeleteTarefa,
   toggleSubtarefa,
@@ -147,6 +151,47 @@ export function useSoftDeleteTarefa() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => softDeleteTarefa(id),
+    onSuccess: () => invalidateTarefas(queryClient),
+  });
+}
+
+export function useDuplicateTarefa() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => duplicateTarefa(id),
+    onSuccess: () => invalidateTarefas(queryClient),
+  });
+}
+
+export function useMoveTarefa() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      projeto_id,
+      setor_id,
+    }: {
+      id: string;
+      projeto_id: string | null;
+      setor_id: string | null;
+    }) => moveTarefa(id, { projeto_id, setor_id }),
+    onSuccess: () => invalidateTarefas(queryClient),
+  });
+}
+
+export function useDuplicateSubtarefa() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => duplicateSubtarefa(id),
+    onSuccess: () => invalidateTarefas(queryClient),
+  });
+}
+
+export function useMoveSubtarefa() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, tarefaId }: { id: string; tarefaId: string }) =>
+      moveSubtarefa(id, tarefaId),
     onSuccess: () => invalidateTarefas(queryClient),
   });
 }

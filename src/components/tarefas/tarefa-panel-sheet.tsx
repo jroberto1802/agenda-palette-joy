@@ -23,6 +23,7 @@ import { CommentsThread } from "@/components/common/comments-thread";
 import { EditableOnDoubleClick } from "@/components/common/editable-on-double-click";
 import { SubtarefaPanelSheet } from "@/components/tarefas/subtarefa-panel-sheet";
 import { SubtarefaRow } from "@/components/tarefas/subtarefa-row";
+import { MoverSubtarefaDialog } from "@/components/tarefas/mover-subtarefa-dialog";
 import { TarefaAnexosSection } from "@/components/tarefas/tarefa-anexos-section";
 import { TarefaMetaToolbar } from "@/components/tarefas/tarefa-meta-toolbar";
 import { TarefaPeopleStrip } from "@/components/tarefas/tarefa-people-strip";
@@ -60,6 +61,7 @@ import {
   useCreateTarefaComentario,
   useDeleteSubtarefa,
   useDeleteTarefaComentario,
+  useDuplicateSubtarefa,
   useReorderSubtarefas,
   useTarefaDetail,
   useToggleSubtarefa,
@@ -162,6 +164,8 @@ function SortableSubtarefaRow({
   pessoasDisponiveis,
   onOpen,
   onToggle,
+  onDuplicate,
+  onMove,
   onDelete,
   onUpdateMeta,
 }: {
@@ -170,6 +174,8 @@ function SortableSubtarefaRow({
   pessoasDisponiveis: ProfileWithSetor[];
   onOpen: () => void;
   onToggle: (concluida: boolean) => Promise<void>;
+  onDuplicate: () => void;
+  onMove: () => void;
   onDelete: () => Promise<void>;
   onUpdateMeta: (meta: {
     data_inicio?: string | null;
@@ -193,6 +199,8 @@ function SortableSubtarefaRow({
         pessoasDisponiveis={pessoasDisponiveis}
         onOpen={onOpen}
         onToggle={onToggle}
+        onDuplicate={onDuplicate}
+        onMove={onMove}
         onDelete={onDelete}
         onUpdateMeta={onUpdateMeta}
         isDragging={isDragging}
@@ -321,6 +329,7 @@ export function TarefaPanelSheet({
   const toggleSubtarefa = useToggleSubtarefa();
   const updateSubtarefaMeta = useUpdateSubtarefaMeta();
   const deleteSubtarefa = useDeleteSubtarefa();
+  const duplicateSubtarefa = useDuplicateSubtarefa();
   const reorderSubtarefas = useReorderSubtarefas();
   const createComentario = useCreateTarefaComentario();
   const deleteComentario = useDeleteTarefaComentario();
@@ -329,6 +338,7 @@ export function TarefaPanelSheet({
   const [novaSubtarefa, setNovaSubtarefa] = useState("");
   const [subtarefaOrder, setSubtarefaOrder] = useState<string[]>([]);
   const [subtarefaDrawerId, setSubtarefaDrawerId] = useState<string | null>(null);
+  const [movingSubtarefa, setMovingSubtarefa] = useState<SubtarefaWithAuthors | null>(null);
   const [sideTab, setSideTab] = useState<"comentarios" | "anexos">(
     initialAba ?? "comentarios",
   );
@@ -911,6 +921,17 @@ export function TarefaPanelSheet({
                                         throw error;
                                       }
                                     }}
+                                    onDuplicate={async () => {
+                                      try {
+                                        await duplicateSubtarefa.mutateAsync(sub.id);
+                                        toast.success("Subtarefa duplicada");
+                                      } catch (error) {
+                                        toast.error("Erro ao duplicar subtarefa", {
+                                          description: getSupabaseErrorMessage(error as Error),
+                                        });
+                                      }
+                                    }}
+                                    onMove={() => setMovingSubtarefa(sub)}
                                     onDelete={async () => {
                                       try {
                                         await deleteSubtarefa.mutateAsync(sub.id);
@@ -1055,6 +1076,14 @@ export function TarefaPanelSheet({
           ? highlightComentarioId
           : null
       }
+    />
+
+    <MoverSubtarefaDialog
+      subtarefa={movingSubtarefa}
+      open={!!movingSubtarefa}
+      onOpenChange={(open) => {
+        if (!open) setMovingSubtarefa(null);
+      }}
     />
     </>
   );

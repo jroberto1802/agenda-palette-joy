@@ -591,6 +591,10 @@ export async function getTarefaDetail(id: string): Promise<TarefaDetail> {
         responsaveis:subtarefa_responsaveis(
           usuario_id,
           usuario:profiles!subtarefa_responsaveis_usuario_id_fkey(id, nome_completo, avatar_url)
+        ),
+        observadores:subtarefa_observadores(
+          usuario_id,
+          usuario:profiles!subtarefa_observadores_usuario_id_fkey(id, nome_completo, avatar_url)
         )
       ),
       comentarios:tarefa_comentarios(${COMENTARIO_SELECT}),
@@ -846,6 +850,189 @@ export async function createSubtarefa(
 
   if (error) throw error;
   return data as unknown as SubtarefaWithAuthors;
+}
+
+function tituloComSufixoCopia(titulo: string): string {
+  const base = titulo.trim();
+  return base.endsWith("(cópia)") ? base : `${base} (cópia)`;
+}
+
+async function insertSubtarefaCopia(params: {
+  source: SubtarefaWithAuthors & {
+    observadores?: { usuario_id: string }[];
+  };
+  tarefaId: string;
+  userId: string;
+  withTituloCopia: boolean;
+  posicao: number;
+}): Promise<string> {
+  const { source, tarefaId, userId, withTituloCopia, posicao } = params;
+  const newId = crypto.randomUUID();
+
+  const { error } = await supabase.from("subtarefas").insert({
+    id: newId,
+    tarefa_id: tarefaId,
+    titulo: withTituloCopia ? tituloComSufixoCopia(source.titulo) : source.titulo,
+    descricao: source.descricao,
+    prioridade: source.prioridade,
+    data_inicio: source.data_inicio,
+    projeto_id: source.projeto_id,
+    setor_id: source.setor_id,
+    visibilidade: source.visibilidade,
+    lembretes: source.lembretes,
+    recorrencia: source.recorrencia,
+    concluida: false,
+    concluido_por: null,
+    criado_por: userId,
+    posicao,
+  });
+  if (error) throw error;
+
+  const responsavelIds = (source.responsaveis ?? []).map((r) => r.usuario_id).filter(Boolean);
+  if (responsavelIds.length > 0) {
+    await syncSubtarefaResponsaveis(newId, responsavelIds);
+  }
+
+  const observadorIds = (source.observadores ?? []).map((r) => r.usuario_id).filter(Boolean);
+  if (source.visibilidade === "pessoas_especificas" && observadorIds.length > 0) {
+    await syncSubtarefaObservadores(newId, observadorIds);
+  }
+
+  return newId;
+}
+
+/** Duplica tarefa (campos principais + subtarefas). Sem anexos/comentários. */
+export async function duplicateTarefa(id: string): Promise<TarefaWithRelations> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Usuário não autenticado");
+
+  const source = await getTarefaDetail(id);
+  const newId = crypto.randomUUID();
+  const responsavelIds =
+    source.responsaveis?.map((r) => r.usuario_id).filter(Boolean) ??
+    (source.atribuido_a ? [source.atribuido_a] : []);
+
+  if (responsavelIds.length === 0) {
+    throw new Error("A tarefa original não possui responsáveis para copiar.");
+  }
+
+  const { error } = await supabase.from("tarefas").insert({
+    id: newId,
+    titulo: tituloComSufixoCopia(source.titulo),
+    descricao: source.descricao,
+    projeto_id: source.projeto_id,
+    setor_id: source.setor_id,
+    atribuido_a: primaryAtribuido(responsavelIds),
+    prioridade: source.prioridade,
+    concluida: false,
+    data_inicio: source.data_inicio,
+    tags: source.tags,
+    recorrencia: source.recorrencia,
+    visibilidade: source.visibilidade,
+    lembretes: source.lembretes,
+    criado_por: user.id,
+  });
+  if (error) throw error;
+
+  await syncResponsaveis(newId, responsavelIds);
+
+  if (source.visibilidade === "pessoas_especificas") {
+    const observadorIds = (source.observadores ?? []).map((r) => r.usuario_id).filter(Boolean);
+    await syncObservadores(newId, observadorIds);
+  }
+
+  const subtarefas = sortSubtarefasList(source.subtarefas ?? []);
+  for (let index = 0; index < subtarefas.length; index++) {
+    await insertSubtarefaCopia({
+      source: subtarefas[index],
+      tarefaId: newId,
+      userId: user.id,
+      withTituloCopia: false,
+      posicao: index,
+    });
+  }
+
+  return getTarefa(newId);
+}
+
+/** Duplica subtarefa na mesma tarefa (sem anexos/comentários). */
+export async function duplicateSubtarefa(id: string): Promise<SubtarefaWithAuthors> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Usuário não autenticado");
+
+  const source = await getSubtarefaDetail(id);
+
+  const { data: existing, error: existingError } = await supabase
+    .from("subtarefas")
+    .select("posicao")
+    .eq("tarefa_id", source.tarefa_id)
+    .order("posicao", { ascending: false })
+    .limit(1);
+  if (existingError) throw existingError;
+
+  const nextPosicao = (existing?.[0]?.posicao ?? -1) + 1;
+  const newId = await insertSubtarefaCopia({
+    source,
+    tarefaId: source.tarefa_id,
+    userId: user.id,
+    withTituloCopia: true,
+    posicao: nextPosicao,
+  });
+
+  return getSubtarefaRow(newId);
+}
+
+/** Altera apenas Projeto e/ou Setor da tarefa (preserva filhos, anexos e comentários). */
+export async function moveTarefa(
+  id: string,
+  destino: { projeto_id: string | null; setor_id: string | null },
+): Promise<TarefaWithRelations> {
+  const { error } = await supabase
+    .from("tarefas")
+    .update({
+      projeto_id: destino.projeto_id,
+      setor_id: destino.setor_id,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .is("deleted_at", null);
+
+  if (error) throw error;
+  return getTarefa(id);
+}
+
+/** Move subtarefa para outra tarefa (preserva anexos e comentários). */
+export async function moveSubtarefa(
+  id: string,
+  destinoTarefaId: string,
+): Promise<SubtarefaWithAuthors> {
+  if (!destinoTarefaId) throw new Error("Selecione a tarefa de destino.");
+
+  const { data: existing, error: existingError } = await supabase
+    .from("subtarefas")
+    .select("posicao")
+    .eq("tarefa_id", destinoTarefaId)
+    .order("posicao", { ascending: false })
+    .limit(1);
+  if (existingError) throw existingError;
+
+  const nextPosicao = (existing?.[0]?.posicao ?? -1) + 1;
+
+  const { error } = await supabase
+    .from("subtarefas")
+    .update({
+      tarefa_id: destinoTarefaId,
+      posicao: nextPosicao,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+
+  if (error) throw error;
+  return getSubtarefaRow(id);
 }
 
 /** Reordena subtarefas da mesma tarefa (ordem compartilhada). */

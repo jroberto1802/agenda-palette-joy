@@ -1,4 +1,4 @@
-import { CalendarIcon, ChevronRight, ListTodo } from "lucide-react";
+import { DescricaoPreview } from "@/components/tarefas/descricao-preview";
 import { ConclusaoBolinha } from "@/components/tarefas/conclusao-bolinha";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -9,6 +9,7 @@ import {
   TAREFA_PRIORIDADE_COLORS,
   TAREFA_PRIORIDADE_LABELS,
 } from "@/utils/tarefas";
+import { CalendarIcon, ChevronRight, ListTodo } from "lucide-react";
 
 export function SubtarefaAgendaListRow({
   subtarefa,
@@ -45,6 +46,7 @@ export function SubtarefaAgendaListRow({
         >
           {subtarefa.titulo}
         </p>
+        <DescricaoPreview descricao={subtarefa.descricao} />
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           <Badge variant="secondary" className="gap-1 px-1.5 py-0 text-[10px]">
             <ListTodo className="h-3 w-3" />
@@ -96,6 +98,7 @@ export function SubtarefaAgendaCard({
       )}
     >
       <p className="line-clamp-2 text-sm font-medium leading-snug">{subtarefa.titulo}</p>
+      <DescricaoPreview descricao={subtarefa.descricao} className="mt-1 line-clamp-2 text-[11px] leading-snug text-muted-foreground" />
       <p className="mt-1 truncate text-[11px] text-muted-foreground">de: {parentTitle}</p>
       <div className="mt-1.5 flex flex-wrap gap-1">
         <Badge variant="secondary" className="gap-1 px-1.5 py-0 text-[10px]">

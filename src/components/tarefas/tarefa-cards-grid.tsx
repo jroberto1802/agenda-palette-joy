@@ -32,6 +32,8 @@ function SortableCardShell({
   canToggleConcluida,
   onOpen,
   onEdit,
+  onDuplicate,
+  onMove,
   onDelete,
   onToggleConcluida,
 }: {
@@ -41,6 +43,8 @@ function SortableCardShell({
   canToggleConcluida: boolean;
   onOpen: () => void;
   onEdit: () => void;
+  onDuplicate: () => void;
+  onMove: () => void;
   onDelete: () => void;
   onToggleConcluida: (concluida: boolean) => void | Promise<void>;
 }) {
@@ -71,6 +75,8 @@ function SortableCardShell({
         canToggleConcluida={canToggleConcluida}
         onOpen={onOpen}
         onEdit={onEdit}
+        onDuplicate={onDuplicate}
+        onMove={onMove}
         onDelete={onDelete}
         onToggleConcluida={onToggleConcluida}
       />
@@ -84,6 +90,8 @@ export function TarefaCardsGrid({
   canDeleteTarefa,
   canToggleConcluida,
   onOpenTarefa,
+  onDuplicate,
+  onMove,
   onDelete,
   onToggleConcluida,
   enableReorder = false,
@@ -93,6 +101,8 @@ export function TarefaCardsGrid({
   canDeleteTarefa: (tarefa: TarefaWithRelations) => boolean;
   canToggleConcluida: (tarefa: TarefaWithRelations) => boolean;
   onOpenTarefa: (tarefa: TarefaWithRelations) => void;
+  onDuplicate: (tarefa: TarefaWithRelations) => void;
+  onMove: (tarefa: TarefaWithRelations) => void;
   onDelete: (tarefa: TarefaWithRelations) => void;
   onToggleConcluida: (tarefa: TarefaWithRelations, concluida: boolean) => void | Promise<void>;
   enableReorder?: boolean;
@@ -158,6 +168,8 @@ export function TarefaCardsGrid({
             canToggleConcluida={canToggleConcluida(tarefa)}
             onOpen={() => onOpenTarefa(tarefa)}
             onEdit={() => onOpenTarefa(tarefa)}
+            onDuplicate={() => onDuplicate(tarefa)}
+            onMove={() => onMove(tarefa)}
             onDelete={() => onDelete(tarefa)}
             onToggleConcluida={(concluida) => onToggleConcluida(tarefa, concluida)}
           />
@@ -179,6 +191,8 @@ export function TarefaCardsGrid({
               canToggleConcluida={canToggleConcluida(tarefa)}
               onOpen={() => onOpenTarefa(tarefa)}
               onEdit={() => onOpenTarefa(tarefa)}
+              onDuplicate={() => onDuplicate(tarefa)}
+              onMove={() => onMove(tarefa)}
               onDelete={() => onDelete(tarefa)}
               onToggleConcluida={(concluida) => onToggleConcluida(tarefa, concluida)}
             />

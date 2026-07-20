@@ -163,6 +163,10 @@ export type SubtarefaWithAuthors = Subtarefa & {
     usuario_id: string;
     usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
   }[];
+  observadores?: {
+    usuario_id: string;
+    usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
+  }[];
 };
 
 /** Subtarefa com data própria para as abas Hoje / Em breve da Agenda. */

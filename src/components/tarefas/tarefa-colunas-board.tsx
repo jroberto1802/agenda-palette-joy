@@ -22,7 +22,9 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ConfirmDeleteDialog } from "@/components/common/confirm-delete-dialog";
 import { ConclusaoBolinha } from "@/components/tarefas/conclusao-bolinha";
+import { DescricaoPreview } from "@/components/tarefas/descricao-preview";
 import { MinhaAgendaBadge } from "@/components/tarefas/subtarefa-row";
+import { TarefaActionsMenu } from "@/components/tarefas/tarefa-actions-menu";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -66,11 +68,13 @@ function ColunaCardContent({
   isDragging,
   onToggleConcluida,
   canToggleConcluida = true,
+  actions,
 }: {
   tarefa: TarefaWithRelations;
   isDragging?: boolean;
   onToggleConcluida?: (concluida: boolean) => void | Promise<void>;
   canToggleConcluida?: boolean;
+  actions?: React.ReactNode;
 }) {
   const vencimentoVariant = getVencimentoVariant(tarefa.data_inicio, tarefa.concluida);
 
@@ -93,8 +97,9 @@ function ColunaCardContent({
             className="mt-0.5"
           />
         )}
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 space-y-1">
           <p className="text-sm font-medium leading-snug">{tarefa.titulo}</p>
+          <DescricaoPreview descricao={tarefa.descricao} />
           <div className="mt-2 flex flex-wrap gap-1">
             <Badge
               variant="outline"
@@ -114,6 +119,7 @@ function ColunaCardContent({
             <MinhaAgendaBadge tarefa={tarefa} />
           </div>
         </div>
+        {actions}
       </div>
       <div className="flex flex-wrap gap-x-3 gap-y-1 pl-6 text-xs text-muted-foreground">
         {formatResponsaveisLabel(tarefa) !== "Sem responsável" && (
@@ -145,11 +151,13 @@ function SortableColunaCard({
   onOpen,
   onToggleConcluida,
   canToggleConcluida,
+  actions,
 }: {
   tarefa: TarefaWithRelations;
   onOpen: () => void;
   onToggleConcluida: (concluida: boolean) => void | Promise<void>;
   canToggleConcluida: boolean;
+  actions?: React.ReactNode;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: tarefa.id,
@@ -172,6 +180,7 @@ function SortableColunaCard({
         isDragging={isDragging}
         onToggleConcluida={onToggleConcluida}
         canToggleConcluida={canToggleConcluida}
+        actions={actions}
       />
     </div>
   );
@@ -183,6 +192,11 @@ function DroppableColuna({
   onOpenTarefa,
   onToggleConcluida,
   canToggleConcluida,
+  canEdit,
+  canDeleteTarefa,
+  onDuplicate,
+  onMove,
+  onDeleteTarefa,
   onRename,
   onDelete,
 }: {
@@ -191,6 +205,11 @@ function DroppableColuna({
   onOpenTarefa: (tarefa: TarefaWithRelations) => void;
   onToggleConcluida: (tarefa: TarefaWithRelations, concluida: boolean) => void | Promise<void>;
   canToggleConcluida: (tarefa: TarefaWithRelations) => boolean;
+  canEdit?: (tarefa: TarefaWithRelations) => boolean;
+  canDeleteTarefa?: (tarefa: TarefaWithRelations) => boolean;
+  onDuplicate?: (tarefa: TarefaWithRelations) => void;
+  onMove?: (tarefa: TarefaWithRelations) => void;
+  onDeleteTarefa?: (tarefa: TarefaWithRelations) => void;
   onRename: (coluna: TarefaBoardColuna) => void;
   onDelete: (coluna: TarefaBoardColuna) => void;
 }) {
@@ -254,6 +273,18 @@ function DroppableColuna({
                   onOpen={() => onOpenTarefa(tarefa)}
                   onToggleConcluida={(concluida) => onToggleConcluida(tarefa, concluida)}
                   canToggleConcluida={canToggleConcluida(tarefa)}
+                  actions={
+                    canEdit && onDuplicate && onMove && onDeleteTarefa ? (
+                      <TarefaActionsMenu
+                        canEdit={canEdit(tarefa)}
+                        canDelete={canDeleteTarefa ? canDeleteTarefa(tarefa) : false}
+                        onEdit={() => onOpenTarefa(tarefa)}
+                        onDuplicate={() => onDuplicate(tarefa)}
+                        onMove={() => onMove(tarefa)}
+                        onDelete={() => onDeleteTarefa(tarefa)}
+                      />
+                    ) : undefined
+                  }
                 />
               ))}
               {tarefas.length === 0 && (
@@ -284,11 +315,21 @@ export function TarefaColunasBoard({
   onOpenTarefa,
   onToggleConcluida,
   canToggleConcluida,
+  canEdit,
+  canDeleteTarefa,
+  onDuplicate,
+  onMove,
+  onDelete,
 }: {
   tarefas: TarefaWithRelations[];
   onOpenTarefa: (tarefa: TarefaWithRelations) => void;
   onToggleConcluida: (tarefa: TarefaWithRelations, concluida: boolean) => void | Promise<void>;
   canToggleConcluida: (tarefa: TarefaWithRelations) => boolean;
+  canEdit?: (tarefa: TarefaWithRelations) => boolean;
+  canDeleteTarefa?: (tarefa: TarefaWithRelations) => boolean;
+  onDuplicate?: (tarefa: TarefaWithRelations) => void;
+  onMove?: (tarefa: TarefaWithRelations) => void;
+  onDelete?: (tarefa: TarefaWithRelations) => void;
 }) {
   const { data: colunas = [], isLoading: loadingColunas } = useTarefaBoardColunas();
   const { data: itens = [] } = useTarefaBoardItens();
@@ -515,6 +556,11 @@ export function TarefaColunasBoard({
               onOpenTarefa={onOpenTarefa}
               onToggleConcluida={onToggleConcluida}
               canToggleConcluida={canToggleConcluida}
+              canEdit={canEdit}
+              canDeleteTarefa={canDeleteTarefa}
+              onDuplicate={onDuplicate}
+              onMove={onMove}
+              onDeleteTarefa={onDelete}
               onRename={(c) => {
                 setRenaming(c);
                 setRenameValue(c.nome);

@@ -1,11 +1,13 @@
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarDays, Eye, Trash2, UserRound } from "lucide-react";
+import { CalendarDays, Eye, UserRound } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import { ConfirmDeleteDialog } from "@/components/common/confirm-delete-dialog";
 import { PessoasMultiSelect } from "@/components/common/pessoas-multi-select";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
 import { ConclusaoBolinha } from "@/components/tarefas/conclusao-bolinha";
+import { DescricaoPreview } from "@/components/tarefas/descricao-preview";
+import { TarefaActionsMenu } from "@/components/tarefas/tarefa-actions-menu";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -123,6 +125,8 @@ export function SubtarefaRow({
   pessoasDisponiveis,
   onOpen,
   onToggle,
+  onDuplicate,
+  onMove,
   onDelete,
   onUpdateMeta,
   dragHandle,
@@ -133,6 +137,8 @@ export function SubtarefaRow({
   pessoasDisponiveis: ProfileWithSetor[];
   onOpen: () => void;
   onToggle: (concluida: boolean) => Promise<void>;
+  onDuplicate?: () => void;
+  onMove?: () => void;
   onDelete: () => Promise<void>;
   onUpdateMeta: (meta: {
     data_inicio?: string | null;
@@ -209,6 +215,7 @@ export function SubtarefaRow({
         title="Abrir detalhes da subtarefa"
       >
         <span className="block whitespace-normal break-words">{subtarefa.titulo}</span>
+        <DescricaoPreview descricao={subtarefa.descricao} className="mt-0.5 line-clamp-2 text-xs leading-snug text-muted-foreground" />
       </button>
 
       <TooltipProvider delayDuration={200}>
@@ -369,15 +376,15 @@ export function SubtarefaRow({
           )}
 
           {canEdit && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 opacity-0 group-hover:opacity-100"
-              onClick={() => setConfirmDeleteOpen(true)}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
+            <TarefaActionsMenu
+              canEdit={canEdit}
+              canDelete={canEdit}
+              label="Ações da subtarefa"
+              onEdit={onOpen}
+              onDuplicate={() => onDuplicate?.()}
+              onMove={() => onMove?.()}
+              onDelete={() => setConfirmDeleteOpen(true)}
+            />
           )}
         </div>
       </TooltipProvider>

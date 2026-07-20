@@ -1,14 +1,17 @@
 import { Plus } from "lucide-react";
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { AgendaViewSelector } from "@/components/tarefas/agenda-view-selector";
+import { MoverTarefaDialog } from "@/components/tarefas/mover-tarefa-dialog";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TarefaCardsGrid } from "@/components/tarefas/tarefa-cards-grid";
 import { TarefaColunasBoard } from "@/components/tarefas/tarefa-colunas-board";
 import { TarefaFiltersBar } from "@/components/tarefas/tarefa-filters";
 import { TarefaListView } from "@/components/tarefas/tarefa-list-view";
-import { useTarefas } from "@/hooks/use-tarefas";
+import { useDuplicateTarefa, useTarefas } from "@/hooks/use-tarefas";
 import { DENSE_CARD_GRID_CLASS } from "@/lib/layout";
+import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
 import type {
   ProfileWithSetor,
   Projeto,
@@ -114,6 +117,20 @@ export function TarefaAgendaBoard({
   const stateRef = useRef(state);
   stateRef.current = state;
 
+  const duplicateTarefa = useDuplicateTarefa();
+  const [movingTarefa, setMovingTarefa] = useState<TarefaWithRelations | null>(null);
+
+  const handleDuplicate = async (tarefa: TarefaWithRelations) => {
+    try {
+      await duplicateTarefa.mutateAsync(tarefa.id);
+      toast.success("Tarefa duplicada");
+    } catch (error) {
+      toast.error("Erro ao duplicar tarefa", {
+        description: getSupabaseErrorMessage(error as Error),
+      });
+    }
+  };
+
   const handleFiltersChange = useMemo(() => {
     let timeout: ReturnType<typeof setTimeout>;
     return (next: TarefaFilters) => {
@@ -195,6 +212,8 @@ export function TarefaAgendaBoard({
               canDeleteTarefa={canDeleteTarefa}
               canToggleConcluida={canToggleConcluida}
               onOpenTarefa={onOpenTarefa}
+              onDuplicate={(tarefa) => void handleDuplicate(tarefa)}
+              onMove={setMovingTarefa}
               onDelete={onDelete}
               onToggleConcluida={onToggleConcluida}
               enableReorder={enableReorder}
@@ -219,6 +238,11 @@ export function TarefaAgendaBoard({
               onOpenTarefa={onOpenTarefa}
               onToggleConcluida={onToggleConcluida}
               canToggleConcluida={canToggleConcluida}
+              canEdit={canEdit}
+              canDeleteTarefa={canDeleteTarefa}
+              onDuplicate={(tarefa) => void handleDuplicate(tarefa)}
+              onMove={setMovingTarefa}
+              onDelete={onDelete}
               enableReorder={enableReorder}
             />
           )}
@@ -241,10 +265,25 @@ export function TarefaAgendaBoard({
               onOpenTarefa={onOpenTarefa}
               onToggleConcluida={onToggleConcluida}
               canToggleConcluida={canToggleConcluida}
+              canEdit={canEdit}
+              canDeleteTarefa={canDeleteTarefa}
+              onDuplicate={(tarefa) => void handleDuplicate(tarefa)}
+              onMove={setMovingTarefa}
+              onDelete={onDelete}
             />
           )}
         </div>
       )}
+
+      <MoverTarefaDialog
+        tarefa={movingTarefa}
+        open={!!movingTarefa}
+        onOpenChange={(open) => {
+          if (!open) setMovingTarefa(null);
+        }}
+        setores={setores}
+        projetos={projetos}
+      />
     </div>
   );
 }

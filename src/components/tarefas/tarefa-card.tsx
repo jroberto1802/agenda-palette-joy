@@ -1,16 +1,11 @@
-import { CalendarIcon, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { CalendarIcon } from "lucide-react";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
 import { ConclusaoBolinha } from "@/components/tarefas/conclusao-bolinha";
+import { DescricaoPreview } from "@/components/tarefas/descricao-preview";
 import { MinhaAgendaBadge } from "@/components/tarefas/subtarefa-row";
+import { TarefaActionsMenu } from "@/components/tarefas/tarefa-actions-menu";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import type { TarefaWithRelations } from "@/types";
 import { formatDate, getVencimentoVariant } from "@/utils/formatters";
 import {
@@ -27,6 +22,8 @@ export function TarefaCard({
   canDelete,
   canToggleConcluida,
   onEdit,
+  onDuplicate,
+  onMove,
   onDelete,
   onToggleConcluida,
   onOpen,
@@ -37,6 +34,8 @@ export function TarefaCard({
   /** Permissão específica da bolinha: concluir (aberta) ou reabrir (concluída, respeita janela de 20min). */
   canToggleConcluida?: boolean;
   onEdit: () => void;
+  onDuplicate: () => void;
+  onMove: () => void;
   onDelete: () => void;
   onToggleConcluida: (concluida: boolean) => void | Promise<void>;
   onOpen?: () => void;
@@ -114,42 +113,19 @@ export function TarefaCard({
             </div>
           </div>
 
-          {(canEdit || canDelete) && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 shrink-0"
-                  aria-label="Ações da tarefa"
-                  onClick={(event) => event.stopPropagation()}
-                >
-                  <MoreHorizontal className="h-3.5 w-3.5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {canEdit && (
-                  <DropdownMenuItem onClick={onEdit}>
-                    <Pencil className="h-4 w-4 mr-2" />
-                    Editar
-                  </DropdownMenuItem>
-                )}
-                {canDelete && (
-                  <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Excluir
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+          <TarefaActionsMenu
+            canEdit={canEdit}
+            canDelete={canDelete}
+            onEdit={onEdit}
+            onDuplicate={onDuplicate}
+            onMove={onMove}
+            onDelete={onDelete}
+          />
         </div>
       </CardHeader>
 
       <CardContent className="space-y-2 p-3 pt-0 text-xs">
-        {tarefa.descricao && (
-          <p className="text-muted-foreground line-clamp-2 leading-snug">{tarefa.descricao}</p>
-        )}
+        <DescricaoPreview descricao={tarefa.descricao} />
 
         <div className="flex flex-wrap gap-x-3 gap-y-1 text-muted-foreground">
           {getTarefaResponsaveis(tarefa).length > 0 && (
