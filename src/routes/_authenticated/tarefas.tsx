@@ -57,7 +57,7 @@ function AgendaPage() {
   const { data: projetos } = useProjetos();
   const { data: pessoas } = usePessoas();
 
-  const [agendaTab, setAgendaTab] = useState<AgendaTab>("geral");
+  const [agendaTab, setAgendaTab] = useState<AgendaTab>("hoje");
   const [boardState, setBoardState] = useState<AgendaBoardState>(createAgendaBoardState);
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelId, setPanelId] = useState<string | null>(null);
@@ -204,12 +204,6 @@ function AgendaPage() {
       >
         <TabsList className="h-9 w-full justify-start gap-1 bg-transparent p-0 sm:w-auto">
           <TabsTrigger
-            value="geral"
-            className="rounded-none border-b-2 border-transparent px-3 pb-2 pt-1 shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
-          >
-            Agenda geral
-          </TabsTrigger>
-          <TabsTrigger
             value="hoje"
             className="rounded-none border-b-2 border-transparent px-3 pb-2 pt-1 shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
           >
@@ -221,7 +215,33 @@ function AgendaPage() {
           >
             Em breve
           </TabsTrigger>
+          <TabsTrigger
+            value="geral"
+            className="rounded-none border-b-2 border-transparent px-3 pb-2 pt-1 shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+          >
+            Agenda geral
+          </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="hoje" className="mt-0 focus-visible:ring-0">
+          <AgendaHojeView
+            usuarioId={profile?.id}
+            setores={setores ?? []}
+            projetos={projetos ?? []}
+            onOpenTarefa={openTarefa}
+            onOpenSubtarefa={openSubtarefa}
+            onCreate={() => openCreate(startOfTodayLocal())}
+          />
+        </TabsContent>
+
+        <TabsContent value="em_breve" className="mt-0 focus-visible:ring-0">
+          <AgendaEmBreveView
+            usuarioId={profile?.id}
+            onOpenTarefa={openTarefa}
+            onOpenSubtarefa={openSubtarefa}
+            onCreateForDate={(date) => openCreate(date)}
+          />
+        </TabsContent>
 
         <TabsContent value="geral" className="mt-0 focus-visible:ring-0">
           <TarefaAgendaBoard
@@ -253,24 +273,6 @@ function AgendaPage() {
             onCreate={() => openCreate(null)}
             onToggleConcluida={handleToggleConcluida}
             onDelete={setDeleting}
-          />
-        </TabsContent>
-
-        <TabsContent value="hoje" className="mt-0 focus-visible:ring-0">
-          <AgendaHojeView
-            usuarioId={profile?.id}
-            onOpenTarefa={openTarefa}
-            onOpenSubtarefa={openSubtarefa}
-            onCreate={() => openCreate(startOfTodayLocal())}
-          />
-        </TabsContent>
-
-        <TabsContent value="em_breve" className="mt-0 focus-visible:ring-0">
-          <AgendaEmBreveView
-            usuarioId={profile?.id}
-            onOpenTarefa={openTarefa}
-            onOpenSubtarefa={openSubtarefa}
-            onCreateForDate={(date) => openCreate(date)}
           />
         </TabsContent>
       </Tabs>

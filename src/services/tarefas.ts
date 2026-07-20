@@ -1,6 +1,6 @@
 import { endOfDay, startOfDay } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
-import { buscarTarefaIds } from "@/services/busca";
+import { buscarSubtarefaIds, buscarTarefaIds } from "@/services/busca";
 import {
   getCurrentActor,
   getSubtarefaStakeholderIds,
@@ -673,7 +673,7 @@ export async function listSubtarefasAgenda(
       ${SUBTAREFA_SELECT},
       setor:setores(id, nome, cor),
       projeto:projetos(id, nome),
-      tarefa:tarefas!inner(id, titulo, concluida, deleted_at)
+      tarefa:tarefas!inner(id, titulo, concluida, deleted_at, setor_id, projeto_id)
     `,
     )
     .eq("concluida", false)
@@ -690,6 +690,17 @@ export async function listSubtarefasAgenda(
     query = query.in("tarefa_id", tarefaIds);
   }
 
+  const searchTerm = filters.search?.trim() ?? "";
+  if (searchTerm.length >= 2) {
+    const searchIds = await buscarSubtarefaIds(searchTerm);
+    if (searchIds.length === 0) return [];
+    query = query.in("id", searchIds);
+  }
+
+  if (filters.prioridade && filters.prioridade !== "all") {
+    query = query.eq("prioridade", filters.prioridade);
+  }
+
   const de = filters.data_inicio_de.trim();
   const ate = filters.data_inicio_ate.trim();
   if (de || ate) {
@@ -702,14 +713,38 @@ export async function listSubtarefasAgenda(
   const { data, error } = await query;
   if (error) throw error;
 
+  const setorFilter =
+    filters.setor_id && filters.setor_id !== "all" ? filters.setor_id : null;
+  const projetoFilter =
+    filters.projeto_id && filters.projeto_id !== "all" ? filters.projeto_id : null;
+
   return ((data ?? []) as unknown as Array<
     SubtarefaAgendaItem & {
-      tarefa: { id: string; titulo: string; concluida: boolean; deleted_at: string | null } | null;
+      tarefa: {
+        id: string;
+        titulo: string;
+        concluida: boolean;
+        deleted_at: string | null;
+        setor_id: string | null;
+        projeto_id: string | null;
+      } | null;
     }
-  >).map((row) => ({
-    ...row,
-    tarefa: row.tarefa ? { id: row.tarefa.id, titulo: row.tarefa.titulo } : null,
-  }));
+  >)
+    .filter((row) => {
+      if (setorFilter) {
+        const setorId = row.setor_id ?? row.tarefa?.setor_id ?? null;
+        if (setorId !== setorFilter) return false;
+      }
+      if (projetoFilter) {
+        const projetoId = row.projeto_id ?? row.tarefa?.projeto_id ?? null;
+        if (projetoId !== projetoFilter) return false;
+      }
+      return true;
+    })
+    .map((row) => ({
+      ...row,
+      tarefa: row.tarefa ? { id: row.tarefa.id, titulo: row.tarefa.titulo } : null,
+    }));
 }
 
 async function syncSubtarefaResponsaveis(

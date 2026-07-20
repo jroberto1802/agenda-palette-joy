@@ -76,6 +76,10 @@ export function useSubtarefasAgenda(
     usuario_id: filters.usuario_id,
     data_inicio_de: filters.data_inicio_de,
     data_inicio_ate: filters.data_inicio_ate,
+    search: filters.search ?? "",
+    prioridade: filters.prioridade ?? "all",
+    setor_id: filters.setor_id ?? "all",
+    projeto_id: filters.projeto_id ?? "all",
   };
 
   return useQuery({

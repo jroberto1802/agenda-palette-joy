@@ -176,6 +176,10 @@ export type SubtarefaAgendaFilters = {
   usuario_id: string;
   data_inicio_de: string;
   data_inicio_ate: string;
+  search?: string;
+  prioridade?: TarefaPrioridade | "all";
+  setor_id?: string;
+  projeto_id?: string;
 };
 
 export type SubtarefaMetaUpdate = {

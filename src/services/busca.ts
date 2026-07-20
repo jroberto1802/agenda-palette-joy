@@ -111,3 +111,16 @@ export async function buscarProjetoIds(termo: string): Promise<string[]> {
   if (error) throw error;
   return Array.isArray(data) ? (data as string[]) : [];
 }
+
+/** IDs de subtarefas para filtros locais (ex.: aba Hoje). */
+export async function buscarSubtarefaIds(termo: string): Promise<string[]> {
+  const trimmed = termo.trim();
+  if (trimmed.length < 2) return [];
+
+  const { data, error } = await supabase.rpc("buscar_subtarefa_ids", {
+    p_termo: trimmed,
+  });
+
+  if (error) throw error;
+  return Array.isArray(data) ? (data as string[]) : [];
+}

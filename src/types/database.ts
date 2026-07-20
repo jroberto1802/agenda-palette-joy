@@ -1230,6 +1230,10 @@ export type Database = {
         Args: { p_termo: string };
         Returns: string[];
       };
+      buscar_subtarefa_ids: {
+        Args: { p_termo: string };
+        Returns: string[];
+      };
       fold_search_text: {
         Args: { t: string };
         Returns: string;

@@ -27,6 +27,7 @@ export function TarefaFiltersBar({
   hideResponsavel = false,
   hideProjeto = false,
   /** Menu Finalizados: período por data de finalização */
+  /** Menu Hoje: busca + prioridade + setor + projeto (sem tag/responsável) */
   variant = "default",
 }: {
   filters: TarefaFilters;
@@ -36,10 +37,11 @@ export function TarefaFiltersBar({
   pessoas: ProfileWithSetor[];
   hideResponsavel?: boolean;
   hideProjeto?: boolean;
-  variant?: "default" | "finalizados";
+  variant?: "default" | "finalizados" | "hoje";
 }) {
   const atribuidoIds = filters.atribuido_ids ?? [];
   const isFinalizados = variant === "finalizados";
+  const isHoje = variant === "hoje";
 
   return (
     <div className="-mx-1 overflow-x-auto pb-1">
@@ -109,7 +111,7 @@ export function TarefaFiltersBar({
           </Select>
         )}
 
-        {!hideResponsavel && (
+        {!hideResponsavel && !isHoje && (
           <div className="w-[180px] shrink-0 [&>button]:h-9">
             <PessoasMultiSelect
               pessoas={pessoas}
@@ -146,7 +148,7 @@ export function TarefaFiltersBar({
               onChange={(e) => onChange({ ...filters, periodo_fim: e.target.value })}
             />
           </>
-        ) : (
+        ) : isHoje ? null : (
           <Input
             placeholder="Filtrar por tag..."
             className="w-[160px] shrink-0"
