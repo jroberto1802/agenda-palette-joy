@@ -16,7 +16,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBuscaConteudo } from "@/hooks/use-busca";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
@@ -57,7 +56,7 @@ export function BuscaDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[85vh] w-[calc(100%-2rem)] max-w-2xl flex-col gap-0 overflow-hidden p-0 sm:rounded-xl">
-        <DialogHeader className="space-y-3 border-b px-5 pb-4 pt-5 text-left">
+        <DialogHeader className="shrink-0 space-y-3 border-b px-5 pb-4 pt-5 text-left">
           <DialogTitle>Buscar</DialogTitle>
           <DialogDescription>
             Localize projetos, tarefas, subtarefas, avisos e comentários.
@@ -74,7 +73,7 @@ export function BuscaDialog({
           </div>
         </DialogHeader>
 
-        <ScrollArea className="max-h-[min(55vh,28rem)] px-5 py-4">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
           {!enabled && (
             <p className="text-sm text-muted-foreground">
               Digite pelo menos 2 caracteres para iniciar a busca.
@@ -222,7 +221,7 @@ export function BuscaDialog({
               </ResultGroup>
             </div>
           )}
-        </ScrollArea>
+        </div>
       </DialogContent>
     </Dialog>
   );
@@ -253,7 +252,7 @@ function ResultGroup({
 
   return (
     <section className="space-y-2">
-      <div className="flex items-center gap-2">
+      <div className="sticky top-0 z-10 -mx-1 flex items-center gap-2 bg-background px-1 py-1.5">
         <Icon className="h-4 w-4 text-muted-foreground" />
         <h2 className="text-sm font-semibold">
           {title}{" "}
