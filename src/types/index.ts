@@ -153,6 +153,11 @@ export type TarefaFilters = {
   data_inicio_ate?: string;
   /** Agenda Hoje: `data_inicio` anterior a hoje (itens abertos com data vencida). */
   somente_atrasadas?: boolean;
+  /**
+   * Agenda Visualizando: itens visíveis por visibilidade,
+   * excluindo aqueles em que o usuário logado é responsável ou criador.
+   */
+  somente_visualizando?: boolean;
 };
 
 export type Subtarefa = Tables<"subtarefas">;
@@ -184,10 +189,17 @@ export type SubtarefaAgendaFilters = {
   data_inicio_ate?: string;
   /** Agenda Hoje: `data_inicio` anterior a hoje (itens abertos com data vencida). */
   somente_atrasadas?: boolean;
+  /**
+   * Agenda Visualizando: subtarefas visíveis por herança da tarefa pai,
+   * excluindo aquelas em que o usuário é responsável (da subtarefa ou da pai).
+   */
+  somente_visualizando?: boolean;
   search?: string;
   prioridade?: TarefaPrioridade | "all";
   setor_id?: string;
   projeto_id?: string;
+  /** Filtro multi: subtarefa aparece se qualquer um destes for responsável */
+  atribuido_ids?: string[];
 };
 
 export type SubtarefaMetaUpdate = {

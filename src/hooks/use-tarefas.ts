@@ -65,6 +65,7 @@ export function useTarefas(
     data_inicio_de: filters.data_inicio_de ?? "",
     data_inicio_ate: filters.data_inicio_ate ?? "",
     somente_atrasadas: filters.somente_atrasadas ? "1" : "0",
+    somente_visualizando: filters.somente_visualizando ? "1" : "0",
   };
 
   return useQuery({
@@ -83,10 +84,12 @@ export function useSubtarefasAgenda(
     data_inicio_de: filters.data_inicio_de ?? "",
     data_inicio_ate: filters.data_inicio_ate ?? "",
     somente_atrasadas: filters.somente_atrasadas ? "1" : "0",
+    somente_visualizando: filters.somente_visualizando ? "1" : "0",
     search: filters.search ?? "",
     prioridade: filters.prioridade ?? "all",
     setor_id: filters.setor_id ?? "all",
     projeto_id: filters.projeto_id ?? "all",
+    atribuido_ids: [...(filters.atribuido_ids ?? [])].sort().join(","),
   };
 
   return useQuery({

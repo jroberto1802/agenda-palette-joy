@@ -176,6 +176,10 @@ async function listResponsavelIds(tarefaId: string): Promise<string[]> {
 }
 
 export async function listTarefas(filters: TarefaFilters = {}): Promise<TarefaWithRelations[]> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   let query = supabase.from("tarefas").select(TAREFA_SELECT).is("deleted_at", null);
 
   if (filters.somente_finalizadas) {
@@ -235,6 +239,26 @@ export async function listTarefas(filters: TarefaFilters = {}): Promise<TarefaWi
     }
   }
 
+  let excludeIds = new Set<string>();
+  if (filters.somente_visualizando) {
+    if (!user) return [];
+    query = query
+      .neq("criado_por", user.id)
+      .neq("visibilidade", "somente_para_mim");
+
+    const { data: myLinks, error: myLinksError } = await supabase
+      .from("tarefa_responsaveis")
+      .select("tarefa_id")
+      .eq("usuario_id", user.id);
+    if (myLinksError) throw myLinksError;
+    excludeIds = new Set((myLinks ?? []).map((row) => row.tarefa_id));
+
+    if (allowedIds) {
+      allowedIds = allowedIds.filter((id) => !excludeIds.has(id));
+      if (allowedIds.length === 0) return [];
+    }
+  }
+
   if (allowedIds) {
     query = query.in("id", allowedIds);
   }
@@ -269,7 +293,21 @@ export async function listTarefas(filters: TarefaFilters = {}): Promise<TarefaWi
 
   const { data, error } = await query;
   if (error) throw error;
-  return (data ?? []) as TarefaWithRelations[];
+
+  let rows = (data ?? []) as TarefaWithRelations[];
+
+  if (filters.somente_visualizando && user) {
+    rows = rows.filter((tarefa) => {
+      if (excludeIds.has(tarefa.id)) return false;
+      if (tarefa.criado_por === user.id) return false;
+      if (tarefa.atribuido_a === user.id) return false;
+      if (tarefa.responsaveis?.some((r) => r.usuario_id === user.id)) return false;
+      if (tarefa.visibilidade === "somente_para_mim") return false;
+      return true;
+    });
+  }
+
+  return rows;
 }
 
 export async function getTarefa(id: string): Promise<TarefaWithRelations> {
@@ -709,14 +747,19 @@ const SUBTAREFA_DETAIL_SELECT = `
 `;
 
 /**
- * Subtarefas com Data própria para Agenda (Hoje / Em breve).
- * Escopo: responsável da subtarefa ou da tarefa pai; só abertas; pai não excluído/concluído.
+ * Subtarefas para Agenda (Hoje / Em breve / Visualizando).
+ * - Padrão: responsável da subtarefa ou da tarefa pai; com Data; abertas.
+ * - `somente_visualizando`: visíveis por herança da pai, sem ser responsável.
  */
 export async function listSubtarefasAgenda(
   filters: SubtarefaAgendaFilters,
 ): Promise<SubtarefaAgendaItem[]> {
   const usuarioId = filters.usuario_id.trim();
   if (!usuarioId) return [];
+
+  if (filters.somente_visualizando) {
+    return listSubtarefasVisualizando(filters);
+  }
 
   const [{ data: subLinks, error: subLinksError }, { data: tarefaLinks, error: tarefaLinksError }] =
     await Promise.all([
@@ -762,6 +805,81 @@ export async function listSubtarefasAgenda(
     query = query.in("tarefa_id", tarefaIds);
   }
 
+  return finalizeSubtarefasAgendaQuery(query, filters);
+}
+
+/** Subtarefas visíveis (RLS via pai) em que o usuário não é responsável. */
+async function listSubtarefasVisualizando(
+  filters: SubtarefaAgendaFilters,
+): Promise<SubtarefaAgendaItem[]> {
+  const usuarioId = filters.usuario_id.trim();
+
+  const [
+    { data: mySubLinks, error: mySubError },
+    { data: myTarefaLinks, error: myTarefaError },
+  ] = await Promise.all([
+    supabase
+      .from("subtarefa_responsaveis")
+      .select("subtarefa_id")
+      .eq("usuario_id", usuarioId),
+    supabase
+      .from("tarefa_responsaveis")
+      .select("tarefa_id")
+      .eq("usuario_id", usuarioId),
+  ]);
+
+  if (mySubError) throw mySubError;
+  if (myTarefaError) throw myTarefaError;
+
+  const excludeSubIds = new Set((mySubLinks ?? []).map((row) => row.subtarefa_id));
+  const excludeTarefaIds = new Set((myTarefaLinks ?? []).map((row) => row.tarefa_id));
+
+  let query = supabase
+    .from("subtarefas")
+    .select(
+      `
+      ${SUBTAREFA_SELECT},
+      setor:setores(id, nome, cor),
+      projeto:projetos(id, nome),
+      tarefa:tarefas!inner(
+        id, titulo, concluida, deleted_at, setor_id, projeto_id, criado_por, visibilidade
+      )
+    `,
+    )
+    .eq("concluida", false)
+    .eq("tarefa.concluida", false)
+    .is("tarefa.deleted_at", null)
+    .neq("tarefa.visibilidade", "somente_para_mim")
+    .order("created_at", { ascending: false });
+
+  if (filters.atribuido_ids && filters.atribuido_ids.length > 0) {
+    const { data: respLinks, error: respError } = await supabase
+      .from("subtarefa_responsaveis")
+      .select("subtarefa_id")
+      .in("usuario_id", filters.atribuido_ids);
+    if (respError) throw respError;
+    const ids = [...new Set((respLinks ?? []).map((row) => row.subtarefa_id))];
+    if (ids.length === 0) return [];
+    query = query.in("id", ids);
+  }
+
+  const rows = await finalizeSubtarefasAgendaQuery(query, filters);
+
+  return rows.filter((row) => {
+    if (excludeSubIds.has(row.id)) return false;
+    if (excludeTarefaIds.has(row.tarefa_id)) return false;
+    if (row.criado_por === usuarioId) return false;
+    if (row.responsaveis?.some((r) => r.usuario_id === usuarioId)) return false;
+    return true;
+  });
+}
+
+async function finalizeSubtarefasAgendaQuery(
+  // PostgREST builder tipado de forma frouxa — filtros encadeados variam por modo.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  query: any,
+  filters: SubtarefaAgendaFilters,
+): Promise<SubtarefaAgendaItem[]> {
   const searchTerm = filters.search?.trim() ?? "";
   if (searchTerm.length >= 2) {
     const searchIds = await buscarSubtarefaIds(searchTerm);
@@ -776,7 +894,9 @@ export async function listSubtarefasAgenda(
   const de = filters.data_inicio_de?.trim() ?? "";
   const ate = filters.data_inicio_ate?.trim() ?? "";
   if (filters.somente_atrasadas) {
-    query = query.lt("data_inicio", startOfTodayLocal().toISOString());
+    query = query
+      .not("data_inicio", "is", null)
+      .lt("data_inicio", startOfTodayLocal().toISOString());
   } else if (de || ate) {
     const from = de || ate;
     const to = ate || de;

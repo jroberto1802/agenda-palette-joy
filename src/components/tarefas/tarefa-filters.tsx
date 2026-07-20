@@ -28,6 +28,7 @@ export function TarefaFiltersBar({
   hideProjeto = false,
   /** Menu Finalizados: período por data de finalização */
   /** Menu Hoje: busca + prioridade + setor + projeto (sem tag/responsável) */
+  /** Menu Visualizando: busca + prioridade + setor + responsáveis (sem projeto/tag) */
   variant = "default",
 }: {
   filters: TarefaFilters;
@@ -37,11 +38,15 @@ export function TarefaFiltersBar({
   pessoas: ProfileWithSetor[];
   hideResponsavel?: boolean;
   hideProjeto?: boolean;
-  variant?: "default" | "finalizados" | "hoje";
+  variant?: "default" | "finalizados" | "hoje" | "visualizando";
 }) {
   const atribuidoIds = filters.atribuido_ids ?? [];
   const isFinalizados = variant === "finalizados";
   const isHoje = variant === "hoje";
+  const isVisualizando = variant === "visualizando";
+  const showProjeto = !hideProjeto && !isVisualizando;
+  const showTag = !isFinalizados && !isHoje && !isVisualizando;
+  const showResponsavel = !hideResponsavel && !isHoje;
 
   return (
     <div className="-mx-1 overflow-x-auto pb-1">
@@ -92,7 +97,7 @@ export function TarefaFiltersBar({
           </SelectContent>
         </Select>
 
-        {!hideProjeto && (
+        {showProjeto && (
           <Select
             value={filters.projeto_id ?? "all"}
             onValueChange={(v) => onChange({ ...filters, projeto_id: v })}
@@ -111,7 +116,7 @@ export function TarefaFiltersBar({
           </Select>
         )}
 
-        {!hideResponsavel && !isHoje && (
+        {showResponsavel && (
           <div className="w-[180px] shrink-0 [&>button]:h-9">
             <PessoasMultiSelect
               pessoas={pessoas}
@@ -148,14 +153,14 @@ export function TarefaFiltersBar({
               onChange={(e) => onChange({ ...filters, periodo_fim: e.target.value })}
             />
           </>
-        ) : isHoje ? null : (
+        ) : showTag ? (
           <Input
             placeholder="Filtrar por tag..."
             className="w-[160px] shrink-0"
             value={filters.tag ?? ""}
             onChange={(e) => onChange({ ...filters, tag: e.target.value })}
           />
-        )}
+        ) : null}
       </div>
     </div>
   );

@@ -5,6 +5,11 @@ import { toast } from "sonner";
 import { ConfirmDeleteDialog } from "@/components/common/confirm-delete-dialog";
 import { AgendaEmBreveView } from "@/components/tarefas/agenda-em-breve-view";
 import { AgendaHojeView } from "@/components/tarefas/agenda-hoje-view";
+import {
+  AgendaVisualizandoView,
+  createVisualizandoBoardState,
+  type VisualizandoBoardState,
+} from "@/components/tarefas/agenda-visualizando-view";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -31,7 +36,7 @@ type AgendaSearch = {
   subtarefaId?: string;
 };
 
-type AgendaTab = "hoje" | "em_breve" | "geral";
+type AgendaTab = "hoje" | "em_breve" | "geral" | "visualizando";
 
 export const Route = createFileRoute("/_authenticated/tarefas")({
   validateSearch: (search: Record<string, unknown>): AgendaSearch => ({
@@ -59,6 +64,9 @@ function AgendaPage() {
 
   const [agendaTab, setAgendaTab] = useState<AgendaTab>("hoje");
   const [boardState, setBoardState] = useState<AgendaBoardState>(createAgendaBoardState);
+  const [visualizandoState, setVisualizandoState] = useState<VisualizandoBoardState>(
+    createVisualizandoBoardState,
+  );
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelId, setPanelId] = useState<string | null>(null);
   const [panelAba, setPanelAba] = useState<"comentarios" | "anexos" | undefined>();
@@ -221,6 +229,12 @@ function AgendaPage() {
           >
             Agenda geral
           </TabsTrigger>
+          <TabsTrigger
+            value="visualizando"
+            className="rounded-none border-b-2 border-transparent px-3 pb-2 pt-1 shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+          >
+            Visualizando
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="hoje" className="mt-0 focus-visible:ring-0">
@@ -270,6 +284,25 @@ function AgendaPage() {
             canDeleteTarefa={canDeleteTarefa}
             canToggleConcluida={canToggleConcluida}
             onOpenTarefa={openTarefa}
+            onCreate={() => openCreate(null)}
+            onToggleConcluida={handleToggleConcluida}
+            onDelete={setDeleting}
+          />
+        </TabsContent>
+
+        <TabsContent value="visualizando" className="mt-0 focus-visible:ring-0">
+          <AgendaVisualizandoView
+            usuarioId={profile?.id}
+            state={visualizandoState}
+            onStateChange={setVisualizandoState}
+            setores={setores ?? []}
+            projetos={projetos ?? []}
+            pessoas={pessoasAtivas}
+            canEdit={canEdit}
+            canDeleteTarefa={canDeleteTarefa}
+            canToggleConcluida={canToggleConcluida}
+            onOpenTarefa={openTarefa}
+            onOpenSubtarefa={openSubtarefa}
             onCreate={() => openCreate(null)}
             onToggleConcluida={handleToggleConcluida}
             onDelete={setDeleting}
