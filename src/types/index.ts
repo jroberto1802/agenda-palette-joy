@@ -165,6 +165,19 @@ export type SubtarefaWithAuthors = Subtarefa & {
   }[];
 };
 
+/** Subtarefa com data própria para as abas Hoje / Em breve da Agenda. */
+export type SubtarefaAgendaItem = SubtarefaWithAuthors & {
+  tarefa: Pick<Tarefa, "id" | "titulo"> | null;
+  setor: Pick<Setor, "id" | "nome" | "cor"> | null;
+  projeto: Pick<Projeto, "id" | "nome"> | null;
+};
+
+export type SubtarefaAgendaFilters = {
+  usuario_id: string;
+  data_inicio_de: string;
+  data_inicio_ate: string;
+};
+
 export type SubtarefaMetaUpdate = {
   data_inicio?: string | null;
   atribuido_ids?: string[];

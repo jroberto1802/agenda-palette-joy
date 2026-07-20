@@ -19,7 +19,7 @@ import { useProfile } from "@/hooks/use-profile";
 import { useSetores } from "@/hooks/use-setores";
 import { useSoftDeleteTarefa, useUpdateTarefaConclusao } from "@/hooks/use-tarefas";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
-import type { TarefaWithRelations } from "@/types";
+import type { SubtarefaAgendaItem, TarefaWithRelations } from "@/types";
 import { localDateAtNoon, startOfTodayLocal } from "@/utils/agenda-datas";
 import { isAdmin, isGerente } from "@/utils/permissions";
 import { canEditTarefa, canToggleTarefaConclusao } from "@/utils/tarefas";
@@ -121,6 +121,15 @@ function AgendaPage() {
     setPanelAba(undefined);
     setHighlightComentarioId(null);
     setPanelSubtarefaId(null);
+    setDefaultDataInicio(null);
+    setPanelOpen(true);
+  };
+
+  const openSubtarefa = (subtarefa: SubtarefaAgendaItem) => {
+    setPanelId(subtarefa.tarefa_id);
+    setPanelAba(undefined);
+    setHighlightComentarioId(null);
+    setPanelSubtarefaId(subtarefa.id);
     setDefaultDataInicio(null);
     setPanelOpen(true);
   };
@@ -251,6 +260,7 @@ function AgendaPage() {
           <AgendaHojeView
             usuarioId={profile?.id}
             onOpenTarefa={openTarefa}
+            onOpenSubtarefa={openSubtarefa}
             onCreate={() => openCreate(startOfTodayLocal())}
           />
         </TabsContent>
@@ -259,6 +269,7 @@ function AgendaPage() {
           <AgendaEmBreveView
             usuarioId={profile?.id}
             onOpenTarefa={openTarefa}
+            onOpenSubtarefa={openSubtarefa}
             onCreateForDate={(date) => openCreate(date)}
           />
         </TabsContent>

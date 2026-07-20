@@ -44,6 +44,8 @@ export const anexoKeys = {
 export const subtarefaKeys = {
   all: ["subtarefas"] as const,
   detail: (id: string) => [...subtarefaKeys.all, "detail", id] as const,
+  agenda: (filters?: Record<string, string>) =>
+    [...subtarefaKeys.all, "agenda", filters ?? {}] as const,
 };
 
 export const avisoKeys = {

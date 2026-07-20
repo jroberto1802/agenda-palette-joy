@@ -2,6 +2,7 @@ import { addDays, format, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
+import { SubtarefaAgendaCard } from "@/components/tarefas/subtarefa-agenda-item";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,9 +13,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useTarefas } from "@/hooks/use-tarefas";
+import { useSubtarefasAgenda, useTarefas } from "@/hooks/use-tarefas";
 import { cn } from "@/lib/utils";
-import type { TarefaWithRelations } from "@/types";
+import type { SubtarefaAgendaItem, TarefaWithRelations } from "@/types";
 import {
   AGENDA_EM_BREVE_PAGE_SIZE,
   getEmBreveDays,
@@ -38,6 +39,10 @@ function buildYearOptions(): number[] {
     (_, i) => YEAR_OPTIONS_START + i,
   );
 }
+
+type EmBreveItem =
+  | { kind: "tarefa"; tarefa: TarefaWithRelations }
+  | { kind: "subtarefa"; subtarefa: SubtarefaAgendaItem };
 
 function EmBreveTaskCard({
   tarefa,
@@ -82,10 +87,12 @@ function EmBreveTaskCard({
 export function AgendaEmBreveView({
   usuarioId,
   onOpenTarefa,
+  onOpenSubtarefa,
   onCreateForDate,
 }: {
   usuarioId: string | undefined;
   onOpenTarefa: (tarefa: TarefaWithRelations) => void;
+  onOpenSubtarefa: (subtarefa: SubtarefaAgendaItem) => void;
   onCreateForDate: (date: Date) => void;
 }) {
   const [windowStart, setWindowStart] = useState(() => startOfTodayLocal());
@@ -98,7 +105,7 @@ export function AgendaEmBreveView({
   const rangeDe = toLocalDateKey(days[0])!;
   const rangeAte = toLocalDateKey(days[days.length - 1])!;
 
-  const { data: tarefas, isLoading } = useTarefas(
+  const { data: tarefas, isLoading: loadingTarefas } = useTarefas(
     {
       excluir_finalizadas: true,
       atribuido_ids: usuarioId ? [usuarioId] : [],
@@ -108,24 +115,49 @@ export function AgendaEmBreveView({
     { enabled: !!usuarioId },
   );
 
+  const { data: subtarefas, isLoading: loadingSubtarefas } = useSubtarefasAgenda(
+    {
+      usuario_id: usuarioId ?? "",
+      data_inicio_de: rangeDe,
+      data_inicio_ate: rangeAte,
+    },
+    { enabled: !!usuarioId },
+  );
+
+  const isLoading = loadingTarefas || loadingSubtarefas;
+
   const byDay = useMemo(() => {
-    const map = new Map<string, TarefaWithRelations[]>();
+    const map = new Map<string, EmBreveItem[]>();
     for (const day of days) {
       map.set(toLocalDateKey(day)!, []);
     }
     for (const t of tarefas ?? []) {
       const key = toLocalDateKey(t.data_inicio);
       if (!key || !map.has(key)) continue;
-      map.get(key)!.push(t);
+      map.get(key)!.push({ kind: "tarefa", tarefa: t });
+    }
+    for (const s of subtarefas ?? []) {
+      const key = toLocalDateKey(s.data_inicio);
+      if (!key || !map.has(key)) continue;
+      map.get(key)!.push({ kind: "subtarefa", subtarefa: s });
+    }
+    for (const [key, items] of map) {
+      map.set(
+        key,
+        [...items].sort((a, b) => {
+          const titleA = a.kind === "tarefa" ? a.tarefa.titulo : a.subtarefa.titulo;
+          const titleB = b.kind === "tarefa" ? b.tarefa.titulo : b.subtarefa.titulo;
+          return titleA.localeCompare(titleB, "pt-BR");
+        }),
+      );
     }
     return map;
-  }, [tarefas, days]);
+  }, [tarefas, subtarefas, days]);
 
   const selectedMonth = windowStart.getMonth();
   const selectedYear = windowStart.getFullYear();
   const yearOptions = useMemo(() => {
     const years = buildYearOptions();
-    // Mantém o Select sincronizado se a seta levar para fora do intervalo.
     if (!years.includes(selectedYear)) {
       return [...years, selectedYear].sort((a, b) => a - b);
     }
@@ -236,13 +268,21 @@ export function AgendaEmBreveView({
                     <Skeleton className="h-14 rounded-lg" />
                   </>
                 ) : (
-                  items.map((tarefa) => (
-                    <EmBreveTaskCard
-                      key={tarefa.id}
-                      tarefa={tarefa}
-                      onOpen={() => onOpenTarefa(tarefa)}
-                    />
-                  ))
+                  items.map((item) =>
+                    item.kind === "tarefa" ? (
+                      <EmBreveTaskCard
+                        key={`tarefa-${item.tarefa.id}`}
+                        tarefa={item.tarefa}
+                        onOpen={() => onOpenTarefa(item.tarefa)}
+                      />
+                    ) : (
+                      <SubtarefaAgendaCard
+                        key={`subtarefa-${item.subtarefa.id}`}
+                        subtarefa={item.subtarefa}
+                        onOpen={() => onOpenSubtarefa(item.subtarefa)}
+                      />
+                    ),
+                  )
                 )}
               </div>
 

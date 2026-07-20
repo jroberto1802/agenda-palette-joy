@@ -31,7 +31,7 @@ import {
   getTarefaResponsaveis,
 } from "@/utils/tarefas";
 
-function TarefaListRowContent({
+export function TarefaListRowContent({
   tarefa,
   onOpen,
   onToggleConcluida,

@@ -27,6 +27,8 @@ import { sortSubtarefasList } from "@/utils/tarefas";
 import type {
   DashboardKpis,
   Profile,
+  SubtarefaAgendaFilters,
+  SubtarefaAgendaItem,
   SubtarefaComentario,
   SubtarefaDetail,
   SubtarefaFormData,
@@ -633,6 +635,82 @@ const SUBTAREFA_DETAIL_SELECT = `
   anexos:subtarefa_anexos(id, subtarefa_id, storage_path, nome, tipo, tamanho, created_at),
   tarefa:tarefas!subtarefas_tarefa_id_fkey(id, titulo)
 `;
+
+/**
+ * Subtarefas com Data própria para Agenda (Hoje / Em breve).
+ * Escopo: responsável da subtarefa ou da tarefa pai; só abertas; pai não excluído/concluído.
+ */
+export async function listSubtarefasAgenda(
+  filters: SubtarefaAgendaFilters,
+): Promise<SubtarefaAgendaItem[]> {
+  const usuarioId = filters.usuario_id.trim();
+  if (!usuarioId) return [];
+
+  const [{ data: subLinks, error: subLinksError }, { data: tarefaLinks, error: tarefaLinksError }] =
+    await Promise.all([
+      supabase
+        .from("subtarefa_responsaveis")
+        .select("subtarefa_id")
+        .eq("usuario_id", usuarioId),
+      supabase
+        .from("tarefa_responsaveis")
+        .select("tarefa_id")
+        .eq("usuario_id", usuarioId),
+    ]);
+
+  if (subLinksError) throw subLinksError;
+  if (tarefaLinksError) throw tarefaLinksError;
+
+  const subtarefaIds = [...new Set((subLinks ?? []).map((row) => row.subtarefa_id))];
+  const tarefaIds = [...new Set((tarefaLinks ?? []).map((row) => row.tarefa_id))];
+
+  if (subtarefaIds.length === 0 && tarefaIds.length === 0) return [];
+
+  let query = supabase
+    .from("subtarefas")
+    .select(
+      `
+      ${SUBTAREFA_SELECT},
+      setor:setores(id, nome, cor),
+      projeto:projetos(id, nome),
+      tarefa:tarefas!inner(id, titulo, concluida, deleted_at)
+    `,
+    )
+    .eq("concluida", false)
+    .not("data_inicio", "is", null)
+    .eq("tarefa.concluida", false)
+    .is("tarefa.deleted_at", null)
+    .order("data_inicio", { ascending: true });
+
+  if (subtarefaIds.length > 0 && tarefaIds.length > 0) {
+    query = query.or(`id.in.(${subtarefaIds.join(",")}),tarefa_id.in.(${tarefaIds.join(",")})`);
+  } else if (subtarefaIds.length > 0) {
+    query = query.in("id", subtarefaIds);
+  } else {
+    query = query.in("tarefa_id", tarefaIds);
+  }
+
+  const de = filters.data_inicio_de.trim();
+  const ate = filters.data_inicio_ate.trim();
+  if (de || ate) {
+    const from = de || ate;
+    const to = ate || de;
+    const { startIso, endIso } = localDateRangeToIsoBounds(from, to);
+    query = query.gte("data_inicio", startIso).lte("data_inicio", endIso);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  return ((data ?? []) as unknown as Array<
+    SubtarefaAgendaItem & {
+      tarefa: { id: string; titulo: string; concluida: boolean; deleted_at: string | null } | null;
+    }
+  >).map((row) => ({
+    ...row,
+    tarefa: row.tarefa ? { id: row.tarefa.id, titulo: row.tarefa.titulo } : null,
+  }));
+}
 
 async function syncSubtarefaResponsaveis(
   subtarefaId: string,

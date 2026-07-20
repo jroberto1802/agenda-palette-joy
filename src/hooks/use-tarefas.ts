@@ -12,6 +12,7 @@ import {
   getSubtarefaDetail,
   getTarefaDetail,
   listRecentTarefas,
+  listSubtarefasAgenda,
   listTarefas,
   listTarefasCalendario,
   reorderSubtarefas,
@@ -26,6 +27,7 @@ import {
   updateTarefaConclusao,
 } from "@/services/tarefas";
 import type {
+  SubtarefaAgendaFilters,
   SubtarefaDetail,
   SubtarefaFormData,
   TarefaDetail,
@@ -63,6 +65,23 @@ export function useTarefas(
     queryKey: tarefaKeys.list(filterKey),
     queryFn: () => listTarefas(filters),
     enabled: options?.enabled ?? true,
+  });
+}
+
+export function useSubtarefasAgenda(
+  filters: SubtarefaAgendaFilters,
+  options?: { enabled?: boolean },
+) {
+  const filterKey = {
+    usuario_id: filters.usuario_id,
+    data_inicio_de: filters.data_inicio_de,
+    data_inicio_ate: filters.data_inicio_ate,
+  };
+
+  return useQuery({
+    queryKey: subtarefaKeys.agenda(filterKey),
+    queryFn: () => listSubtarefasAgenda(filters),
+    enabled: (options?.enabled ?? true) && !!filters.usuario_id,
   });
 }
 
