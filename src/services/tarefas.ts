@@ -24,7 +24,7 @@ import {
   parseRecorrencia,
   serializeRecorrencia,
 } from "@/utils/recorrencia";
-import { localDateRangeToIsoBounds, startOfTodayLocal } from "@/utils/agenda-datas";
+import { localDateRangeToIsoBounds, startOfTodayLocal, toLocalDateKey } from "@/utils/agenda-datas";
 import { sortSubtarefasList } from "@/utils/tarefas";
 import type {
   DashboardKpis,
@@ -474,6 +474,11 @@ export async function updateTarefa(
   }
 
   const anterioresIds = await listResponsavelIds(id);
+  const { data: anteriorMeta } = await supabase
+    .from("tarefas")
+    .select("data_inicio")
+    .eq("id", id)
+    .single();
 
   const updateData: TablesUpdate<"tarefas"> = {
     titulo: payload.titulo,
@@ -516,6 +521,21 @@ export async function updateTarefa(
     }).catch(() => undefined);
   }
 
+  if (toLocalDateKey(anteriorMeta?.data_inicio) !== toLocalDateKey(payload.data_inicio)) {
+    const ator = await getCurrentActor();
+    const stakeholders = await getTarefaStakeholderIds(id);
+    const alvos = stakeholders.filter((uid) => uid !== ator?.id);
+    if (alvos.length > 0) {
+      await notifyTarefaPrazo({
+        usuarioIds: alvos,
+        tarefaId: id,
+        titulo: tarefa.titulo,
+        atorNome: ator?.nome ?? "Alguém",
+        dataInicio: payload.data_inicio,
+      }).catch(() => undefined);
+    }
+  }
+
   return tarefa;
 }
 
@@ -541,7 +561,7 @@ export async function updateTarefaDataInicio(
   if (error) throw error;
   const tarefa = data as TarefaWithRelations;
 
-  if (anterior?.data_inicio !== dataInicio) {
+  if (toLocalDateKey(anterior?.data_inicio) !== toLocalDateKey(dataInicio)) {
     const ator = await getCurrentActor();
     const stakeholders = await getTarefaStakeholderIds(id);
     const alvos = stakeholders.filter((uid) => uid !== ator?.id);
@@ -551,6 +571,7 @@ export async function updateTarefaDataInicio(
         tarefaId: id,
         titulo: tarefa.titulo,
         atorNome: ator?.nome ?? "Alguém",
+        dataInicio,
       }).catch(() => undefined);
     }
   }
@@ -1218,7 +1239,7 @@ export async function updateSubtarefaMeta(
 
   if (
     meta.data_inicio !== undefined &&
-    anterior?.data_inicio !== meta.data_inicio
+    toLocalDateKey(anterior?.data_inicio) !== toLocalDateKey(meta.data_inicio)
   ) {
     const {
       data: { user },
@@ -1237,6 +1258,7 @@ export async function updateSubtarefaMeta(
         titulo: anterior.titulo,
         tarefaTitulo: tarefa?.titulo ?? "tarefa",
         atorNome: ator?.nome ?? "Alguém",
+        dataInicio: meta.data_inicio,
       }).catch(() => undefined);
     }
   }
@@ -1252,6 +1274,13 @@ export async function updateSubtarefa(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Usuário não autenticado");
+
+  const { data: anterior, error: anteriorError } = await supabase
+    .from("subtarefas")
+    .select("data_inicio, titulo, tarefa_id")
+    .eq("id", id)
+    .single();
+  if (anteriorError) throw anteriorError;
 
   const patch = {
     titulo: payload.titulo.trim(),
@@ -1274,6 +1303,26 @@ export async function updateSubtarefa(
     await syncSubtarefaObservadores(id, payload.observador_ids);
   } else {
     await syncSubtarefaObservadores(id, []);
+  }
+
+  if (toLocalDateKey(anterior.data_inicio) !== toLocalDateKey(payload.data_inicio)) {
+    const [ator, stakeholders, { data: tarefa }] = await Promise.all([
+      getCurrentActor(),
+      getSubtarefaStakeholderIds(id),
+      supabase.from("tarefas").select("titulo").eq("id", anterior.tarefa_id).single(),
+    ]);
+    const alvos = stakeholders.filter((uid) => uid !== user.id);
+    if (alvos.length > 0) {
+      await notifySubtarefaPrazo({
+        usuarioIds: alvos,
+        tarefaId: anterior.tarefa_id,
+        subtarefaId: id,
+        titulo: payload.titulo.trim() || anterior.titulo,
+        tarefaTitulo: tarefa?.titulo ?? "tarefa",
+        atorNome: ator?.nome ?? "Alguém",
+        dataInicio: payload.data_inicio,
+      }).catch(() => undefined);
+    }
   }
 
   return getSubtarefaDetail(id);

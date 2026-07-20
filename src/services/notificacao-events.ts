@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { notifyUsers } from "@/services/notificacoes";
 import type { NotificacaoMeta, NotificacaoTipo } from "@/utils/notificacoes";
 import { extractMentionedUserIds } from "@/utils/notificacoes";
+import { formatDate } from "@/utils/formatters";
 import { TAREFA_PRIORIDADE_LABELS } from "@/utils/tarefas";
 import type { TarefaPrioridade } from "@/types";
 
@@ -141,11 +142,16 @@ export async function notifyTarefaPrazo(params: {
   tarefaId: string;
   titulo: string;
   atorNome: string;
+  dataInicio: string | null;
 }) {
+  const mensagem = params.dataInicio
+    ? `${params.atorNome} alterou a data da tarefa ${params.titulo} para ${formatDate(params.dataInicio)}`
+    : `${params.atorNome} removeu a data da tarefa ${params.titulo}`;
+
   await notifyEvent({
     usuarioIds: params.usuarioIds,
     tipo: "tarefa_prazo",
-    mensagem: `${params.atorNome} alterou a data da tarefa ${params.titulo}`,
+    mensagem,
     referencia_tipo: "tarefa",
     referencia_id: params.tarefaId,
   });
@@ -158,11 +164,16 @@ export async function notifySubtarefaPrazo(params: {
   titulo: string;
   tarefaTitulo: string;
   atorNome: string;
+  dataInicio: string | null;
 }) {
+  const mensagem = params.dataInicio
+    ? `${params.atorNome} alterou a data da subtarefa ${params.titulo} (${params.tarefaTitulo}) para ${formatDate(params.dataInicio)}`
+    : `${params.atorNome} removeu a data da subtarefa ${params.titulo} (${params.tarefaTitulo})`;
+
   await notifyEvent({
     usuarioIds: params.usuarioIds,
     tipo: "tarefa_prazo",
-    mensagem: `${params.atorNome} alterou a data da subtarefa ${params.titulo} (${params.tarefaTitulo})`,
+    mensagem,
     referencia_tipo: "tarefa",
     referencia_id: params.tarefaId,
     meta: { subtarefa_id: params.subtarefaId },
