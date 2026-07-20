@@ -1,6 +1,7 @@
 import { Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import { AgendaAtrasadasSection } from "@/components/tarefas/agenda-atrasadas-section";
 import { SubtarefaAgendaListRow } from "@/components/tarefas/subtarefa-agenda-item";
 import { TarefaFiltersBar } from "@/components/tarefas/tarefa-filters";
 import { TarefaListRowContent } from "@/components/tarefas/tarefa-list-view";
@@ -35,6 +36,24 @@ const EMPTY_HOJE_FILTERS: TarefaFilters = {
   search: "",
   tag: "",
 };
+
+function isAtrasada(dataInicio: string | null | undefined, hojeKey: string): boolean {
+  const key = toLocalDateKey(dataInicio);
+  return !!key && key < hojeKey;
+}
+
+function sortAgendaItems(items: AgendaHojeItem[]): AgendaHojeItem[] {
+  return [...items].sort((a, b) => {
+    const dateA =
+      (a.kind === "tarefa" ? a.tarefa.data_inicio : a.subtarefa.data_inicio) ?? "";
+    const dateB =
+      (b.kind === "tarefa" ? b.tarefa.data_inicio : b.subtarefa.data_inicio) ?? "";
+    if (dateA !== dateB) return dateA.localeCompare(dateB);
+    const titleA = a.kind === "tarefa" ? a.tarefa.titulo : a.subtarefa.titulo;
+    const titleB = b.kind === "tarefa" ? b.tarefa.titulo : b.subtarefa.titulo;
+    return titleA.localeCompare(titleB, "pt-BR");
+  });
+}
 
 export function AgendaHojeView({
   usuarioId,
@@ -91,14 +110,18 @@ export function AgendaHojeView({
     }
   };
 
+  const sharedFilter = {
+    ...debouncedFilters,
+    excluir_finalizadas: true as const,
+    atribuido_ids: usuarioId ? [usuarioId] : [],
+    tag: "",
+  };
+
   const { data: tarefas, isLoading: loadingTarefas } = useTarefas(
     {
-      ...debouncedFilters,
-      excluir_finalizadas: true,
-      atribuido_ids: usuarioId ? [usuarioId] : [],
+      ...sharedFilter,
       data_inicio_de: hojeKey,
       data_inicio_ate: hojeKey,
-      tag: "",
     },
     { enabled: !!usuarioId },
   );
@@ -116,7 +139,28 @@ export function AgendaHojeView({
     { enabled: !!usuarioId },
   );
 
-  const items = useMemo((): AgendaHojeItem[] => {
+  const { data: tarefasAtrasadas, isLoading: loadingTarefasAtrasadas } = useTarefas(
+    {
+      ...sharedFilter,
+      somente_atrasadas: true,
+    },
+    { enabled: !!usuarioId },
+  );
+
+  const { data: subtarefasAtrasadas, isLoading: loadingSubtarefasAtrasadas } =
+    useSubtarefasAgenda(
+      {
+        usuario_id: usuarioId ?? "",
+        somente_atrasadas: true,
+        search: debouncedFilters.search,
+        prioridade: debouncedFilters.prioridade,
+        setor_id: debouncedFilters.setor_id,
+        projeto_id: debouncedFilters.projeto_id,
+      },
+      { enabled: !!usuarioId },
+    );
+
+  const itemsHoje = useMemo((): AgendaHojeItem[] => {
     const tarefasDoDia = (tarefas ?? []).filter(
       (t) => toLocalDateKey(t.data_inicio) === hojeKey,
     );
@@ -124,22 +168,37 @@ export function AgendaHojeView({
       (s) => toLocalDateKey(s.data_inicio) === hojeKey,
     );
 
-    return [
+    return sortAgendaItems([
       ...tarefasDoDia.map((tarefa) => ({ kind: "tarefa" as const, tarefa })),
       ...subtarefasDoDia.map((subtarefa) => ({ kind: "subtarefa" as const, subtarefa })),
-    ].sort((a, b) => {
-      const titleA = a.kind === "tarefa" ? a.tarefa.titulo : a.subtarefa.titulo;
-      const titleB = b.kind === "tarefa" ? b.tarefa.titulo : b.subtarefa.titulo;
-      return titleA.localeCompare(titleB, "pt-BR");
-    });
+    ]);
   }, [tarefas, subtarefas, hojeKey]);
 
-  const isLoading = loadingTarefas || loadingSubtarefas;
+  const itemsAtrasadas = useMemo((): AgendaHojeItem[] => {
+    const tarefasVencidas = (tarefasAtrasadas ?? []).filter((t) =>
+      isAtrasada(t.data_inicio, hojeKey),
+    );
+    const subtarefasVencidas = (subtarefasAtrasadas ?? []).filter((s) =>
+      isAtrasada(s.data_inicio, hojeKey),
+    );
+
+    return sortAgendaItems([
+      ...tarefasVencidas.map((tarefa) => ({ kind: "tarefa" as const, tarefa })),
+      ...subtarefasVencidas.map((subtarefa) => ({ kind: "subtarefa" as const, subtarefa })),
+    ]);
+  }, [tarefasAtrasadas, subtarefasAtrasadas, hojeKey]);
+
+  const isLoading =
+    loadingTarefas ||
+    loadingSubtarefas ||
+    loadingTarefasAtrasadas ||
+    loadingSubtarefasAtrasadas;
   const hasActiveFilters =
     !!(debouncedFilters.search?.trim()) ||
     (debouncedFilters.prioridade && debouncedFilters.prioridade !== "all") ||
     (debouncedFilters.setor_id && debouncedFilters.setor_id !== "all") ||
     (debouncedFilters.projeto_id && debouncedFilters.projeto_id !== "all");
+  const hasAnyItems = itemsAtrasadas.length > 0 || itemsHoje.length > 0;
 
   return (
     <div className="space-y-4">
@@ -159,7 +218,7 @@ export function AgendaHojeView({
             <Skeleton key={i} className="h-14 rounded-xl" />
           ))}
         </div>
-      ) : !items.length ? (
+      ) : !hasAnyItems ? (
         <div className="rounded-xl border border-dashed p-12 text-center">
           <p className="text-muted-foreground">
             {hasActiveFilters
@@ -174,30 +233,51 @@ export function AgendaHojeView({
           )}
         </div>
       ) : (
-        <div className="max-h-[min(70vh,720px)] space-y-2 overflow-y-auto pr-1">
-          <ul className="space-y-2">
-            {items.map((item) =>
-              item.kind === "tarefa" ? (
-                <li key={`tarefa-${item.tarefa.id}`}>
-                  <TarefaListRowContent
-                    tarefa={item.tarefa}
-                    onOpen={() => onOpenTarefa(item.tarefa)}
-                    onToggleConcluida={(concluida) => handleToggleConcluida(item.tarefa, concluida)}
-                  />
-                </li>
-              ) : (
-                <li key={`subtarefa-${item.subtarefa.id}`}>
-                  <SubtarefaAgendaListRow
-                    subtarefa={item.subtarefa}
-                    onOpen={() => onOpenSubtarefa(item.subtarefa)}
-                    onToggleConcluida={(concluida) =>
-                      handleToggleSubtarefa(item.subtarefa, concluida)
-                    }
-                  />
-                </li>
-              ),
-            )}
-          </ul>
+        <div className="max-h-[min(70vh,720px)] space-y-5 overflow-y-auto pr-1">
+          <AgendaAtrasadasSection
+            items={itemsAtrasadas}
+            onOpenTarefa={onOpenTarefa}
+            onOpenSubtarefa={onOpenSubtarefa}
+          />
+
+          {itemsHoje.length > 0 ? (
+            <section className="space-y-2">
+              {itemsAtrasadas.length > 0 && (
+                <h3 className="text-sm font-semibold text-foreground">Hoje</h3>
+              )}
+              <ul className="space-y-2">
+                {itemsHoje.map((item) =>
+                  item.kind === "tarefa" ? (
+                    <li key={`tarefa-${item.tarefa.id}`}>
+                      <TarefaListRowContent
+                        tarefa={item.tarefa}
+                        onOpen={() => onOpenTarefa(item.tarefa)}
+                        onToggleConcluida={(concluida) =>
+                          handleToggleConcluida(item.tarefa, concluida)
+                        }
+                      />
+                    </li>
+                  ) : (
+                    <li key={`subtarefa-${item.subtarefa.id}`}>
+                      <SubtarefaAgendaListRow
+                        subtarefa={item.subtarefa}
+                        onOpen={() => onOpenSubtarefa(item.subtarefa)}
+                        onToggleConcluida={(concluida) =>
+                          handleToggleSubtarefa(item.subtarefa, concluida)
+                        }
+                      />
+                    </li>
+                  ),
+                )}
+              </ul>
+            </section>
+          ) : itemsAtrasadas.length > 0 ? (
+            <p className="text-sm text-muted-foreground">
+              {hasActiveFilters
+                ? "Nenhum item de hoje para os filtros atuais."
+                : "Nenhuma tarefa ou subtarefa com Data para hoje."}
+            </p>
+          ) : null}
         </div>
       )}
     </div>

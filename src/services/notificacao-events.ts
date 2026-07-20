@@ -151,6 +151,24 @@ export async function notifyTarefaPrazo(params: {
   });
 }
 
+export async function notifySubtarefaPrazo(params: {
+  usuarioIds: string[];
+  tarefaId: string;
+  subtarefaId: string;
+  titulo: string;
+  tarefaTitulo: string;
+  atorNome: string;
+}) {
+  await notifyEvent({
+    usuarioIds: params.usuarioIds,
+    tipo: "tarefa_prazo",
+    mensagem: `${params.atorNome} alterou a data da subtarefa ${params.titulo} (${params.tarefaTitulo})`,
+    referencia_tipo: "tarefa",
+    referencia_id: params.tarefaId,
+    meta: { subtarefa_id: params.subtarefaId },
+  });
+}
+
 export async function notifyTarefaMovida(params: {
   usuarioIds: string[];
   tarefaId: string;

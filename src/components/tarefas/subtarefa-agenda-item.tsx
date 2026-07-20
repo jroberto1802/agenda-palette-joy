@@ -9,16 +9,21 @@ import {
   TAREFA_PRIORIDADE_COLORS,
   TAREFA_PRIORIDADE_LABELS,
 } from "@/utils/tarefas";
-import { CalendarIcon, ChevronRight, ListTodo } from "lucide-react";
+import { AlertTriangle, CalendarIcon, ChevronRight, ListTodo } from "lucide-react";
+import type { ReactNode } from "react";
 
 export function SubtarefaAgendaListRow({
   subtarefa,
   onOpen,
   onToggleConcluida,
+  actions,
+  showAtrasadaBadge = false,
 }: {
   subtarefa: SubtarefaAgendaItem;
   onOpen: () => void;
   onToggleConcluida?: (concluida: boolean) => void | Promise<void>;
+  actions?: ReactNode;
+  showAtrasadaBadge?: boolean;
 }) {
   const vencimentoVariant = getVencimentoVariant(subtarefa.data_inicio, subtarefa.concluida);
   const parentTitle = subtarefa.tarefa?.titulo?.trim() || "Tarefa principal";
@@ -48,6 +53,12 @@ export function SubtarefaAgendaListRow({
         </p>
         <DescricaoPreview descricao={subtarefa.descricao} />
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          {showAtrasadaBadge && (
+            <Badge variant="destructive" className="gap-1 px-1.5 py-0 text-[10px]">
+              <AlertTriangle className="h-3 w-3" />
+              Atrasada
+            </Badge>
+          )}
           <Badge variant="secondary" className="gap-1 px-1.5 py-0 text-[10px]">
             <ListTodo className="h-3 w-3" />
             Subtarefa
@@ -74,6 +85,7 @@ export function SubtarefaAgendaListRow({
           )}
         </div>
       </button>
+      {actions}
       <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
     </div>
   );

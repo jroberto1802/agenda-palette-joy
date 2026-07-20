@@ -151,6 +151,8 @@ export type TarefaFilters = {
   data_inicio_de?: string;
   /** YYYY-MM-DD — fim do intervalo por campo Data (`data_inicio`) */
   data_inicio_ate?: string;
+  /** Agenda Hoje: `data_inicio` anterior a hoje (itens abertos com data vencida). */
+  somente_atrasadas?: boolean;
 };
 
 export type Subtarefa = Tables<"subtarefas">;
@@ -178,8 +180,10 @@ export type SubtarefaAgendaItem = SubtarefaWithAuthors & {
 
 export type SubtarefaAgendaFilters = {
   usuario_id: string;
-  data_inicio_de: string;
-  data_inicio_ate: string;
+  data_inicio_de?: string;
+  data_inicio_ate?: string;
+  /** Agenda Hoje: `data_inicio` anterior a hoje (itens abertos com data vencida). */
+  somente_atrasadas?: boolean;
   search?: string;
   prioridade?: TarefaPrioridade | "all";
   setor_id?: string;

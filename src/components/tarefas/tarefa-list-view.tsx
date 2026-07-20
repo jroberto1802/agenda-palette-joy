@@ -13,7 +13,12 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { CalendarIcon, ChevronRight, GripVertical } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarIcon,
+  ChevronRight,
+  GripVertical,
+} from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
 import { ConclusaoBolinha } from "@/components/tarefas/conclusao-bolinha";
@@ -41,6 +46,7 @@ export function TarefaListRowContent({
   actions,
   dragHandle,
   isDragging,
+  showAtrasadaBadge = false,
 }: {
   tarefa: TarefaWithRelations;
   onOpen: () => void;
@@ -49,6 +55,7 @@ export function TarefaListRowContent({
   actions?: ReactNode;
   dragHandle?: ReactNode;
   isDragging?: boolean;
+  showAtrasadaBadge?: boolean;
 }) {
   const vencimentoVariant = getVencimentoVariant(tarefa.data_inicio, tarefa.concluida);
 
@@ -80,6 +87,12 @@ export function TarefaListRowContent({
         </p>
         <DescricaoPreview descricao={tarefa.descricao} />
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          {showAtrasadaBadge && (
+            <Badge variant="destructive" className="gap-1 px-1.5 py-0 text-[10px]">
+              <AlertTriangle className="h-3 w-3" />
+              Atrasada
+            </Badge>
+          )}
           <Badge
             variant="outline"
             className={cn("px-1.5 py-0 text-[10px]", TAREFA_PRIORIDADE_COLORS[tarefa.prioridade])}

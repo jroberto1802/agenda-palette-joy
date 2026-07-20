@@ -8,9 +8,11 @@ import {
   listSubtarefaMencionaveis,
   listTarefaMencionaveis,
   notifySubtarefaMencao,
+  notifySubtarefaPrazo,
   notifyTarefaComentario,
   notifyTarefaConcluida,
   notifyTarefaMencao,
+  notifyTarefaPrazo,
   notifyTarefaResposta,
   notifyTarefaSubtarefaConcluida,
   resolveMentionIds,
@@ -22,7 +24,7 @@ import {
   parseRecorrencia,
   serializeRecorrencia,
 } from "@/utils/recorrencia";
-import { localDateRangeToIsoBounds } from "@/utils/agenda-datas";
+import { localDateRangeToIsoBounds, startOfTodayLocal } from "@/utils/agenda-datas";
 import { sortSubtarefasList } from "@/utils/tarefas";
 import type {
   DashboardKpis,
@@ -249,14 +251,20 @@ export async function listTarefas(filters: TarefaFilters = {}): Promise<TarefaWi
     query = query.lte("data_conclusao", `${filters.periodo_fim.trim()}T23:59:59.999Z`);
   }
 
-  const dataInicioDe = filters.data_inicio_de?.trim();
-  const dataInicioAte = filters.data_inicio_ate?.trim();
-  if (dataInicioDe || dataInicioAte) {
-    query = query.not("data_inicio", "is", null);
-    const de = dataInicioDe || dataInicioAte!;
-    const ate = dataInicioAte || dataInicioDe!;
-    const { startIso, endIso } = localDateRangeToIsoBounds(de, ate);
-    query = query.gte("data_inicio", startIso).lte("data_inicio", endIso);
+  if (filters.somente_atrasadas) {
+    query = query
+      .not("data_inicio", "is", null)
+      .lt("data_inicio", startOfTodayLocal().toISOString());
+  } else {
+    const dataInicioDe = filters.data_inicio_de?.trim();
+    const dataInicioAte = filters.data_inicio_ate?.trim();
+    if (dataInicioDe || dataInicioAte) {
+      query = query.not("data_inicio", "is", null);
+      const de = dataInicioDe || dataInicioAte!;
+      const ate = dataInicioAte || dataInicioDe!;
+      const { startIso, endIso } = localDateRangeToIsoBounds(de, ate);
+      query = query.gte("data_inicio", startIso).lte("data_inicio", endIso);
+    }
   }
 
   const { data, error } = await query;
@@ -511,6 +519,45 @@ export async function updateTarefa(
   return tarefa;
 }
 
+/** Altera apenas a Data da tarefa e notifica os demais responsáveis/stakeholders. */
+export async function updateTarefaDataInicio(
+  id: string,
+  dataInicio: string | null,
+): Promise<TarefaWithRelations> {
+  const { data: anterior, error: anteriorError } = await supabase
+    .from("tarefas")
+    .select("data_inicio")
+    .eq("id", id)
+    .single();
+  if (anteriorError) throw anteriorError;
+
+  const { data, error } = await supabase
+    .from("tarefas")
+    .update({ data_inicio: dataInicio })
+    .eq("id", id)
+    .select(TAREFA_SELECT)
+    .single();
+
+  if (error) throw error;
+  const tarefa = data as TarefaWithRelations;
+
+  if (anterior?.data_inicio !== dataInicio) {
+    const ator = await getCurrentActor();
+    const stakeholders = await getTarefaStakeholderIds(id);
+    const alvos = stakeholders.filter((uid) => uid !== ator?.id);
+    if (alvos.length > 0) {
+      await notifyTarefaPrazo({
+        usuarioIds: alvos,
+        tarefaId: id,
+        titulo: tarefa.titulo,
+        atorNome: ator?.nome ?? "Alguém",
+      }).catch(() => undefined);
+    }
+  }
+
+  return tarefa;
+}
+
 /**
  * Alterna o estado Aberta/Concluída da tarefa.
  * Se houver subtarefas abertas, o banco bloqueia a conclusão (trigger) e
@@ -705,9 +752,11 @@ export async function listSubtarefasAgenda(
     query = query.eq("prioridade", filters.prioridade);
   }
 
-  const de = filters.data_inicio_de.trim();
-  const ate = filters.data_inicio_ate.trim();
-  if (de || ate) {
+  const de = filters.data_inicio_de?.trim() ?? "";
+  const ate = filters.data_inicio_ate?.trim() ?? "";
+  if (filters.somente_atrasadas) {
+    query = query.lt("data_inicio", startOfTodayLocal().toISOString());
+  } else if (de || ate) {
     const from = de || ate;
     const to = ate || de;
     const { startIso, endIso } = localDateRangeToIsoBounds(from, to);
@@ -1135,6 +1184,13 @@ export async function updateSubtarefaMeta(
     visibilidade?: SubtarefaWithAuthors["visibilidade"];
   },
 ): Promise<SubtarefaWithAuthors> {
+  const { data: anterior, error: anteriorError } = await supabase
+    .from("subtarefas")
+    .select("data_inicio, titulo, tarefa_id")
+    .eq("id", id)
+    .single();
+  if (anteriorError) throw anteriorError;
+
   const patch: {
     data_inicio?: string | null;
     visibilidade?: SubtarefaWithAuthors["visibilidade"];
@@ -1158,7 +1214,34 @@ export async function updateSubtarefaMeta(
     await syncSubtarefaResponsaveis(id, meta.atribuido_ids);
   }
 
-  return getSubtarefaRow(id);
+  const row = await getSubtarefaRow(id);
+
+  if (
+    meta.data_inicio !== undefined &&
+    anterior?.data_inicio !== meta.data_inicio
+  ) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const [ator, stakeholders, { data: tarefa }] = await Promise.all([
+      getCurrentActor(),
+      getSubtarefaStakeholderIds(id),
+      supabase.from("tarefas").select("titulo").eq("id", anterior.tarefa_id).single(),
+    ]);
+    const alvos = stakeholders.filter((uid) => uid !== (user?.id ?? ator?.id));
+    if (alvos.length > 0) {
+      await notifySubtarefaPrazo({
+        usuarioIds: alvos,
+        tarefaId: anterior.tarefa_id,
+        subtarefaId: id,
+        titulo: anterior.titulo,
+        tarefaTitulo: tarefa?.titulo ?? "tarefa",
+        atorNome: ator?.nome ?? "Alguém",
+      }).catch(() => undefined);
+    }
+  }
+
+  return row;
 }
 
 export async function updateSubtarefa(

@@ -29,6 +29,7 @@ import {
   updateTarefa,
   updateTarefaComentario,
   updateTarefaConclusao,
+  updateTarefaDataInicio,
 } from "@/services/tarefas";
 import type {
   SubtarefaAgendaFilters,
@@ -63,6 +64,7 @@ export function useTarefas(
     periodo_fim: filters.periodo_fim ?? "",
     data_inicio_de: filters.data_inicio_de ?? "",
     data_inicio_ate: filters.data_inicio_ate ?? "",
+    somente_atrasadas: filters.somente_atrasadas ? "1" : "0",
   };
 
   return useQuery({
@@ -78,8 +80,9 @@ export function useSubtarefasAgenda(
 ) {
   const filterKey = {
     usuario_id: filters.usuario_id,
-    data_inicio_de: filters.data_inicio_de,
-    data_inicio_ate: filters.data_inicio_ate,
+    data_inicio_de: filters.data_inicio_de ?? "",
+    data_inicio_ate: filters.data_inicio_ate ?? "",
+    somente_atrasadas: filters.somente_atrasadas ? "1" : "0",
     search: filters.search ?? "",
     prioridade: filters.prioridade ?? "all",
     setor_id: filters.setor_id ?? "all",
@@ -143,6 +146,15 @@ export function useUpdateTarefaConclusao() {
   return useMutation({
     mutationFn: ({ id, concluida }: { id: string; concluida: boolean }) =>
       updateTarefaConclusao(id, concluida),
+    onSuccess: () => invalidateTarefas(queryClient),
+  });
+}
+
+export function useUpdateTarefaDataInicio() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, dataInicio }: { id: string; dataInicio: string | null }) =>
+      updateTarefaDataInicio(id, dataInicio),
     onSuccess: () => invalidateTarefas(queryClient),
   });
 }
