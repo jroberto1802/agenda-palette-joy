@@ -15,7 +15,9 @@ import {
   notifyTarefaPrazo,
   notifyTarefaResposta,
   notifyTarefaSubtarefaConcluida,
+  notifyTarefaVisualizador,
   resolveMentionIds,
+  resolveTarefaVisualizadorIds,
 } from "@/services/notificacao-events";
 import { notifyUsers } from "@/services/notificacoes";
 import {
@@ -173,6 +175,43 @@ async function listResponsavelIds(tarefaId: string): Promise<string[]> {
 
   if (error) throw error;
   return (data ?? []).map((row) => row.usuario_id);
+}
+
+async function listObservadorIds(tarefaId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("tarefa_observadores")
+    .select("usuario_id")
+    .eq("tarefa_id", tarefaId);
+
+  if (error) throw error;
+  return (data ?? []).map((row) => row.usuario_id);
+}
+
+/** Notifica quem passou a ter acesso de visualização (exclui responsáveis, criador e o ator). */
+async function notifyNovosVisualizadores(params: {
+  tarefaId: string;
+  titulo: string;
+  novosVisualizadorIds: string[];
+  responsavelIds: string[];
+  criadoPor?: string | null;
+}) {
+  if (params.novosVisualizadorIds.length === 0) return;
+
+  const ator = await getCurrentActor();
+  const excluidos = new Set(
+    [...params.responsavelIds, params.criadoPor, ator?.id].filter(
+      (id): id is string => !!id,
+    ),
+  );
+  const alvos = params.novosVisualizadorIds.filter((id) => !excluidos.has(id));
+  if (alvos.length === 0) return;
+
+  await notifyTarefaVisualizador({
+    usuarioIds: alvos,
+    tarefaId: params.tarefaId,
+    titulo: params.titulo,
+    atorNome: ator?.nome ?? "Alguém",
+  }).catch(() => undefined);
 }
 
 export async function listTarefas(filters: TarefaFilters = {}): Promise<TarefaWithRelations[]> {
@@ -476,6 +515,20 @@ export async function createTarefa(payload: TarefaFormData): Promise<TarefaWithR
       referencia_id: tarefa.id,
     }).catch(() => undefined);
 
+    const visualizadores = await resolveTarefaVisualizadorIds({
+      visibilidade: normalized.visibilidade,
+      setorId: normalized.setor_id,
+      projetoId: normalized.projeto_id,
+      observadorIds: normalized.observador_ids,
+    });
+    await notifyNovosVisualizadores({
+      tarefaId: tarefa.id,
+      titulo: tarefa.titulo,
+      novosVisualizadorIds: visualizadores,
+      responsavelIds: atribuidoIds,
+      criadoPor: user.id,
+    });
+
     return tarefa;
   }
 
@@ -486,6 +539,20 @@ export async function createTarefa(payload: TarefaFormData): Promise<TarefaWithR
     referencia_tipo: "tarefa",
     referencia_id: tarefa.id,
   }).catch(() => undefined);
+
+  const visualizadores = await resolveTarefaVisualizadorIds({
+    visibilidade: normalized.visibilidade,
+    setorId: normalized.setor_id,
+    projetoId: normalized.projeto_id,
+    observadorIds: normalized.observador_ids,
+  });
+  await notifyNovosVisualizadores({
+    tarefaId: tarefa.id,
+    titulo: tarefa.titulo,
+    novosVisualizadorIds: visualizadores,
+    responsavelIds: atribuidoIds,
+    criadoPor: user.id,
+  });
 
   return tarefa;
 }
@@ -512,11 +579,21 @@ export async function updateTarefa(
   }
 
   const anterioresIds = await listResponsavelIds(id);
-  const { data: anteriorMeta } = await supabase
-    .from("tarefas")
-    .select("data_inicio")
-    .eq("id", id)
-    .single();
+  const [{ data: anteriorMeta }, anterioresObservadores] = await Promise.all([
+    supabase
+      .from("tarefas")
+      .select("data_inicio, visibilidade, setor_id, projeto_id, titulo, criado_por")
+      .eq("id", id)
+      .single(),
+    listObservadorIds(id),
+  ]);
+
+  const anterioresVisualizadores = await resolveTarefaVisualizadorIds({
+    visibilidade: (anteriorMeta?.visibilidade ?? "somente_para_mim") as TarefaFormData["visibilidade"],
+    setorId: anteriorMeta?.setor_id,
+    projetoId: anteriorMeta?.projeto_id,
+    observadorIds: anterioresObservadores,
+  });
 
   const updateData: TablesUpdate<"tarefas"> = {
     titulo: payload.titulo,
@@ -558,6 +635,23 @@ export async function updateTarefa(
       referencia_id: tarefa.id,
     }).catch(() => undefined);
   }
+
+  const novosVisualizadores = (
+    await resolveTarefaVisualizadorIds({
+      visibilidade: payload.visibilidade,
+      setorId: payload.setor_id,
+      projetoId: payload.projeto_id,
+      observadorIds: payload.observador_ids,
+    })
+  ).filter((uid) => !anterioresVisualizadores.includes(uid));
+
+  await notifyNovosVisualizadores({
+    tarefaId: tarefa.id,
+    titulo: tarefa.titulo,
+    novosVisualizadorIds: novosVisualizadores,
+    responsavelIds: atribuidoIds,
+    criadoPor: anteriorMeta?.criado_por ?? tarefa.criado_por,
+  });
 
   if (toLocalDateKey(anteriorMeta?.data_inicio) !== toLocalDateKey(payload.data_inicio)) {
     const ator = await getCurrentActor();

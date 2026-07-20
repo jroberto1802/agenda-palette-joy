@@ -4,7 +4,7 @@ import type { NotificacaoMeta, NotificacaoTipo } from "@/utils/notificacoes";
 import { extractMentionedUserIds } from "@/utils/notificacoes";
 import { formatDate } from "@/utils/formatters";
 import { TAREFA_PRIORIDADE_LABELS } from "@/utils/tarefas";
-import type { TarefaPrioridade } from "@/types";
+import type { TarefaPrioridade, TarefaVisibilidade } from "@/types";
 
 export async function getCurrentActor(): Promise<{ id: string; nome: string } | null> {
   const {
@@ -90,6 +90,63 @@ export async function notifyTarefaAtribuida(params: {
     referencia_tipo: "tarefa",
     referencia_id: params.tarefaId,
   });
+}
+
+export async function notifyTarefaVisualizador(params: {
+  usuarioIds: string[];
+  tarefaId: string;
+  titulo: string;
+  atorNome: string;
+}) {
+  await notifyEvent({
+    usuarioIds: params.usuarioIds,
+    tipo: "tarefa_visualizador",
+    mensagem: `${params.atorNome} adicionou você como visualizador da tarefa ${params.titulo}`,
+    referencia_tipo: "tarefa",
+    referencia_id: params.tarefaId,
+  });
+}
+
+/** Resolve quem passa a poder visualizar a tarefa pelo escopo de visibilidade. */
+export async function resolveTarefaVisualizadorIds(params: {
+  visibilidade: TarefaVisibilidade;
+  setorId?: string | null;
+  projetoId?: string | null;
+  observadorIds?: string[];
+}): Promise<string[]> {
+  const { visibilidade, setorId, projetoId, observadorIds = [] } = params;
+
+  if (visibilidade === "somente_para_mim") return [];
+
+  if (visibilidade === "pessoas_especificas") {
+    return [...new Set(observadorIds.filter(Boolean))];
+  }
+
+  if (visibilidade === "todos_empresa") {
+    const { data } = await supabase.from("profiles").select("id").eq("ativo", true);
+    return (data ?? []).map((p) => p.id);
+  }
+
+  if (visibilidade === "todos_setor") {
+    if (!setorId) return [];
+    const { data } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("ativo", true)
+      .eq("setor_id", setorId);
+    return (data ?? []).map((p) => p.id);
+  }
+
+  if (visibilidade === "todos_projeto") {
+    if (!projetoId) return [];
+    const { data } = await supabase
+      .from("projeto_membros")
+      .select("usuario_id")
+      .eq("projeto_id", projetoId);
+    return [...new Set((data ?? []).map((m) => m.usuario_id).filter(Boolean))];
+  }
+
+  return [];
 }
 
 export async function notifyTarefaConcluida(params: {
