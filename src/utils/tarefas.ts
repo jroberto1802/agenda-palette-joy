@@ -155,7 +155,9 @@ function temVinculoDeEdicaoTarefa(
 }
 
 /**
- * Edição de campos da tarefa (título, descrição, metadados, subtarefas, anexos, comentários).
+ * Edição de campos da tarefa (título, descrição, metadados, subtarefas, status).
+ * Comentários e anexos usam `canCommentOrAttachTarefa` — visualizadores podem
+ * interagir sem editar campos.
  * Tarefa concluída: edição de campos é sempre restrita ao Administrador, em qualquer
  * momento — mesmo dentro da janela de reabertura, usuário/gestor não editam campos.
  */
@@ -168,6 +170,22 @@ export function canEditTarefa(
 ): boolean {
   if (tarefa.concluida) return isAdminUser;
   return temVinculoDeEdicaoTarefa(tarefa, userId, isAdminUser, isGerenteUser, userSetorId);
+}
+
+/**
+ * Comentários e upload de anexos: quem tem acesso de leitura à tarefa/subtarefa
+ * (incluindo Visualizadores via Visibilidade) pode interagir.
+ * Não libera edição de campos, exclusão da tarefa nem conclusão — use
+ * `canEditTarefa` / `canToggleTarefaConclusao` / delete na rota.
+ * Exclusão de anexos permanece no padrão de quem edita (`canEdit`).
+ */
+export function canCommentOrAttachTarefa(
+  tarefa: Pick<TarefaWithRelations, "id"> | null | undefined,
+  userId: string | undefined,
+  readOnly = false,
+): boolean {
+  if (readOnly || !userId || !tarefa) return false;
+  return true;
 }
 
 /**

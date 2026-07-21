@@ -21,17 +21,21 @@ export function TarefaAnexosSection({
   tarefaId,
   anexos,
   canEdit,
+  /** Upload liberado para visualizadores; se omitido, segue `canEdit`. */
+  canUpload,
   hideTitle = false,
 }: {
   tarefaId: string;
   anexos: TarefaAnexo[];
   canEdit: boolean;
+  canUpload?: boolean;
   hideTitle?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const uploadAnexo = useUploadAnexo();
   const deleteAnexo = useDeleteAnexo();
   const [deleting, setDeleting] = useState<TarefaAnexo | null>(null);
+  const allowUpload = canUpload ?? canEdit;
 
   const handleUpload = async (files: FileList | null) => {
     if (!files?.length) return;
@@ -69,7 +73,7 @@ export function TarefaAnexosSection({
         ) : (
           <span className="text-xs text-muted-foreground">{anexos.length} arquivo(s)</span>
         )}
-        {canEdit && (
+        {allowUpload && (
           <>
             <input
               ref={inputRef}

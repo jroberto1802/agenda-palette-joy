@@ -56,6 +56,7 @@ import { parseRecorrencia } from "@/utils/recorrencia";
 import { isAdmin, isGerente } from "@/utils/permissions";
 import {
   TAREFA_PRIORIDADE_COLORS,
+  canCommentOrAttachTarefa,
   canEditTarefa,
   canEditVisibilidade,
   getSetoresPermitidos,
@@ -249,6 +250,12 @@ export function SubtarefaPanelSheet({
       profile.setor_id,
     );
   }, [readOnly, parentTarefa, profile]);
+
+  /** Visualizadores (e quem tem leitura) podem comentar/anexar sem editar campos. */
+  const canCommentOrAttach = useMemo(
+    () => canCommentOrAttachTarefa(parentTarefa, profile?.id, readOnly),
+    [parentTarefa, profile?.id, readOnly],
+  );
 
   const canEditVisibility = useMemo(() => {
     if (readOnly) return false;
@@ -628,6 +635,7 @@ export function SubtarefaPanelSheet({
                             subtarefaId={subtarefa.id}
                             anexos={anexos}
                             canEdit={canEdit}
+                            canUpload={canCommentOrAttach}
                             hideTitle
                           />
                         </div>
@@ -645,7 +653,7 @@ export function SubtarefaPanelSheet({
                             pessoasMencionaveis={pessoasMencionaveis}
                             currentUserId={profile?.id}
                             currentUserProfile={profile}
-                            canComment={canEdit}
+                            canComment={canCommentOrAttach}
                             highlightId={highlightComentarioId}
                             idPrefix="subtarefa-comentario"
                             pending={createComentario.isPending}

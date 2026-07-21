@@ -24,17 +24,21 @@ export function SubtarefaAnexosSection({
   subtarefaId,
   anexos,
   canEdit,
+  /** Upload liberado para visualizadores; se omitido, segue `canEdit`. */
+  canUpload,
   hideTitle = false,
 }: {
   subtarefaId: string;
   anexos: SubtarefaAnexo[];
   canEdit: boolean;
+  canUpload?: boolean;
   hideTitle?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const uploadAnexo = useUploadSubtarefaAnexo();
   const deleteAnexo = useDeleteSubtarefaAnexo();
   const [deleting, setDeleting] = useState<SubtarefaAnexo | null>(null);
+  const allowUpload = canUpload ?? canEdit;
 
   const handleUpload = async (files: FileList | null) => {
     if (!files?.length) return;
@@ -72,7 +76,7 @@ export function SubtarefaAnexosSection({
         ) : (
           <span className="text-xs text-muted-foreground">{anexos.length} arquivo(s)</span>
         )}
-        {canEdit && (
+        {allowUpload && (
           <>
             <input
               ref={inputRef}

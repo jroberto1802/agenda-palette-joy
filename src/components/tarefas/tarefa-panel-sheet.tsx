@@ -85,6 +85,7 @@ import { parseRecorrencia } from "@/utils/recorrencia";
 import { isAdmin, isGerente } from "@/utils/permissions";
 import {
   TAREFA_PRIORIDADE_COLORS,
+  canCommentOrAttachTarefa,
   canEditTarefa,
   canEditVisibilidade,
   getSetoresPermitidos,
@@ -402,6 +403,12 @@ export function TarefaPanelSheet({
       profile.setor_id,
     );
   }, [readOnly, isCreate, tarefa, profile]);
+
+  /** Visualizadores (e quem tem leitura) podem comentar/anexar sem editar campos. */
+  const canCommentOrAttach = useMemo(
+    () => canCommentOrAttachTarefa(tarefa, profile?.id, readOnly),
+    [tarefa, profile?.id, readOnly],
+  );
 
   const canEditVisibility = useMemo(() => {
     if (readOnly) return false;
@@ -989,6 +996,7 @@ export function TarefaPanelSheet({
                               tarefaId={tarefaId!}
                               anexos={anexos}
                               canEdit={canEdit}
+                              canUpload={canCommentOrAttach}
                               hideTitle
                             />
                           )}
@@ -1012,7 +1020,7 @@ export function TarefaPanelSheet({
                               pessoasMencionaveis={pessoasMencionaveis}
                               currentUserId={profile?.id}
                               currentUserProfile={profile}
-                              canComment={canEdit}
+                              canComment={canCommentOrAttach}
                               highlightId={highlightComentarioId}
                               idPrefix="tarefa-comentario"
                               pending={createComentario.isPending}
