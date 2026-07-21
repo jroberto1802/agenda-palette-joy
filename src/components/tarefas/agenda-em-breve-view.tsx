@@ -315,6 +315,7 @@ export function AgendaEmBreveView({
                         key={`subtarefa-${item.subtarefa.id}`}
                         subtarefa={item.subtarefa}
                         onOpen={() => onOpenSubtarefa(item.subtarefa)}
+                        compact
                       />
                     ),
                   )

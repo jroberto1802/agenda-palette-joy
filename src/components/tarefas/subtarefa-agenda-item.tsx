@@ -94,36 +94,61 @@ export function SubtarefaAgendaListRow({
 export function SubtarefaAgendaCard({
   subtarefa,
   onOpen,
+  /** Em breve: card menor que o de tarefa, mantendo as mesmas informações. */
+  compact = false,
 }: {
   subtarefa: SubtarefaAgendaItem;
   onOpen: () => void;
+  compact?: boolean;
 }) {
   const parentTitle = subtarefa.tarefa?.titulo?.trim() || "Tarefa principal";
+  const badgeClass = compact ? "gap-0.5 px-1 py-0 text-[9px]" : "gap-1 px-1.5 py-0 text-[10px]";
+  const iconClass = compact ? "h-2.5 w-2.5" : "h-3 w-3";
 
   return (
     <button
       type="button"
       onClick={onOpen}
       className={cn(
-        "w-full rounded-lg border border-l-4 bg-card px-3 py-2.5 text-left shadow-sm transition-colors hover:bg-muted/40",
+        "w-full border border-l-4 bg-card text-left shadow-sm transition-colors hover:bg-muted/40",
+        compact ? "rounded-md px-2 py-1.5" : "rounded-lg px-3 py-2.5",
         TAREFA_PRIORIDADE_BAND_CLASS[subtarefa.prioridade],
       )}
     >
-      <p className="line-clamp-2 text-sm font-medium leading-snug">{subtarefa.titulo}</p>
+      <p
+        className={cn(
+          "line-clamp-2 font-medium leading-snug",
+          compact ? "text-xs" : "text-sm",
+        )}
+      >
+        {subtarefa.titulo}
+      </p>
       <DescricaoPreview
         descricao={subtarefa.descricao}
-        className="mt-1 line-clamp-2 text-[11px] leading-snug text-muted-foreground"
+        className={cn(
+          "leading-snug text-muted-foreground",
+          compact
+            ? "mt-0.5 line-clamp-1 text-[10px]"
+            : "mt-1 line-clamp-2 text-[11px]",
+        )}
       />
-      <p className="mt-1 truncate text-[11px] text-muted-foreground">de: {parentTitle}</p>
-      <div className="mt-1.5 flex flex-wrap gap-1">
-        <Badge variant="secondary" className="gap-1 px-1.5 py-0 text-[10px]">
-          <ListTodo className="h-3 w-3" />
+      <p
+        className={cn(
+          "truncate text-muted-foreground",
+          compact ? "mt-0.5 text-[10px]" : "mt-1 text-[11px]",
+        )}
+      >
+        de: {parentTitle}
+      </p>
+      <div className={cn("flex flex-wrap", compact ? "mt-1 gap-0.5" : "mt-1.5 gap-1")}>
+        <Badge variant="secondary" className={badgeClass}>
+          <ListTodo className={iconClass} />
           Subtarefa
         </Badge>
         {subtarefa.setor && (
           <Badge
             variant="outline"
-            className="px-1.5 py-0 text-[10px]"
+            className={badgeClass}
             style={{
               borderColor: subtarefa.setor.cor ?? undefined,
               color: subtarefa.setor.cor ?? undefined,
@@ -133,7 +158,7 @@ export function SubtarefaAgendaCard({
           </Badge>
         )}
         {subtarefa.projeto && (
-          <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
+          <Badge variant="outline" className={badgeClass}>
             {subtarefa.projeto.nome}
           </Badge>
         )}
