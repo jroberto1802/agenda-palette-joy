@@ -6,6 +6,7 @@ import {
   useDroppable,
   useSensor,
   useSensors,
+  type CollisionDetection,
   type DragEndEvent,
   type DragOverEvent,
   type DragStartEvent,
@@ -75,6 +76,53 @@ function parseColunaSortId(id: string): string | null {
   if (!id.startsWith(COLUNA_SORT_PREFIX)) return null;
   return id.slice(COLUNA_SORT_PREFIX.length);
 }
+
+function findContainer(
+  tarefaId: string,
+  columnsState: Record<string, string[]>,
+): string | null {
+  for (const [colunaId, ids] of Object.entries(columnsState)) {
+    if (ids.includes(tarefaId)) return colunaId;
+  }
+  return null;
+}
+
+/** Resolve a coluna alvo mesmo quando o ponteiro está sobre uma tarefa dentro dela. */
+function resolveOverColunaId(
+  over: { id: string | number; data: { current?: Record<string, unknown> | null } } | null,
+  columnsState: Record<string, string[]>,
+): string | null {
+  if (!over) return null;
+  const type = over.data.current?.type;
+  if (type === "coluna-reorder" || type === "coluna") {
+    const colunaId = over.data.current?.colunaId;
+    return typeof colunaId === "string" ? colunaId : null;
+  }
+  const fromSortId = parseColunaSortId(String(over.id));
+  if (fromSortId) return fromSortId;
+  return findContainer(String(over.id), columnsState);
+}
+
+/** Coluna padrão (inbox) sempre à esquerda; demais mantêm a ordem relativa. */
+function pinInboxFirst(order: string[], colunas: TarefaBoardColuna[]): string[] {
+  const inbox = colunas.find((c) => c.is_inbox);
+  const rest = order.filter((id) => id !== inbox?.id);
+  for (const c of colunas) {
+    if (!c.is_inbox && !rest.includes(c.id)) rest.push(c.id);
+  }
+  return inbox ? [inbox.id, ...rest] : rest;
+}
+
+const columnAwareCollision: CollisionDetection = (args) => {
+  if (args.active.data.current?.type === "coluna-reorder") {
+    const columnContainers = args.droppableContainers.filter((container) => {
+      const type = container.data.current?.type;
+      return type === "coluna-reorder" || type === "coluna";
+    });
+    return closestCorners({ ...args, droppableContainers: columnContainers });
+  }
+  return closestCorners(args);
+};
 
 function ColunaCardContent({
   tarefa,
@@ -226,6 +274,7 @@ function DroppableColuna({
   onRename: (coluna: TarefaBoardColuna) => void;
   onDelete: (coluna: TarefaBoardColuna) => void;
 }) {
+  const isInbox = coluna.is_inbox;
   const {
     attributes,
     listeners,
@@ -236,6 +285,7 @@ function DroppableColuna({
   } = useSortable({
     id: colunaSortId(coluna.id),
     data: { type: "coluna-reorder", colunaId: coluna.id },
+    disabled: isInbox,
   });
 
   const { setNodeRef: setDroppableRef, isOver } = useDroppable({
@@ -252,29 +302,39 @@ function DroppableColuna({
     <div
       ref={setColumnRef}
       style={{
-        transform: CSS.Transform.toString(transform),
+        transform: CSS.Translate.toString(transform),
         transition,
       }}
       className={cn(
         "flex min-w-[280px] max-w-sm flex-1 flex-col",
-        isDragging && "z-10 opacity-70",
+        isDragging && "z-10 opacity-40",
       )}
     >
       <div className="mb-3 flex items-center justify-between gap-2 px-1">
         <div className="flex min-w-0 items-center gap-2">
-          <button
-            type="button"
-            className="shrink-0 cursor-grab touch-none rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-            aria-label={`Arrastar coluna ${coluna.nome}`}
-            title="Arrastar para reordenar coluna"
-            {...attributes}
-            {...listeners}
-          >
-            <GripVertical className="h-4 w-4" />
-          </button>
+          {isInbox ? (
+            <span
+              className="inline-flex h-5 w-5 shrink-0 items-center justify-center text-muted-foreground/40"
+              title="Coluna padrão — posição fixa"
+              aria-hidden
+            >
+              <GripVertical className="h-4 w-4" />
+            </span>
+          ) : (
+            <button
+              type="button"
+              className="shrink-0 cursor-grab touch-none rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground active:cursor-grabbing"
+              aria-label={`Arrastar coluna ${coluna.nome}`}
+              title="Arrastar para reordenar coluna"
+              {...attributes}
+              {...listeners}
+            >
+              <GripVertical className="h-4 w-4" />
+            </button>
+          )}
           <p className="truncate text-sm font-medium">{coluna.nome}</p>
           <span className="text-xs text-muted-foreground">{tarefas.length}</span>
-          {coluna.is_inbox && (
+          {isInbox && (
             <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
               padrão
             </Badge>
@@ -291,7 +351,7 @@ function DroppableColuna({
               <Pencil className="mr-2 h-3.5 w-3.5" />
               Renomear
             </DropdownMenuItem>
-            {!coluna.is_inbox && (
+            {!isInbox && (
               <DropdownMenuItem
                 className="text-destructive focus:text-destructive"
                 onClick={() => onDelete(coluna)}
@@ -349,14 +409,29 @@ function DroppableColuna({
   );
 }
 
-function findContainer(
-  tarefaId: string,
-  columnsState: Record<string, string[]>,
-): string | null {
-  for (const [colunaId, ids] of Object.entries(columnsState)) {
-    if (ids.includes(tarefaId)) return colunaId;
-  }
-  return null;
+function ColunaDragOverlayPreview({
+  coluna,
+  tarefaCount,
+}: {
+  coluna: TarefaBoardColuna;
+  tarefaCount: number;
+}) {
+  return (
+    <div className="flex min-w-[280px] max-w-sm flex-1 flex-col rounded-xl border bg-card shadow-xl">
+      <div className="flex items-center gap-2 border-b px-3 py-2.5">
+        <GripVertical className="h-4 w-4 text-muted-foreground" />
+        <p className="truncate text-sm font-medium">{coluna.nome}</p>
+        <span className="text-xs text-muted-foreground">{tarefaCount}</span>
+      </div>
+      <div className="min-h-[200px] rounded-b-xl bg-muted/30 p-3">
+        <p className="text-xs text-muted-foreground">
+          {tarefaCount === 0
+            ? "Sem tarefas"
+            : `${tarefaCount} tarefa${tarefaCount === 1 ? "" : "s"}`}
+        </p>
+      </div>
+    </div>
+  );
 }
 
 export function TarefaColunasBoard({
@@ -418,10 +493,13 @@ export function TarefaColunasBoard({
   );
 
   const tarefaIdsKey = useMemo(() => tarefas.map((t) => t.id).sort().join(","), [tarefas]);
-  const colunasKey = useMemo(() => colunas.map((c) => c.id).join(","), [colunas]);
+  const colunasKey = useMemo(
+    () => colunas.map((c) => `${c.id}:${c.posicao}`).join(","),
+    [colunas],
+  );
 
   useEffect(() => {
-    setColunaOrder(colunas.map((c) => c.id));
+    setColunaOrder(pinInboxFirst(colunas.map((c) => c.id), colunas));
   }, [colunasKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -489,12 +567,7 @@ export function TarefaColunasBoard({
     const overId = String(over.id);
 
     const activeContainer = findContainer(activeTarefaId, columnsState);
-    let overContainer =
-      over.data.current?.type === "coluna"
-        ? String(over.data.current.colunaId)
-        : over.data.current?.type === "coluna-reorder"
-          ? String(over.data.current.colunaId)
-          : findContainer(overId, columnsState);
+    const overContainer = resolveOverColunaId(over, columnsState);
 
     if (!activeContainer || !overContainer || activeContainer === overContainer) return;
 
@@ -527,25 +600,23 @@ export function TarefaColunasBoard({
 
     if (active.data.current?.type === "coluna-reorder") {
       const activeColId = String(active.data.current.colunaId);
-      const overColId =
-        over.data.current?.type === "coluna-reorder"
-          ? String(over.data.current.colunaId)
-          : over.data.current?.type === "coluna"
-            ? String(over.data.current.colunaId)
-            : parseColunaSortId(String(over.id));
-
+      const overColId = resolveOverColunaId(over, columnsState);
       if (!overColId || activeColId === overColId) return;
+
+      const activeColunaMeta = colunaById.get(activeColId);
+      const overColunaMeta = colunaById.get(overColId);
+      if (activeColunaMeta?.is_inbox || overColunaMeta?.is_inbox) return;
 
       const oldIndex = colunaOrder.indexOf(activeColId);
       const newIndex = colunaOrder.indexOf(overColId);
-      if (oldIndex < 0 || newIndex < 0) return;
+      if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return;
 
-      const nextOrder = arrayMove(colunaOrder, oldIndex, newIndex);
+      const nextOrder = pinInboxFirst(arrayMove(colunaOrder, oldIndex, newIndex), colunas);
       setColunaOrder(nextOrder);
       try {
         await reorderColunas.mutateAsync(nextOrder);
       } catch (error) {
-        setColunaOrder(colunas.map((c) => c.id));
+        setColunaOrder(pinInboxFirst(colunas.map((c) => c.id), colunas));
         toast.error("Erro ao reordenar colunas", {
           description: getSupabaseErrorMessage(error as Error),
         });
@@ -556,10 +627,7 @@ export function TarefaColunasBoard({
     const activeTarefaId = String(active.id);
     const overId = String(over.id);
     const activeContainer = findContainer(activeTarefaId, columnsState);
-    const overContainer =
-      over.data.current?.type === "coluna" || over.data.current?.type === "coluna-reorder"
-        ? String(over.data.current.colunaId)
-        : findContainer(overId, columnsState);
+    const overContainer = resolveOverColunaId(over, columnsState);
 
     if (!activeContainer || !overContainer) return;
 
@@ -643,7 +711,7 @@ export function TarefaColunasBoard({
 
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCorners}
+        collisionDetection={columnAwareCollision}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDragEnd={(e) => void handleDragEnd(e)}
@@ -677,13 +745,14 @@ export function TarefaColunasBoard({
             ))}
           </div>
         </SortableContext>
-        <DragOverlay>
+        <DragOverlay dropAnimation={null}>
           {activeTarefa ? (
             <ColunaCardContent tarefa={activeTarefa} isDragging />
           ) : activeColuna ? (
-            <div className="min-w-[280px] rounded-xl border bg-card p-3 shadow-lg">
-              <p className="text-sm font-medium">{activeColuna.nome}</p>
-            </div>
+            <ColunaDragOverlayPreview
+              coluna={activeColuna}
+              tarefaCount={(columnsState[activeColuna.id] ?? []).length}
+            />
           ) : null}
         </DragOverlay>
       </DndContext>
