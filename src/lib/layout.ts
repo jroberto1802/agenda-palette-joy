@@ -8,6 +8,12 @@ export const CARD_GRID_CLASS = "grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-co
 export const DENSE_CARD_GRID_CLASS =
   "grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4";
 
+/**
+ * Altura fixa dos cards de tarefa/subtarefa na grade (igual ao skeleton da Agenda).
+ * Conteúdo variável trunca — não altera as dimensões do card.
+ */
+export const TAREFA_CARD_FIXED_CLASS = "h-36 w-full overflow-hidden";
+
 /** @deprecated Prefira `DENSE_CARD_GRID_CLASS`. */
 export const TAREFA_CARD_GRID_CLASS = DENSE_CARD_GRID_CLASS;
 

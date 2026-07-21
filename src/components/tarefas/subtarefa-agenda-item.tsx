@@ -1,6 +1,7 @@
 import { DescricaoPreview } from "@/components/tarefas/descricao-preview";
 import { ConclusaoBolinha } from "@/components/tarefas/conclusao-bolinha";
 import { Badge } from "@/components/ui/badge";
+import { TAREFA_CARD_FIXED_CLASS } from "@/lib/layout";
 import { cn } from "@/lib/utils";
 import type { SubtarefaAgendaItem } from "@/types";
 import { formatDate, getVencimentoVariant } from "@/utils/formatters";
@@ -105,22 +106,28 @@ export function SubtarefaAgendaCard({
       type="button"
       onClick={onOpen}
       className={cn(
-        "w-full rounded-lg border border-l-4 bg-card px-3 py-2.5 text-left shadow-sm transition-colors hover:bg-muted/40",
+        TAREFA_CARD_FIXED_CLASS,
+        "flex flex-col rounded-lg border border-l-4 bg-card px-3 py-2.5 text-left shadow-sm transition-colors hover:bg-muted/40",
         TAREFA_PRIORIDADE_BAND_CLASS[subtarefa.prioridade],
       )}
     >
-      <p className="line-clamp-2 text-sm font-medium leading-snug">{subtarefa.titulo}</p>
-      <DescricaoPreview descricao={subtarefa.descricao} className="mt-1 line-clamp-2 text-[11px] leading-snug text-muted-foreground" />
+      <p className="line-clamp-2 shrink-0 text-sm font-medium leading-snug">{subtarefa.titulo}</p>
+      <div className="mt-1 min-h-[2.25rem] shrink-0">
+        <DescricaoPreview
+          descricao={subtarefa.descricao}
+          className="line-clamp-2 text-[11px] leading-snug text-muted-foreground"
+        />
+      </div>
       <p className="mt-1 truncate text-[11px] text-muted-foreground">de: {parentTitle}</p>
-      <div className="mt-1.5 flex flex-wrap gap-1">
-        <Badge variant="secondary" className="gap-1 px-1.5 py-0 text-[10px]">
+      <div className="mt-auto flex min-w-0 items-center gap-1 overflow-hidden pt-1.5">
+        <Badge variant="secondary" className="shrink-0 gap-1 px-1.5 py-0 text-[10px]">
           <ListTodo className="h-3 w-3" />
           Subtarefa
         </Badge>
         {subtarefa.setor && (
           <Badge
             variant="outline"
-            className="px-1.5 py-0 text-[10px]"
+            className="max-w-[6rem] shrink truncate px-1.5 py-0 text-[10px]"
             style={{
               borderColor: subtarefa.setor.cor ?? undefined,
               color: subtarefa.setor.cor ?? undefined,
@@ -130,7 +137,10 @@ export function SubtarefaAgendaCard({
           </Badge>
         )}
         {subtarefa.projeto && (
-          <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
+          <Badge
+            variant="outline"
+            className="max-w-[6rem] shrink truncate px-1.5 py-0 text-[10px]"
+          >
             {subtarefa.projeto.nome}
           </Badge>
         )}

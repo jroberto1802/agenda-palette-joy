@@ -56,7 +56,7 @@ function SortableCardShell({
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={cn("relative", isDragging && "z-10 opacity-70")}
+      className={cn("relative h-36", isDragging && "z-10 opacity-70")}
     >
       <button
         type="button"
