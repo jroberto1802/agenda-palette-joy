@@ -1,7 +1,7 @@
 import { addDays, format, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { SubtarefaAgendaCard } from "@/components/tarefas/subtarefa-agenda-item";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,13 +17,20 @@ import { useSubtarefasAgenda, useTarefas } from "@/hooks/use-tarefas";
 import { cn } from "@/lib/utils";
 import type { SubtarefaAgendaItem, TarefaWithRelations } from "@/types";
 import {
+  normalizeTarefaClassificar,
+  readAgendaClassificarPreference,
+  TAREFA_CLASSIFICAR_LABELS,
+  writeAgendaClassificarPreference,
+  type TarefaClassificar,
+} from "@/utils/agenda-classificar-preference";
+import {
   AGENDA_EM_BREVE_PAGE_SIZE,
   getEmBreveDays,
   resolveWindowStartForMonth,
   startOfTodayLocal,
   toLocalDateKey,
 } from "@/utils/agenda-datas";
-import { TAREFA_PRIORIDADE_BAND_CLASS } from "@/utils/tarefas";
+import { compareByClassificar, TAREFA_PRIORIDADE_BAND_CLASS } from "@/utils/tarefas";
 
 const MONTH_OPTIONS = Array.from({ length: 12 }, (_, monthIndex) => ({
   value: String(monthIndex),
@@ -96,6 +103,18 @@ export function AgendaEmBreveView({
   onCreateForDate: (date: Date) => void;
 }) {
   const [windowStart, setWindowStart] = useState(() => startOfTodayLocal());
+  const [classificar, setClassificar] = useState<TarefaClassificar>("prioridade");
+
+  useEffect(() => {
+    if (!usuarioId) return;
+    setClassificar(readAgendaClassificarPreference(usuarioId, "agenda-em-breve"));
+  }, [usuarioId]);
+
+  const handleClassificarChange = (value: TarefaClassificar) => {
+    const next = normalizeTarefaClassificar(value);
+    setClassificar(next);
+    writeAgendaClassificarPreference(usuarioId, "agenda-em-breve", next);
+  };
 
   const days = useMemo(
     () => getEmBreveDays(windowStart, AGENDA_EM_BREVE_PAGE_SIZE),
@@ -145,14 +164,14 @@ export function AgendaEmBreveView({
       map.set(
         key,
         [...items].sort((a, b) => {
-          const titleA = a.kind === "tarefa" ? a.tarefa.titulo : a.subtarefa.titulo;
-          const titleB = b.kind === "tarefa" ? b.tarefa.titulo : b.subtarefa.titulo;
-          return titleA.localeCompare(titleB, "pt-BR");
+          const left = a.kind === "tarefa" ? a.tarefa : a.subtarefa;
+          const right = b.kind === "tarefa" ? b.tarefa : b.subtarefa;
+          return compareByClassificar(left, right, classificar);
         }),
       );
     }
     return map;
-  }, [tarefas, subtarefas, days]);
+  }, [tarefas, subtarefas, days, classificar]);
 
   const selectedMonth = windowStart.getMonth();
   const selectedYear = windowStart.getFullYear();
@@ -171,7 +190,7 @@ export function AgendaEmBreveView({
   return (
     <div className="flex min-h-0 flex-col gap-4">
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Select
             value={String(selectedMonth)}
             onValueChange={(value) => applyPeriod(Number(value), selectedYear)}
@@ -201,6 +220,22 @@ export function AgendaEmBreveView({
                   {year}
                 </SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={classificar}
+            onValueChange={(value) =>
+              handleClassificarChange(value as TarefaClassificar)
+            }
+          >
+            <SelectTrigger className="h-8 w-[168px]" aria-label="Classificar">
+              <SelectValue placeholder="Classificar" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="prioridade">
+                {TAREFA_CLASSIFICAR_LABELS.prioridade}
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>

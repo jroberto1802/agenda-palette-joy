@@ -1,5 +1,5 @@
 import { Plus } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AgendaAtrasadasSection } from "@/components/tarefas/agenda-atrasadas-section";
 import { SubtarefaAgendaListRow } from "@/components/tarefas/subtarefa-agenda-item";
@@ -21,37 +21,45 @@ import type {
   TarefaFilters,
   TarefaWithRelations,
 } from "@/types";
+import {
+  normalizeTarefaClassificar,
+  readAgendaClassificarPreference,
+  writeAgendaClassificarPreference,
+  type TarefaClassificar,
+} from "@/utils/agenda-classificar-preference";
 import { startOfTodayLocal, toLocalDateKey } from "@/utils/agenda-datas";
+import { compareByClassificar } from "@/utils/tarefas";
 
 type AgendaHojeItem =
   | { kind: "tarefa"; tarefa: TarefaWithRelations }
   | { kind: "subtarefa"; subtarefa: SubtarefaAgendaItem };
 
-const EMPTY_HOJE_FILTERS: TarefaFilters = {
-  prioridade: "all",
-  setor_id: "all",
-  projeto_id: "all",
-  atribuido_a: "all",
-  atribuido_ids: [],
-  search: "",
-  tag: "",
-};
+function createEmptyHojeFilters(classificar: TarefaClassificar = "prioridade"): TarefaFilters {
+  return {
+    prioridade: "all",
+    setor_id: "all",
+    projeto_id: "all",
+    atribuido_a: "all",
+    atribuido_ids: [],
+    search: "",
+    tag: "",
+    classificar,
+  };
+}
 
 function isAtrasada(dataInicio: string | null | undefined, hojeKey: string): boolean {
   const key = toLocalDateKey(dataInicio);
   return !!key && key < hojeKey;
 }
 
-function sortAgendaItems(items: AgendaHojeItem[]): AgendaHojeItem[] {
+function sortAgendaItems(
+  items: AgendaHojeItem[],
+  mode: TarefaClassificar,
+): AgendaHojeItem[] {
   return [...items].sort((a, b) => {
-    const dateA =
-      (a.kind === "tarefa" ? a.tarefa.data_inicio : a.subtarefa.data_inicio) ?? "";
-    const dateB =
-      (b.kind === "tarefa" ? b.tarefa.data_inicio : b.subtarefa.data_inicio) ?? "";
-    if (dateA !== dateB) return dateA.localeCompare(dateB);
-    const titleA = a.kind === "tarefa" ? a.tarefa.titulo : a.subtarefa.titulo;
-    const titleB = b.kind === "tarefa" ? b.tarefa.titulo : b.subtarefa.titulo;
-    return titleA.localeCompare(titleB, "pt-BR");
+    const left = a.kind === "tarefa" ? a.tarefa : a.subtarefa;
+    const right = b.kind === "tarefa" ? b.tarefa : b.subtarefa;
+    return compareByClassificar(left, right, mode);
   });
 }
 
@@ -74,17 +82,37 @@ export function AgendaHojeView({
   const updateConclusao = useUpdateTarefaConclusao();
   const toggleSubtarefaMut = useToggleSubtarefa();
 
-  const [filters, setFilters] = useState<TarefaFilters>(EMPTY_HOJE_FILTERS);
-  const [debouncedFilters, setDebouncedFilters] = useState<TarefaFilters>(EMPTY_HOJE_FILTERS);
+  const [filters, setFilters] = useState<TarefaFilters>(() => createEmptyHojeFilters());
+  const [debouncedFilters, setDebouncedFilters] = useState<TarefaFilters>(() =>
+    createEmptyHojeFilters(),
+  );
+
+  useEffect(() => {
+    if (!usuarioId) return;
+    const classificar = readAgendaClassificarPreference(usuarioId, "agenda-hoje");
+    setFilters((prev) =>
+      prev.classificar === classificar ? prev : { ...prev, classificar },
+    );
+    setDebouncedFilters((prev) =>
+      prev.classificar === classificar ? prev : { ...prev, classificar },
+    );
+  }, [usuarioId]);
 
   const handleFiltersChange = useMemo(() => {
     let timeout: ReturnType<typeof setTimeout>;
     return (next: TarefaFilters) => {
+      if (next.classificar && next.classificar !== filters.classificar) {
+        writeAgendaClassificarPreference(
+          usuarioId,
+          "agenda-hoje",
+          normalizeTarefaClassificar(next.classificar),
+        );
+      }
       setFilters(next);
       clearTimeout(timeout);
       timeout = setTimeout(() => setDebouncedFilters(next), 300);
     };
-  }, []);
+  }, [filters.classificar, usuarioId]);
 
   const handleToggleConcluida = async (tarefa: TarefaWithRelations, concluida: boolean) => {
     try {
@@ -160,6 +188,10 @@ export function AgendaHojeView({
       { enabled: !!usuarioId },
     );
 
+  const classificarMode: TarefaClassificar = normalizeTarefaClassificar(
+    debouncedFilters.classificar,
+  );
+
   const itemsHoje = useMemo((): AgendaHojeItem[] => {
     const tarefasDoDia = (tarefas ?? []).filter(
       (t) => toLocalDateKey(t.data_inicio) === hojeKey,
@@ -168,11 +200,14 @@ export function AgendaHojeView({
       (s) => toLocalDateKey(s.data_inicio) === hojeKey,
     );
 
-    return sortAgendaItems([
-      ...tarefasDoDia.map((tarefa) => ({ kind: "tarefa" as const, tarefa })),
-      ...subtarefasDoDia.map((subtarefa) => ({ kind: "subtarefa" as const, subtarefa })),
-    ]);
-  }, [tarefas, subtarefas, hojeKey]);
+    return sortAgendaItems(
+      [
+        ...tarefasDoDia.map((tarefa) => ({ kind: "tarefa" as const, tarefa })),
+        ...subtarefasDoDia.map((subtarefa) => ({ kind: "subtarefa" as const, subtarefa })),
+      ],
+      classificarMode,
+    );
+  }, [tarefas, subtarefas, hojeKey, classificarMode]);
 
   const itemsAtrasadas = useMemo((): AgendaHojeItem[] => {
     const tarefasVencidas = (tarefasAtrasadas ?? []).filter((t) =>
@@ -182,11 +217,14 @@ export function AgendaHojeView({
       isAtrasada(s.data_inicio, hojeKey),
     );
 
-    return sortAgendaItems([
-      ...tarefasVencidas.map((tarefa) => ({ kind: "tarefa" as const, tarefa })),
-      ...subtarefasVencidas.map((subtarefa) => ({ kind: "subtarefa" as const, subtarefa })),
-    ]);
-  }, [tarefasAtrasadas, subtarefasAtrasadas, hojeKey]);
+    return sortAgendaItems(
+      [
+        ...tarefasVencidas.map((tarefa) => ({ kind: "tarefa" as const, tarefa })),
+        ...subtarefasVencidas.map((subtarefa) => ({ kind: "subtarefa" as const, subtarefa })),
+      ],
+      classificarMode,
+    );
+  }, [tarefasAtrasadas, subtarefasAtrasadas, hojeKey, classificarMode]);
 
   const isLoading =
     loadingTarefas ||
@@ -210,6 +248,7 @@ export function AgendaHojeView({
         pessoas={[]}
         hideResponsavel
         variant="hoje"
+        classificarOptions={["prioridade"]}
       />
 
       {!usuarioId || isLoading ? (

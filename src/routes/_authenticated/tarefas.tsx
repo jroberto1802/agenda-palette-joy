@@ -26,6 +26,7 @@ import { useSoftDeleteTarefa, useUpdateTarefaConclusao } from "@/hooks/use-taref
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
 import type { SubtarefaAgendaItem, TarefaWithRelations } from "@/types";
 import { localDateAtNoon, startOfTodayLocal } from "@/utils/agenda-datas";
+import { readAgendaClassificarPreference } from "@/utils/agenda-classificar-preference";
 import { readAgendaViewPreference } from "@/utils/agenda-view-preference";
 import { isAdmin, isGerente } from "@/utils/permissions";
 import { canEditTarefa, canToggleTarefaConclusao } from "@/utils/tarefas";
@@ -82,10 +83,43 @@ function AgendaPage() {
     if (!profile?.id) return;
     const geral = readAgendaViewPreference(profile.id, "agenda-geral");
     const visualizando = readAgendaViewPreference(profile.id, "agenda-visualizando");
-    setBoardState((prev) => (prev.view === geral ? prev : { ...prev, view: geral }));
-    setVisualizandoState((prev) =>
-      prev.view === visualizando ? prev : { ...prev, view: visualizando },
+    const classificarGeral = readAgendaClassificarPreference(profile.id, "agenda-geral");
+    const classificarVisualizando = readAgendaClassificarPreference(
+      profile.id,
+      "agenda-visualizando",
     );
+    setBoardState((prev) => {
+      const nextView = prev.view === geral ? prev.view : geral;
+      const nextClassificar =
+        prev.filters.classificar === classificarGeral
+          ? prev.filters.classificar
+          : classificarGeral;
+      if (nextView === prev.view && nextClassificar === prev.filters.classificar) {
+        return prev;
+      }
+      return {
+        ...prev,
+        view: nextView,
+        filters: { ...prev.filters, classificar: nextClassificar },
+        debouncedFilters: { ...prev.debouncedFilters, classificar: nextClassificar },
+      };
+    });
+    setVisualizandoState((prev) => {
+      const nextView = prev.view === visualizando ? prev.view : visualizando;
+      const nextClassificar =
+        prev.filters.classificar === classificarVisualizando
+          ? prev.filters.classificar
+          : classificarVisualizando;
+      if (nextView === prev.view && nextClassificar === prev.filters.classificar) {
+        return prev;
+      }
+      return {
+        ...prev,
+        view: nextView,
+        filters: { ...prev.filters, classificar: nextClassificar },
+        debouncedFilters: { ...prev.debouncedFilters, classificar: nextClassificar },
+      };
+    });
   }, [profile?.id]);
 
   useEffect(() => {

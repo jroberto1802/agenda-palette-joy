@@ -26,11 +26,18 @@ import type {
   TarefaWithRelations,
 } from "@/types";
 import {
+  normalizeTarefaClassificar,
+  readAgendaClassificarPreference,
+  writeAgendaClassificarPreference,
+  type TarefaClassificar,
+} from "@/utils/agenda-classificar-preference";
+import {
   normalizeAgendaViewMode,
   readAgendaViewPreference,
   writeAgendaViewPreference,
   type AgendaViewMode,
 } from "@/utils/agenda-view-preference";
+import { sortByClassificar } from "@/utils/tarefas";
 
 export type VisualizandoBoardState = {
   filters: TarefaFilters;
@@ -41,6 +48,10 @@ export type VisualizandoBoardState = {
 export function createVisualizandoBoardState(
   preference?: { userId?: string | null },
 ): VisualizandoBoardState {
+  const classificar = preference
+    ? readAgendaClassificarPreference(preference.userId, "agenda-visualizando")
+    : "prioridade";
+
   return {
     filters: {
       prioridade: "all",
@@ -50,6 +61,7 @@ export function createVisualizandoBoardState(
       atribuido_ids: [],
       search: "",
       tag: "",
+      classificar,
     },
     debouncedFilters: {
       prioridade: "all",
@@ -59,6 +71,7 @@ export function createVisualizandoBoardState(
       atribuido_ids: [],
       search: "",
       tag: "",
+      classificar,
     },
     view: preference
       ? readAgendaViewPreference(preference.userId, "agenda-visualizando")
@@ -111,6 +124,13 @@ export function AgendaVisualizandoView({
   const handleFiltersChange = useMemo(() => {
     let timeout: ReturnType<typeof setTimeout>;
     return (next: TarefaFilters) => {
+      if (next.classificar && next.classificar !== stateRef.current.filters.classificar) {
+        writeAgendaClassificarPreference(
+          usuarioId,
+          "agenda-visualizando",
+          normalizeTarefaClassificar(next.classificar),
+        );
+      }
       onStateChange({
         ...stateRef.current,
         filters: next,
@@ -124,7 +144,7 @@ export function AgendaVisualizandoView({
         });
       }, 300);
     };
-  }, [onStateChange]);
+  }, [onStateChange, usuarioId]);
 
   const handleViewChange = (nextView: AgendaViewMode) => {
     const normalized = normalizeAgendaViewMode(nextView);
@@ -183,8 +203,15 @@ export function AgendaVisualizandoView({
   );
 
   const isLoading = loadingTarefas || loadingSubtarefas;
-  const tarefasList = tarefas ?? [];
-  const subtarefasList = subtarefas ?? [];
+  const classificarMode: TarefaClassificar = normalizeTarefaClassificar(filters.classificar);
+  const tarefasList = useMemo(
+    () => sortByClassificar(tarefas ?? [], classificarMode),
+    [tarefas, classificarMode],
+  );
+  const subtarefasList = useMemo(
+    () => sortByClassificar(subtarefas ?? [], classificarMode),
+    [subtarefas, classificarMode],
+  );
   const hasItems = tarefasList.length > 0 || subtarefasList.length > 0;
 
   return (
@@ -199,6 +226,7 @@ export function AgendaVisualizandoView({
             pessoas={pessoas}
             hideProjeto
             variant="visualizando"
+            classificarOptions={["prioridade", "data_asc"]}
           />
         </div>
         <AgendaViewSelector value={view} onChange={handleViewChange} hideColunas />

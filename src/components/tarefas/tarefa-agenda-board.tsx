@@ -20,14 +20,37 @@ import type {
   TarefaWithRelations,
 } from "@/types";
 import {
+  normalizeTarefaClassificar,
+  readAgendaClassificarPreference,
+  writeAgendaClassificarPreference,
+  type AgendaClassificarScope,
+  type TarefaClassificar,
+} from "@/utils/agenda-classificar-preference";
+import {
   normalizeAgendaViewMode,
   readAgendaViewPreference,
   writeAgendaViewPreference,
   type AgendaViewMode,
   type AgendaViewPreferenceScope,
 } from "@/utils/agenda-view-preference";
+import { sortByClassificar } from "@/utils/tarefas";
 
 export type { AgendaViewMode, AgendaViewPreferenceScope };
+
+function toClassificarScope(
+  scope: AgendaViewPreferenceScope,
+): AgendaClassificarScope | null {
+  if (scope === "finalizados") return null;
+  if (
+    scope === "agenda-geral" ||
+    scope === "agenda-visualizando" ||
+    scope === "equipe" ||
+    scope === "projeto-detalhe"
+  ) {
+    return scope;
+  }
+  return null;
+}
 
 export type AgendaBoardState = {
   filters: TarefaFilters;
@@ -42,6 +65,11 @@ export function createAgendaBoardState(
     scope: AgendaViewPreferenceScope;
   },
 ): AgendaBoardState {
+  const classificarScope = preference ? toClassificarScope(preference.scope) : null;
+  const classificar = classificarScope
+    ? readAgendaClassificarPreference(preference?.userId, classificarScope)
+    : undefined;
+
   return {
     filters: {
       prioridade: "all",
@@ -53,6 +81,7 @@ export function createAgendaBoardState(
       tag: "",
       periodo_inicio: "",
       periodo_fim: "",
+      ...(classificar ? { classificar } : {}),
       ...overrides,
     },
     debouncedFilters: {
@@ -65,6 +94,7 @@ export function createAgendaBoardState(
       tag: "",
       periodo_inicio: "",
       periodo_fim: "",
+      ...(classificar ? { classificar } : {}),
       ...overrides,
     },
     view: preference
@@ -149,6 +179,19 @@ export function TarefaAgendaBoard({
   const handleFiltersChange = useMemo(() => {
     let timeout: ReturnType<typeof setTimeout>;
     return (next: TarefaFilters) => {
+      const classificarScope = toClassificarScope(preferenceScope);
+      if (
+        classificarScope &&
+        next.classificar &&
+        next.classificar !== stateRef.current.filters.classificar
+      ) {
+        writeAgendaClassificarPreference(
+          preferenceUserId,
+          classificarScope,
+          normalizeTarefaClassificar(next.classificar),
+        );
+      }
+
       onStateChange({
         ...stateRef.current,
         filters: next,
@@ -162,7 +205,7 @@ export function TarefaAgendaBoard({
         });
       }, 300);
     };
-  }, [onStateChange]);
+  }, [onStateChange, preferenceScope, preferenceUserId]);
 
   const handleViewChange = (nextView: AgendaViewMode) => {
     const normalized = normalizeView(nextView);
@@ -186,7 +229,20 @@ export function TarefaAgendaBoard({
   }, [debouncedFilters, forceProjetoId, somenteFinalizadas]);
 
   const { data: tarefas, isLoading } = useTarefas(queryFilters);
-  const enableReorder = !somenteFinalizadas;
+
+  const classificarMode: TarefaClassificar = normalizeTarefaClassificar(
+    filters.classificar,
+  );
+  const sortedTarefas = useMemo(
+    () => (tarefas ? sortByClassificar(tarefas, classificarMode) : []),
+    [tarefas, classificarMode],
+  );
+
+  /** Classificar define a ordem — desativa reordenação manual em Cards/Lista. */
+  const enableReorder = false;
+  const classificarOptions: TarefaClassificar[] = somenteFinalizadas
+    ? []
+    : ["prioridade", "data_asc"];
 
   return (
     <div className="space-y-4">
@@ -201,6 +257,7 @@ export function TarefaAgendaBoard({
             hideProjeto={hideProjeto}
             hideResponsavel={hideResponsavel}
             variant={somenteFinalizadas ? "finalizados" : "default"}
+            classificarOptions={classificarOptions}
           />
         </div>
         <AgendaViewSelector
@@ -218,11 +275,11 @@ export function TarefaAgendaBoard({
                 <Skeleton key={i} className="h-36 rounded-xl" />
               ))}
             </div>
-          ) : !tarefas?.length ? (
+          ) : !sortedTarefas.length ? (
             <EmptyState message={emptyMessage} onCreate={onCreate} hideCreate={hideCreate} />
           ) : (
             <TarefaCardsGrid
-              tarefas={tarefas}
+              tarefas={sortedTarefas}
               canEdit={canEdit}
               canDeleteTarefa={canDeleteTarefa}
               canToggleConcluida={canToggleConcluida}
@@ -245,11 +302,11 @@ export function TarefaAgendaBoard({
                 <Skeleton key={i} className="h-14 rounded-lg" />
               ))}
             </div>
-          ) : !tarefas?.length ? (
+          ) : !sortedTarefas.length ? (
             <EmptyState message={emptyMessage} onCreate={onCreate} hideCreate={hideCreate} />
           ) : (
             <TarefaListView
-              tarefas={tarefas}
+              tarefas={sortedTarefas}
               onOpenTarefa={onOpenTarefa}
               onToggleConcluida={onToggleConcluida}
               canToggleConcluida={canToggleConcluida}
@@ -272,11 +329,11 @@ export function TarefaAgendaBoard({
                 <Skeleton key={i} className="h-[520px] min-w-[280px] flex-1 rounded-xl" />
               ))}
             </div>
-          ) : !tarefas?.length ? (
+          ) : !sortedTarefas.length ? (
             <EmptyState message={emptyMessage} onCreate={onCreate} hideCreate={hideCreate} />
           ) : (
             <TarefaColunasBoard
-              tarefas={tarefas}
+              tarefas={sortedTarefas}
               onOpenTarefa={onOpenTarefa}
               onToggleConcluida={onToggleConcluida}
               canToggleConcluida={canToggleConcluida}

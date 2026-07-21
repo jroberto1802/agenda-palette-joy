@@ -24,6 +24,7 @@ import { useSetores } from "@/hooks/use-setores";
 import { useSoftDeleteTarefa, useUpdateTarefaConclusao } from "@/hooks/use-tarefas";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
 import type { TarefaWithRelations } from "@/types";
+import { readAgendaClassificarPreference } from "@/utils/agenda-classificar-preference";
 import { readAgendaViewPreference } from "@/utils/agenda-view-preference";
 import { canManageProjetoMembros, isAdmin, isGerente } from "@/utils/permissions";
 import { PROJETO_STATUS_BADGE_CLASS, PROJETO_STATUS_LABELS } from "@/utils/projetos";
@@ -60,7 +61,16 @@ function ProjetoDetailPage() {
     if (!profile?.id) return;
     const saved = readAgendaViewPreference(profile.id, "projeto-detalhe");
     const view = saved === "colunas" ? "cards" : saved;
-    setBoardState((prev) => (prev.view === view ? prev : { ...prev, view }));
+    const classificar = readAgendaClassificarPreference(profile.id, "projeto-detalhe");
+    setBoardState((prev) => {
+      if (prev.view === view && prev.filters.classificar === classificar) return prev;
+      return {
+        ...prev,
+        view,
+        filters: { ...prev.filters, classificar },
+        debouncedFilters: { ...prev.debouncedFilters, classificar },
+      };
+    });
   }, [profile?.id]);
 
   const pessoasAtivas = useMemo(

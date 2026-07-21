@@ -7,6 +7,8 @@ import type {
   TarefaVisibilidade,
   TarefaWithRelations,
 } from "@/types";
+import type { TarefaClassificar } from "@/utils/agenda-classificar-preference";
+import { toLocalDateKey } from "@/utils/agenda-datas";
 
 /** Campos mínimos para ordenar a lista de subtarefas (pendentes acima). */
 export type SubtarefaListOrderable = Pick<
@@ -29,6 +31,48 @@ export const TAREFA_PRIORIDADE_LABELS: Record<TarefaPrioridade, string> = {
   P3: "P3",
   P4: "P4",
 };
+
+/** Rank para ordenação P1 (maior) → P4 (menor). */
+export const TAREFA_PRIORIDADE_RANK: Record<TarefaPrioridade, number> = {
+  P1: 0,
+  P2: 1,
+  P3: 2,
+  P4: 3,
+};
+
+export type ClassificavelPorAgenda = {
+  prioridade: TarefaPrioridade;
+  data_inicio: string | null;
+  titulo: string;
+};
+
+export function compareByClassificar(
+  a: ClassificavelPorAgenda,
+  b: ClassificavelPorAgenda,
+  mode: TarefaClassificar,
+): number {
+  if (mode === "prioridade") {
+    const byPriority =
+      TAREFA_PRIORIDADE_RANK[a.prioridade] - TAREFA_PRIORIDADE_RANK[b.prioridade];
+    if (byPriority !== 0) return byPriority;
+    return a.titulo.localeCompare(b.titulo, "pt-BR");
+  }
+
+  const dateA = toLocalDateKey(a.data_inicio);
+  const dateB = toLocalDateKey(b.data_inicio);
+  if (!dateA && !dateB) return a.titulo.localeCompare(b.titulo, "pt-BR");
+  if (!dateA) return 1;
+  if (!dateB) return -1;
+  if (dateA !== dateB) return dateA.localeCompare(dateB);
+  return a.titulo.localeCompare(b.titulo, "pt-BR");
+}
+
+export function sortByClassificar<T extends ClassificavelPorAgenda>(
+  items: T[],
+  mode: TarefaClassificar,
+): T[] {
+  return [...items].sort((a, b) => compareByClassificar(a, b, mode));
+}
 
 export const TAREFA_PRIORIDADE_COLORS: Record<TarefaPrioridade, string> = {
   P1: "bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30",

@@ -14,9 +14,13 @@ import type {
   SetorWithGerente,
   TarefaFilters,
 } from "@/types";
+import {
+  TAREFA_CLASSIFICAR_LABELS,
+  type TarefaClassificar,
+} from "@/utils/agenda-classificar-preference";
 import { TAREFA_PRIORIDADE_LABELS } from "@/utils/tarefas";
 
-const filterControlClass = "h-9 w-[148px] shrink-0";
+const filterControlClass = "h-9 w-[168px] shrink-0";
 
 export function TarefaFiltersBar({
   filters,
@@ -26,10 +30,12 @@ export function TarefaFiltersBar({
   pessoas,
   hideResponsavel = false,
   hideProjeto = false,
-  /** Menu Finalizados: período por data de finalização */
-  /** Menu Hoje: busca + prioridade + setor + projeto (sem tag/responsável) */
-  /** Menu Visualizando: busca + prioridade + setor + responsáveis (sem projeto/tag) */
+  /** Menu Finalizados: período por data de finalização; sem prioridade/tag/classificar */
+  /** Menu Hoje: busca + prioridade + setor + projeto + classificar (só prioridade) */
+  /** Menu Visualizando: busca + prioridade + setor + responsáveis + classificar */
   variant = "default",
+  /** Opções do filtro Classificar. Vazio = oculto. */
+  classificarOptions = ["prioridade", "data_asc"] as TarefaClassificar[],
 }: {
   filters: TarefaFilters;
   onChange: (filters: TarefaFilters) => void;
@@ -39,14 +45,17 @@ export function TarefaFiltersBar({
   hideResponsavel?: boolean;
   hideProjeto?: boolean;
   variant?: "default" | "finalizados" | "hoje" | "visualizando";
+  classificarOptions?: TarefaClassificar[];
 }) {
   const atribuidoIds = filters.atribuido_ids ?? [];
   const isFinalizados = variant === "finalizados";
   const isHoje = variant === "hoje";
   const isVisualizando = variant === "visualizando";
   const showProjeto = !hideProjeto && !isVisualizando;
-  const showTag = !isFinalizados && !isHoje && !isVisualizando;
   const showResponsavel = !hideResponsavel && !isHoje;
+  const showPrioridade = !isFinalizados;
+  const showClassificar = !isFinalizados && classificarOptions.length > 0;
+  const classificarValue = filters.classificar ?? "prioridade";
 
   return (
     <div className="-mx-1 overflow-x-auto pb-1">
@@ -61,24 +70,49 @@ export function TarefaFiltersBar({
           />
         </div>
 
-        <Select
-          value={filters.prioridade ?? "all"}
-          onValueChange={(v) =>
-            onChange({ ...filters, prioridade: v as TarefaFilters["prioridade"] })
-          }
-        >
-          <SelectTrigger className={filterControlClass}>
-            <SelectValue placeholder="Prioridade" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas prioridades</SelectItem>
-            {Object.entries(TAREFA_PRIORIDADE_LABELS).map(([value, label]) => (
-              <SelectItem key={value} value={value}>
-                {label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {showClassificar && (
+          <Select
+            value={classificarValue}
+            onValueChange={(v) =>
+              onChange({
+                ...filters,
+                classificar: v as TarefaClassificar,
+              })
+            }
+          >
+            <SelectTrigger className={filterControlClass} aria-label="Classificar">
+              <SelectValue placeholder="Classificar" />
+            </SelectTrigger>
+            <SelectContent>
+              {classificarOptions.map((option) => (
+                <SelectItem key={option} value={option}>
+                  {TAREFA_CLASSIFICAR_LABELS[option]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
+        {showPrioridade && (
+          <Select
+            value={filters.prioridade ?? "all"}
+            onValueChange={(v) =>
+              onChange({ ...filters, prioridade: v as TarefaFilters["prioridade"] })
+            }
+          >
+            <SelectTrigger className={filterControlClass}>
+              <SelectValue placeholder="Prioridade" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas prioridades</SelectItem>
+              {Object.entries(TAREFA_PRIORIDADE_LABELS).map(([value, label]) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
         <Select
           value={filters.setor_id ?? "all"}
@@ -153,13 +187,6 @@ export function TarefaFiltersBar({
               onChange={(e) => onChange({ ...filters, periodo_fim: e.target.value })}
             />
           </>
-        ) : showTag ? (
-          <Input
-            placeholder="Filtrar por tag..."
-            className="w-[160px] shrink-0"
-            value={filters.tag ?? ""}
-            onChange={(e) => onChange({ ...filters, tag: e.target.value })}
-          />
         ) : null}
       </div>
     </div>

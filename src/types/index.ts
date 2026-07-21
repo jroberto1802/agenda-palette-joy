@@ -139,6 +139,8 @@ export type TarefaFilters = {
   /** Filtro multi: tarefa aparece se qualquer um destes for responsável */
   atribuido_ids?: string[];
   tag?: string;
+  /** Classificação da listagem: Por Prioridade ou Por Data (crescente). */
+  classificar?: "prioridade" | "data_asc";
   /** Menu Finalizados: restringe a itens concluídos (`concluida = true`). */
   somente_finalizadas?: boolean;
   /** Agenda/Projeto/Calendário: omite concluídas (vão para Finalizados). */
