@@ -156,6 +156,25 @@ export async function renameTarefaBoardColuna(
   return data as TarefaBoardColuna;
 }
 
+/** Persiste a ordem visual das colunas do usuário (posições 0..n-1). */
+export async function reorderTarefaBoardColunas(orderedColunaIds: string[]): Promise<void> {
+  const usuarioId = await requireUserId();
+  const unique = [...new Set(orderedColunaIds.filter(Boolean))];
+  if (unique.length === 0) return;
+
+  const updates = unique.map((id, index) =>
+    supabase
+      .from("tarefa_board_colunas")
+      .update({ posicao: index })
+      .eq("id", id)
+      .eq("usuario_id", usuarioId),
+  );
+
+  const results = await Promise.all(updates);
+  const firstError = results.find((r) => r.error)?.error;
+  if (firstError) throw firstError;
+}
+
 export async function deleteTarefaBoardColuna(id: string): Promise<void> {
   const usuarioId = await requireUserId();
   const colunas = await ensureTarefaBoardColunas();

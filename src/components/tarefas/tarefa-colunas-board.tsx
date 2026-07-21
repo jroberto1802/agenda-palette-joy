@@ -13,6 +13,7 @@ import {
 import {
   SortableContext,
   arrayMove,
+  horizontalListSortingStrategy,
   useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
@@ -47,6 +48,7 @@ import {
   useDeleteTarefaBoardColuna,
   useMoveTarefaEntreColunas,
   useRenameTarefaBoardColuna,
+  useReorderTarefaBoardColunas,
   useReorderTarefasNaColuna,
   useSyncTarefaBoardItens,
   useTarefaBoardColunas,
@@ -62,6 +64,17 @@ import {
   TAREFA_PRIORIDADE_COLORS,
   formatResponsaveisLabel,
 } from "@/utils/tarefas";
+
+const COLUNA_SORT_PREFIX = "col-sort:";
+
+function colunaSortId(colunaId: string) {
+  return `${COLUNA_SORT_PREFIX}${colunaId}`;
+}
+
+function parseColunaSortId(id: string): string | null {
+  if (!id.startsWith(COLUNA_SORT_PREFIX)) return null;
+  return id.slice(COLUNA_SORT_PREFIX.length);
+}
 
 function ColunaCardContent({
   tarefa,
@@ -213,15 +226,52 @@ function DroppableColuna({
   onRename: (coluna: TarefaBoardColuna) => void;
   onDelete: (coluna: TarefaBoardColuna) => void;
 }) {
-  const { setNodeRef, isOver } = useDroppable({
+  const {
+    attributes,
+    listeners,
+    setNodeRef: setSortableRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: colunaSortId(coluna.id),
+    data: { type: "coluna-reorder", colunaId: coluna.id },
+  });
+
+  const { setNodeRef: setDroppableRef, isOver } = useDroppable({
     id: `coluna:${coluna.id}`,
     data: { type: "coluna", colunaId: coluna.id },
   });
 
+  const setColumnRef = (node: HTMLDivElement | null) => {
+    setSortableRef(node);
+    setDroppableRef(node);
+  };
+
   return (
-    <div className="flex min-w-[280px] max-w-sm flex-1 flex-col">
+    <div
+      ref={setColumnRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+      }}
+      className={cn(
+        "flex min-w-[280px] max-w-sm flex-1 flex-col",
+        isDragging && "z-10 opacity-70",
+      )}
+    >
       <div className="mb-3 flex items-center justify-between gap-2 px-1">
         <div className="flex min-w-0 items-center gap-2">
+          <button
+            type="button"
+            className="shrink-0 cursor-grab touch-none rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+            aria-label={`Arrastar coluna ${coluna.nome}`}
+            title="Arrastar para reordenar coluna"
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical className="h-4 w-4" />
+          </button>
           <p className="truncate text-sm font-medium">{coluna.nome}</p>
           <span className="text-xs text-muted-foreground">{tarefas.length}</span>
           {coluna.is_inbox && (
@@ -254,7 +304,6 @@ function DroppableColuna({
         </DropdownMenu>
       </div>
       <div
-        ref={setNodeRef}
         className={cn(
           "min-h-[420px] flex-1 rounded-xl border bg-muted/30 p-2 transition-colors",
           isOver && "border-primary bg-primary/5",
@@ -337,10 +386,12 @@ export function TarefaColunasBoard({
   const createColuna = useCreateTarefaBoardColuna();
   const renameColuna = useRenameTarefaBoardColuna();
   const deleteColuna = useDeleteTarefaBoardColuna();
+  const reorderColunas = useReorderTarefaBoardColunas();
   const moveEntre = useMoveTarefaEntreColunas();
   const reorderNaColuna = useReorderTarefasNaColuna();
 
   const [columnsState, setColumnsState] = useState<Record<string, string[]>>({});
+  const [colunaOrder, setColunaOrder] = useState<string[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [newName, setNewName] = useState("");
@@ -353,7 +404,25 @@ export function TarefaColunasBoard({
     [tarefas],
   );
 
+  const colunaById = useMemo(
+    () => new Map(colunas.map((c) => [c.id, c])),
+    [colunas],
+  );
+
+  const orderedColunas = useMemo(
+    () =>
+      colunaOrder
+        .map((id) => colunaById.get(id))
+        .filter((c): c is TarefaBoardColuna => !!c),
+    [colunaOrder, colunaById],
+  );
+
   const tarefaIdsKey = useMemo(() => tarefas.map((t) => t.id).sort().join(","), [tarefas]);
+  const colunasKey = useMemo(() => colunas.map((c) => c.id).join(","), [colunas]);
+
+  useEffect(() => {
+    setColunaOrder(colunas.map((c) => c.id));
+  }, [colunasKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!tarefas.length) return;
@@ -389,7 +458,10 @@ export function TarefaColunasBoard({
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
   );
 
-  const activeTarefa = activeId ? (tarefaById.get(activeId) ?? null) : null;
+  const activeTarefa =
+    activeId && !parseColunaSortId(activeId) ? (tarefaById.get(activeId) ?? null) : null;
+  const activeColunaId = activeId ? parseColunaSortId(activeId) : null;
+  const activeColuna = activeColunaId ? (colunaById.get(activeColunaId) ?? null) : null;
 
   const persistColumnOrder = async (
     colunaId: string,
@@ -411,6 +483,8 @@ export function TarefaColunasBoard({
   const handleDragOver = (event: DragOverEvent) => {
     const { active, over } = event;
     if (!over) return;
+    if (active.data.current?.type === "coluna-reorder") return;
+
     const activeTarefaId = String(active.id);
     const overId = String(over.id);
 
@@ -418,7 +492,9 @@ export function TarefaColunasBoard({
     let overContainer =
       over.data.current?.type === "coluna"
         ? String(over.data.current.colunaId)
-        : findContainer(overId, columnsState);
+        : over.data.current?.type === "coluna-reorder"
+          ? String(over.data.current.colunaId)
+          : findContainer(overId, columnsState);
 
     if (!activeContainer || !overContainer || activeContainer === overContainer) return;
 
@@ -430,7 +506,7 @@ export function TarefaColunasBoard({
       activeItems.splice(activeIndex, 1);
 
       const overIndex =
-        over.data.current?.type === "coluna"
+        over.data.current?.type === "coluna" || over.data.current?.type === "coluna-reorder"
           ? overItems.length
           : overItems.indexOf(overId);
       const insertAt = overIndex >= 0 ? overIndex : overItems.length;
@@ -449,11 +525,39 @@ export function TarefaColunasBoard({
     setActiveId(null);
     if (!over) return;
 
+    if (active.data.current?.type === "coluna-reorder") {
+      const activeColId = String(active.data.current.colunaId);
+      const overColId =
+        over.data.current?.type === "coluna-reorder"
+          ? String(over.data.current.colunaId)
+          : over.data.current?.type === "coluna"
+            ? String(over.data.current.colunaId)
+            : parseColunaSortId(String(over.id));
+
+      if (!overColId || activeColId === overColId) return;
+
+      const oldIndex = colunaOrder.indexOf(activeColId);
+      const newIndex = colunaOrder.indexOf(overColId);
+      if (oldIndex < 0 || newIndex < 0) return;
+
+      const nextOrder = arrayMove(colunaOrder, oldIndex, newIndex);
+      setColunaOrder(nextOrder);
+      try {
+        await reorderColunas.mutateAsync(nextOrder);
+      } catch (error) {
+        setColunaOrder(colunas.map((c) => c.id));
+        toast.error("Erro ao reordenar colunas", {
+          description: getSupabaseErrorMessage(error as Error),
+        });
+      }
+      return;
+    }
+
     const activeTarefaId = String(active.id);
     const overId = String(over.id);
     const activeContainer = findContainer(activeTarefaId, columnsState);
     const overContainer =
-      over.data.current?.type === "coluna"
+      over.data.current?.type === "coluna" || over.data.current?.type === "coluna-reorder"
         ? String(over.data.current.colunaId)
         : findContainer(overId, columnsState);
 
@@ -463,7 +567,7 @@ export function TarefaColunasBoard({
       const items = columnsState[activeContainer] ?? [];
       const oldIndex = items.indexOf(activeTarefaId);
       const newIndex =
-        over.data.current?.type === "coluna"
+        over.data.current?.type === "coluna" || over.data.current?.type === "coluna-reorder"
           ? items.length - 1
           : items.indexOf(overId);
       if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) {
@@ -484,7 +588,6 @@ export function TarefaColunasBoard({
         posicaoColuna: destIds.indexOf(activeTarefaId),
         orderedTarefaIdsInColumn: destIds,
       });
-      // Also reindex source column
       await persistColumnOrder(activeContainer, columnsState[activeContainer] ?? []);
     } catch (error) {
       toast.error("Erro ao mover tarefa", {
@@ -545,32 +648,43 @@ export function TarefaColunasBoard({
         onDragOver={handleDragOver}
         onDragEnd={(e) => void handleDragEnd(e)}
       >
-        <div className="flex gap-4 overflow-x-auto pb-4">
-          {colunas.map((coluna) => (
-            <DroppableColuna
-              key={coluna.id}
-              coluna={coluna}
-              tarefas={(columnsState[coluna.id] ?? [])
-                .map((id) => tarefaById.get(id))
-                .filter((t): t is TarefaWithRelations => !!t)}
-              onOpenTarefa={onOpenTarefa}
-              onToggleConcluida={onToggleConcluida}
-              canToggleConcluida={canToggleConcluida}
-              canEdit={canEdit}
-              canDeleteTarefa={canDeleteTarefa}
-              onDuplicate={onDuplicate}
-              onMove={onMove}
-              onDeleteTarefa={onDelete}
-              onRename={(c) => {
-                setRenaming(c);
-                setRenameValue(c.nome);
-              }}
-              onDelete={setDeleting}
-            />
-          ))}
-        </div>
+        <SortableContext
+          items={orderedColunas.map((c) => colunaSortId(c.id))}
+          strategy={horizontalListSortingStrategy}
+        >
+          <div className="flex gap-4 overflow-x-auto pb-4">
+            {orderedColunas.map((coluna) => (
+              <DroppableColuna
+                key={coluna.id}
+                coluna={coluna}
+                tarefas={(columnsState[coluna.id] ?? [])
+                  .map((id) => tarefaById.get(id))
+                  .filter((t): t is TarefaWithRelations => !!t)}
+                onOpenTarefa={onOpenTarefa}
+                onToggleConcluida={onToggleConcluida}
+                canToggleConcluida={canToggleConcluida}
+                canEdit={canEdit}
+                canDeleteTarefa={canDeleteTarefa}
+                onDuplicate={onDuplicate}
+                onMove={onMove}
+                onDeleteTarefa={onDelete}
+                onRename={(c) => {
+                  setRenaming(c);
+                  setRenameValue(c.nome);
+                }}
+                onDelete={setDeleting}
+              />
+            ))}
+          </div>
+        </SortableContext>
         <DragOverlay>
-          {activeTarefa ? <ColunaCardContent tarefa={activeTarefa} isDragging /> : null}
+          {activeTarefa ? (
+            <ColunaCardContent tarefa={activeTarefa} isDragging />
+          ) : activeColuna ? (
+            <div className="min-w-[280px] rounded-xl border bg-card p-3 shadow-lg">
+              <p className="text-sm font-medium">{activeColuna.nome}</p>
+            </div>
+          ) : null}
         </DragOverlay>
       </DndContext>
 

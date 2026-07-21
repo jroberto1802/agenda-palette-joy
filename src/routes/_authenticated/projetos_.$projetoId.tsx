@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ArrowLeft, Plus } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ConfirmDeleteDialog } from "@/components/common/confirm-delete-dialog";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
@@ -24,6 +24,7 @@ import { useSetores } from "@/hooks/use-setores";
 import { useSoftDeleteTarefa, useUpdateTarefaConclusao } from "@/hooks/use-tarefas";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
 import type { TarefaWithRelations } from "@/types";
+import { readAgendaViewPreference } from "@/utils/agenda-view-preference";
 import { canManageProjetoMembros, isAdmin, isGerente } from "@/utils/permissions";
 import { PROJETO_STATUS_BADGE_CLASS, PROJETO_STATUS_LABELS } from "@/utils/projetos";
 import { canEditTarefa, canToggleTarefaConclusao } from "@/utils/tarefas";
@@ -44,7 +45,9 @@ function ProjetoDetailPage() {
   const { data: setores } = useSetores();
   const { data: pessoas } = usePessoas();
 
-  const [boardState, setBoardState] = useState<AgendaBoardState>(createAgendaBoardState);
+  const [boardState, setBoardState] = useState<AgendaBoardState>(() =>
+    createAgendaBoardState(undefined, { scope: "projeto-detalhe" }),
+  );
   const [equipeOpen, setEquipeOpen] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelId, setPanelId] = useState<string | null>(null);
@@ -52,6 +55,13 @@ function ProjetoDetailPage() {
 
   const updateConclusao = useUpdateTarefaConclusao();
   const softDelete = useSoftDeleteTarefa();
+
+  useEffect(() => {
+    if (!profile?.id) return;
+    const saved = readAgendaViewPreference(profile.id, "projeto-detalhe");
+    const view = saved === "colunas" ? "cards" : saved;
+    setBoardState((prev) => (prev.view === view ? prev : { ...prev, view }));
+  }, [profile?.id]);
 
   const pessoasAtivas = useMemo(
     () => (pessoas ?? []).filter((p) => p.ativo),
@@ -213,7 +223,10 @@ function ProjetoDetailPage() {
         projetos={[]}
         pessoas={pessoasEquipe}
         hideProjeto
+        hideColunas
         forceProjetoId={projetoId}
+        preferenceScope="projeto-detalhe"
+        preferenceUserId={profile?.id}
         emptyMessage="Nenhuma tarefa vinculada a este projeto."
         canEdit={canEdit}
         canDeleteTarefa={canDeleteTarefa}

@@ -15,6 +15,7 @@ import { useSetores } from "@/hooks/use-setores";
 import { useSoftDeleteTarefa, useUpdateTarefaConclusao } from "@/hooks/use-tarefas";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
 import type { TarefaWithRelations } from "@/types";
+import { readAgendaViewPreference } from "@/utils/agenda-view-preference";
 import { isAdmin, isGerente } from "@/utils/permissions";
 import { canEditTarefa, canToggleTarefaConclusao } from "@/utils/tarefas";
 
@@ -47,7 +48,7 @@ function FinalizadosPage() {
   const { data: pessoas } = usePessoas();
 
   const [boardState, setBoardState] = useState<AgendaBoardState>(() =>
-    createAgendaBoardState({ somente_finalizadas: true }),
+    createAgendaBoardState({ somente_finalizadas: true }, { scope: "finalizados" }),
   );
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelId, setPanelId] = useState<string | null>(null);
@@ -59,12 +60,12 @@ function FinalizadosPage() {
     setPanelOpen(true);
   }, [search.tarefaId]);
 
-  // Garante que a aba Colunas não fique selecionada neste menu.
   useEffect(() => {
-    if (boardState.view === "colunas" || (boardState.view as string) === "kanban") {
-      setBoardState((prev) => ({ ...prev, view: "cards" }));
-    }
-  }, [boardState.view]);
+    if (!profile?.id) return;
+    const saved = readAgendaViewPreference(profile.id, "finalizados");
+    const view = saved === "colunas" ? "cards" : saved;
+    setBoardState((prev) => (prev.view === view ? prev : { ...prev, view }));
+  }, [profile?.id]);
 
   const updateConclusao = useUpdateTarefaConclusao();
   const softDelete = useSoftDeleteTarefa();
@@ -143,6 +144,8 @@ function FinalizadosPage() {
         pessoas={pessoasAtivas}
         somenteFinalizadas
         hideCreate
+        preferenceScope="finalizados"
+        preferenceUserId={profile?.id}
         emptyMessage="Nenhuma tarefa finalizada encontrada com os filtros atuais."
         canEdit={canEdit}
         canDeleteTarefa={canDeleteTarefa}

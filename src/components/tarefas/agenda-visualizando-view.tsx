@@ -5,7 +5,6 @@ import { AgendaViewSelector } from "@/components/tarefas/agenda-view-selector";
 import { MoverTarefaDialog } from "@/components/tarefas/mover-tarefa-dialog";
 import { SubtarefaAgendaCard, SubtarefaAgendaListRow } from "@/components/tarefas/subtarefa-agenda-item";
 import { TarefaCardsGrid } from "@/components/tarefas/tarefa-cards-grid";
-import { TarefaColunasBoard } from "@/components/tarefas/tarefa-colunas-board";
 import { TarefaFiltersBar } from "@/components/tarefas/tarefa-filters";
 import { TarefaListView } from "@/components/tarefas/tarefa-list-view";
 import { Button } from "@/components/ui/button";
@@ -39,7 +38,9 @@ export type VisualizandoBoardState = {
   view: AgendaViewMode;
 };
 
-export function createVisualizandoBoardState(): VisualizandoBoardState {
+export function createVisualizandoBoardState(
+  preference?: { userId?: string | null },
+): VisualizandoBoardState {
   return {
     filters: {
       prioridade: "all",
@@ -59,7 +60,9 @@ export function createVisualizandoBoardState(): VisualizandoBoardState {
       search: "",
       tag: "",
     },
-    view: readAgendaViewPreference(),
+    view: preference
+      ? readAgendaViewPreference(preference.userId, "agenda-visualizando")
+      : "cards",
   };
 }
 
@@ -94,7 +97,9 @@ export function AgendaVisualizandoView({
   onToggleConcluida: (tarefa: TarefaWithRelations, concluida: boolean) => void;
   onDelete: (tarefa: TarefaWithRelations) => void;
 }) {
-  const view = normalizeAgendaViewMode(state.view);
+  const viewRaw = normalizeAgendaViewMode(state.view);
+  /** Visualizando: apenas Cards ou Lista. */
+  const view = viewRaw === "colunas" ? "cards" : viewRaw;
   const { filters, debouncedFilters } = state;
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -123,10 +128,11 @@ export function AgendaVisualizandoView({
 
   const handleViewChange = (nextView: AgendaViewMode) => {
     const normalized = normalizeAgendaViewMode(nextView);
-    writeAgendaViewPreference(normalized);
+    const allowed = normalized === "colunas" ? "cards" : normalized;
+    writeAgendaViewPreference(usuarioId, "agenda-visualizando", allowed);
     onStateChange({
       ...stateRef.current,
-      view: normalized,
+      view: allowed,
     });
   };
 
@@ -195,7 +201,7 @@ export function AgendaVisualizandoView({
             variant="visualizando"
           />
         </div>
-        <AgendaViewSelector value={view} onChange={handleViewChange} />
+        <AgendaViewSelector value={view} onChange={handleViewChange} hideColunas />
       </div>
 
       {view === "cards" && (
@@ -291,47 +297,6 @@ export function AgendaVisualizandoView({
                   </ul>
                 </div>
               )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {view === "colunas" && (
-        <div>
-          {isLoading ? (
-            <div className="flex gap-4">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <Skeleton key={i} className="h-[520px] min-w-[280px] flex-1 rounded-xl" />
-              ))}
-            </div>
-          ) : !tarefasList.length ? (
-            <EmptyState
-              onCreate={onCreate}
-              message={
-                subtarefasList.length > 0
-                  ? "Há subtarefas nesta aba — use Lista ou Cards para visualizá-las. Nenhuma tarefa para o quadro de colunas."
-                  : undefined
-              }
-            />
-          ) : (
-            <div className="space-y-3">
-              {subtarefasList.length > 0 && (
-                <p className="text-xs text-muted-foreground">
-                  {subtarefasList.length} subtarefa(s) visível(is) — alterne para Lista ou Cards
-                  para vê-las.
-                </p>
-              )}
-              <TarefaColunasBoard
-                tarefas={tarefasList}
-                onOpenTarefa={onOpenTarefa}
-                onToggleConcluida={onToggleConcluida}
-                canToggleConcluida={canToggleConcluida}
-                canEdit={canEdit}
-                canDeleteTarefa={canDeleteTarefa}
-                onDuplicate={(tarefa) => void handleDuplicate(tarefa)}
-                onMove={setMovingTarefa}
-                onDelete={onDelete}
-              />
             </div>
           )}
         </div>

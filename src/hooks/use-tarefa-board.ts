@@ -6,6 +6,7 @@ import {
   listTarefaBoardItens,
   moveTarefaEntreColunas,
   renameTarefaBoardColuna,
+  reorderTarefaBoardColunas,
   reorderTarefasLista,
   reorderTarefasNaColuna,
   syncTarefaBoardItens,
@@ -70,6 +71,16 @@ export function useDeleteTarefaBoardColuna() {
     mutationFn: (id: string) => deleteTarefaBoardColuna(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: tarefaBoardKeys.all });
+    },
+  });
+}
+
+export function useReorderTarefaBoardColunas() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (orderedColunaIds: string[]) => reorderTarefaBoardColunas(orderedColunaIds),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: tarefaBoardKeys.colunas() });
     },
   });
 }

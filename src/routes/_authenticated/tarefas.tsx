@@ -26,6 +26,7 @@ import { useSoftDeleteTarefa, useUpdateTarefaConclusao } from "@/hooks/use-taref
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
 import type { SubtarefaAgendaItem, TarefaWithRelations } from "@/types";
 import { localDateAtNoon, startOfTodayLocal } from "@/utils/agenda-datas";
+import { readAgendaViewPreference } from "@/utils/agenda-view-preference";
 import { isAdmin, isGerente } from "@/utils/permissions";
 import { canEditTarefa, canToggleTarefaConclusao } from "@/utils/tarefas";
 
@@ -63,9 +64,11 @@ function AgendaPage() {
   const { data: pessoas } = usePessoas();
 
   const [agendaTab, setAgendaTab] = useState<AgendaTab>("hoje");
-  const [boardState, setBoardState] = useState<AgendaBoardState>(createAgendaBoardState);
-  const [visualizandoState, setVisualizandoState] = useState<VisualizandoBoardState>(
-    createVisualizandoBoardState,
+  const [boardState, setBoardState] = useState<AgendaBoardState>(() =>
+    createAgendaBoardState(undefined, { scope: "agenda-geral" }),
+  );
+  const [visualizandoState, setVisualizandoState] = useState<VisualizandoBoardState>(() =>
+    createVisualizandoBoardState(),
   );
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelId, setPanelId] = useState<string | null>(null);
@@ -74,6 +77,16 @@ function AgendaPage() {
   const [panelSubtarefaId, setPanelSubtarefaId] = useState<string | null>(null);
   const [defaultDataInicio, setDefaultDataInicio] = useState<Date | null>(null);
   const [deleting, setDeleting] = useState<TarefaWithRelations | null>(null);
+
+  useEffect(() => {
+    if (!profile?.id) return;
+    const geral = readAgendaViewPreference(profile.id, "agenda-geral");
+    const visualizando = readAgendaViewPreference(profile.id, "agenda-visualizando");
+    setBoardState((prev) => (prev.view === geral ? prev : { ...prev, view: geral }));
+    setVisualizandoState((prev) =>
+      prev.view === visualizando ? prev : { ...prev, view: visualizando },
+    );
+  }, [profile?.id]);
 
   useEffect(() => {
     if (!search.tarefaId) return;
@@ -279,6 +292,8 @@ function AgendaPage() {
             projetos={projetos ?? []}
             pessoas={pessoasAtivas}
             hideResponsavel
+            preferenceScope="agenda-geral"
+            preferenceUserId={profile?.id}
             emptyMessage="Nenhuma tarefa atribuída a você."
             canEdit={canEdit}
             canDeleteTarefa={canDeleteTarefa}

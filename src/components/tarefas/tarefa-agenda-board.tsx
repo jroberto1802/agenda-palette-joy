@@ -24,9 +24,10 @@ import {
   readAgendaViewPreference,
   writeAgendaViewPreference,
   type AgendaViewMode,
+  type AgendaViewPreferenceScope,
 } from "@/utils/agenda-view-preference";
 
-export type { AgendaViewMode };
+export type { AgendaViewMode, AgendaViewPreferenceScope };
 
 export type AgendaBoardState = {
   filters: TarefaFilters;
@@ -36,6 +37,10 @@ export type AgendaBoardState = {
 
 export function createAgendaBoardState(
   overrides?: Partial<TarefaFilters>,
+  preference?: {
+    userId?: string | null;
+    scope: AgendaViewPreferenceScope;
+  },
 ): AgendaBoardState {
   return {
     filters: {
@@ -62,7 +67,9 @@ export function createAgendaBoardState(
       periodo_fim: "",
       ...overrides,
     },
-    view: readAgendaViewPreference(),
+    view: preference
+      ? readAgendaViewPreference(preference.userId, preference.scope)
+      : "cards",
   };
 }
 
@@ -89,6 +96,9 @@ export function TarefaAgendaBoard({
   onDelete,
   somenteFinalizadas = false,
   hideCreate = false,
+  hideColunas = false,
+  preferenceScope,
+  preferenceUserId,
 }: {
   state: AgendaBoardState;
   onStateChange: (state: AgendaBoardState) => void;
@@ -109,10 +119,15 @@ export function TarefaAgendaBoard({
   onDelete: (tarefa: TarefaWithRelations) => void;
   somenteFinalizadas?: boolean;
   hideCreate?: boolean;
+  /** Quando true, oculta opção Colunas (Equipe, Finalizados, Projeto, etc.). */
+  hideColunas?: boolean;
+  preferenceScope: AgendaViewPreferenceScope;
+  preferenceUserId?: string | null;
 }) {
+  const colunasDesabilitadas = hideColunas || somenteFinalizadas;
   const view = normalizeView(state.view);
   const effectiveView =
-    somenteFinalizadas && view === "colunas" ? ("cards" as const) : view;
+    colunasDesabilitadas && view === "colunas" ? ("cards" as const) : view;
   const { filters, debouncedFilters } = state;
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -151,7 +166,7 @@ export function TarefaAgendaBoard({
 
   const handleViewChange = (nextView: AgendaViewMode) => {
     const normalized = normalizeView(nextView);
-    writeAgendaViewPreference(normalized);
+    writeAgendaViewPreference(preferenceUserId, preferenceScope, normalized);
     onStateChange({
       ...stateRef.current,
       view: normalized,
@@ -191,7 +206,7 @@ export function TarefaAgendaBoard({
         <AgendaViewSelector
           value={effectiveView}
           onChange={handleViewChange}
-          hideColunas={somenteFinalizadas}
+          hideColunas={colunasDesabilitadas}
         />
       </div>
 
@@ -249,7 +264,7 @@ export function TarefaAgendaBoard({
         </div>
       )}
 
-      {effectiveView === "colunas" && !somenteFinalizadas && (
+      {effectiveView === "colunas" && !colunasDesabilitadas && (
         <div>
           {isLoading ? (
             <div className="flex gap-4">

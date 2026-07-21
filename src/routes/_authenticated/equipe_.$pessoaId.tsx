@@ -18,6 +18,7 @@ import { useSetores } from "@/hooks/use-setores";
 import { useSoftDeleteTarefa, useUpdateTarefaConclusao } from "@/hooks/use-tarefas";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
 import type { TarefaWithRelations } from "@/types";
+import { readAgendaViewPreference } from "@/utils/agenda-view-preference";
 import { isAdmin, isAdminOrGerente, isGerente } from "@/utils/permissions";
 import { canEditTarefa, canToggleTarefaConclusao } from "@/utils/tarefas";
 
@@ -41,13 +42,22 @@ function EquipePessoaAgendaPage() {
   const { data: setores } = useSetores();
   const { data: projetos } = useProjetos();
 
-  const [boardState, setBoardState] = useState<AgendaBoardState>(createAgendaBoardState);
+  const [boardState, setBoardState] = useState<AgendaBoardState>(() =>
+    createAgendaBoardState(undefined, { scope: "equipe" }),
+  );
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelId, setPanelId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<TarefaWithRelations | null>(null);
 
   const updateConclusao = useUpdateTarefaConclusao();
   const softDelete = useSoftDeleteTarefa();
+
+  useEffect(() => {
+    if (!profile?.id) return;
+    const saved = readAgendaViewPreference(profile.id, "equipe");
+    const view = saved === "colunas" ? "cards" : saved;
+    setBoardState((prev) => (prev.view === view ? prev : { ...prev, view }));
+  }, [profile?.id]);
 
   const canManage = isAdminOrGerente(profile);
 
@@ -136,8 +146,13 @@ function EquipePessoaAgendaPage() {
   );
 
   useEffect(() => {
-    setBoardState(createAgendaBoardState());
-  }, [pessoaId]);
+    setBoardState(
+      createAgendaBoardState(undefined, {
+        scope: "equipe",
+        userId: profile?.id,
+      }),
+    );
+  }, [pessoaId, profile?.id]);
 
   if (!loadingProfile && profile && !canManage) {
     return (
@@ -199,8 +214,8 @@ function EquipePessoaAgendaPage() {
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
               {cargoSetor
-                ? `${cargoSetor}. Tarefas atribuídas em cards, lista ou colunas.`
-                : "Tarefas atribuídas em cards, lista ou colunas."}
+                ? `${cargoSetor}. Tarefas atribuídas em cards ou lista.`
+                : "Tarefas atribuídas em cards ou lista."}
             </p>
           </div>
         </div>
@@ -231,6 +246,9 @@ function EquipePessoaAgendaPage() {
         projetos={projetos ?? []}
         pessoas={pessoasAtivas}
         hideResponsavel
+        hideColunas
+        preferenceScope="equipe"
+        preferenceUserId={profile?.id}
         emptyMessage="Nenhuma tarefa atribuída a você."
         canEdit={canEdit}
         canDeleteTarefa={canDeleteTarefa}
