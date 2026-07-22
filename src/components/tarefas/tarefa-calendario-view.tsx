@@ -8,7 +8,7 @@ import {
   subMonths,
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, ListTodo } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
@@ -16,9 +16,14 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useTarefasCalendario } from "@/hooks/use-tarefas";
-import { listPrevisoesOcorrencia, type PrevisaoOcorrencia } from "@/services/tarefa-recorrencia";
-import type { TarefaWithRelations } from "@/types";
+import { useProfile } from "@/hooks/use-profile";
+import { useSubtarefasAgenda, useTarefasCalendario } from "@/hooks/use-tarefas";
+import {
+  listPrevisoesOcorrencia,
+  type PrevisaoOcorrencia,
+  type PrevisaoSubtarefa,
+} from "@/services/tarefa-recorrencia";
+import type { SubtarefaAgendaItem, TarefaWithRelations } from "@/types";
 import { toLocalDateKey } from "@/utils/agenda-datas";
 import { isSerieModelo } from "@/utils/recorrencia";
 import { TAREFA_PRIORIDADE_COLORS, formatResponsaveisLabel } from "@/utils/tarefas";
@@ -26,13 +31,18 @@ import { cn } from "@/lib/utils";
 
 type TimelineEntry =
   | { kind: "tarefa"; tarefa: TarefaWithRelations }
-  | { kind: "previsao"; previsao: PrevisaoOcorrencia };
+  | { kind: "subtarefa"; subtarefa: SubtarefaAgendaItem }
+  | { kind: "previsao"; previsao: PrevisaoOcorrencia }
+  | { kind: "previsao_subtarefa"; previsao: PrevisaoSubtarefa };
 
 export function TarefaCalendarioView({
   onSelectTarefa,
+  onSelectSubtarefa,
 }: {
   onSelectTarefa: (id: string) => void;
+  onSelectSubtarefa?: (subtarefa: SubtarefaAgendaItem) => void;
 }) {
+  const { data: profile } = useProfile();
   const [mesAtual, setMesAtual] = useState(() => startOfMonth(new Date()));
   const [diaSelecionado, setDiaSelecionado] = useState<Date>(() => new Date());
 
@@ -46,7 +56,17 @@ export function TarefaCalendarioView({
     () => (tarefasRaw ?? []).filter((t) => !isSerieModelo(t)),
     [tarefasRaw],
   );
-  const { data: previsoes, isLoading: loadingPrevisoes } = useQuery({
+
+  const { data: subtarefas, isLoading: loadingSubtarefas } = useSubtarefasAgenda(
+    {
+      usuario_id: profile?.id ?? "",
+      data_inicio_de: rangeDe,
+      data_inicio_ate: rangeAte,
+    },
+    { enabled: !!profile?.id },
+  );
+
+  const { data: previsoesBundle, isLoading: loadingPrevisoes } = useQuery({
     queryKey: ["recorrencia-previsoes", rangeDe, rangeAte],
     queryFn: () => listPrevisoesOcorrencia(rangeDe, rangeAte),
   });
@@ -58,25 +78,43 @@ export function TarefaCalendarioView({
       const key = format(parseISO(t.data_inicio), "yyyy-MM-dd");
       map.set(key, (map.get(key) ?? 0) + 1);
     }
-    for (const p of previsoes ?? []) {
+    for (const s of subtarefas ?? []) {
+      const key = toLocalDateKey(s.data_inicio);
+      if (!key) continue;
+      map.set(key, (map.get(key) ?? 0) + 1);
+    }
+    for (const p of previsoesBundle?.tarefas ?? []) {
+      const key = toLocalDateKey(p.data_inicio);
+      if (!key) continue;
+      map.set(key, (map.get(key) ?? 0) + 1);
+    }
+    for (const p of previsoesBundle?.subtarefas ?? []) {
       const key = toLocalDateKey(p.data_inicio);
       if (!key) continue;
       map.set(key, (map.get(key) ?? 0) + 1);
     }
     return map;
-  }, [tarefas, previsoes]);
+  }, [tarefas, subtarefas, previsoesBundle]);
 
   const itensDoDia = useMemo((): TimelineEntry[] => {
     const reais: TimelineEntry[] = (tarefas ?? [])
       .filter((t) => t.data_inicio && isSameDay(parseISO(t.data_inicio), diaSelecionado))
       .map((tarefa) => ({ kind: "tarefa" as const, tarefa }));
 
-    const ghosts: TimelineEntry[] = (previsoes ?? [])
+    const subs: TimelineEntry[] = (subtarefas ?? [])
+      .filter((s) => s.data_inicio && isSameDay(parseISO(s.data_inicio), diaSelecionado))
+      .map((subtarefa) => ({ kind: "subtarefa" as const, subtarefa }));
+
+    const ghosts: TimelineEntry[] = (previsoesBundle?.tarefas ?? [])
       .filter((p) => p.data_inicio && isSameDay(parseISO(p.data_inicio), diaSelecionado))
       .map((previsao) => ({ kind: "previsao" as const, previsao }));
 
-    return [...reais, ...ghosts];
-  }, [tarefas, previsoes, diaSelecionado]);
+    const ghostSubs: TimelineEntry[] = (previsoesBundle?.subtarefas ?? [])
+      .filter((p) => p.data_inicio && isSameDay(parseISO(p.data_inicio), diaSelecionado))
+      .map((previsao) => ({ kind: "previsao_subtarefa" as const, previsao }));
+
+    return [...reais, ...subs, ...ghosts, ...ghostSubs];
+  }, [tarefas, subtarefas, previsoesBundle, diaSelecionado]);
 
   const modifiers = useMemo(
     () => ({
@@ -90,7 +128,7 @@ export function TarefaCalendarioView({
       "relative after:absolute after:bottom-1 after:left-1/2 after:-translate-x-1/2 after:h-1 after:w-1 after:rounded-full after:bg-primary",
   };
 
-  const loading = isLoading || loadingPrevisoes;
+  const loading = isLoading || loadingPrevisoes || loadingSubtarefas;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,340px)_1fr]">
@@ -153,20 +191,40 @@ export function TarefaCalendarioView({
             <p className="text-sm text-muted-foreground">Nenhuma tarefa com data neste dia.</p>
           ) : (
             <div className="space-y-3">
-              {itensDoDia.map((item) =>
-                item.kind === "tarefa" ? (
-                  <TimelineItem
-                    key={item.tarefa.id}
-                    tarefa={item.tarefa}
-                    onClick={() => onSelectTarefa(item.tarefa.id)}
-                  />
-                ) : (
-                  <PrevisaoTimelineItem
-                    key={`previsao-${item.previsao.serie_raiz_id}-${item.previsao.data_inicio}`}
+              {itensDoDia.map((item) => {
+                if (item.kind === "tarefa") {
+                  return (
+                    <TimelineItem
+                      key={item.tarefa.id}
+                      tarefa={item.tarefa}
+                      onClick={() => onSelectTarefa(item.tarefa.id)}
+                    />
+                  );
+                }
+                if (item.kind === "subtarefa") {
+                  return (
+                    <SubtarefaTimelineItem
+                      key={item.subtarefa.id}
+                      subtarefa={item.subtarefa}
+                      onClick={() => onSelectSubtarefa?.(item.subtarefa)}
+                    />
+                  );
+                }
+                if (item.kind === "previsao") {
+                  return (
+                    <PrevisaoTimelineItem
+                      key={`previsao-${item.previsao.serie_raiz_id}-${item.previsao.data_inicio}`}
+                      previsao={item.previsao}
+                    />
+                  );
+                }
+                return (
+                  <PrevisaoSubtarefaTimelineItem
+                    key={`previsao-sub-${item.previsao.serie_raiz_id}-${item.previsao.modelo_subtarefa_id}-${item.previsao.data_inicio}`}
                     previsao={item.previsao}
                   />
-                ),
-              )}
+                );
+              })}
             </div>
           )}
         </CardContent>
@@ -213,13 +271,43 @@ function TimelineItem({
   );
 }
 
-function PrevisaoTimelineItem({ previsao }: { previsao: PrevisaoOcorrencia }) {
+function SubtarefaTimelineItem({
+  subtarefa,
+  onClick,
+}: {
+  subtarefa: SubtarefaAgendaItem;
+  onClick?: () => void;
+}) {
+  const parentTitle = subtarefa.tarefa?.titulo?.trim() || "Tarefa principal";
   return (
-    <div
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={!onClick}
       className={cn(
-        "w-full rounded-lg border border-dashed p-4 text-left opacity-80",
+        "w-full rounded-lg border border-l-4 p-4 text-left transition-colors",
+        onClick && "hover:bg-accent/50",
+        !onClick && "cursor-default",
       )}
     >
+      <div className="mb-2 flex flex-wrap gap-2">
+        <Badge variant="secondary" className="gap-1 text-[10px]">
+          <ListTodo className="h-3 w-3" />
+          Subtarefa
+        </Badge>
+        <Badge variant="outline" className={TAREFA_PRIORIDADE_COLORS[subtarefa.prioridade]}>
+          {subtarefa.prioridade}
+        </Badge>
+      </div>
+      <p className="font-medium">{subtarefa.titulo}</p>
+      <p className="mt-1 text-xs text-muted-foreground">de: {parentTitle}</p>
+    </button>
+  );
+}
+
+function PrevisaoTimelineItem({ previsao }: { previsao: PrevisaoOcorrencia }) {
+  return (
+    <div className="w-full rounded-lg border border-dashed p-4 text-left opacity-80">
       <div className="mb-2 flex flex-wrap gap-2">
         <Badge variant="outline" className={TAREFA_PRIORIDADE_COLORS[previsao.prioridade]}>
           {previsao.prioridade}
@@ -235,6 +323,27 @@ function PrevisaoTimelineItem({ previsao }: { previsao: PrevisaoOcorrencia }) {
       </div>
       <p className="font-medium text-muted-foreground">{previsao.titulo}</p>
       <p className="mt-1 text-xs text-muted-foreground">Ocorrência ainda não materializada</p>
+    </div>
+  );
+}
+
+function PrevisaoSubtarefaTimelineItem({ previsao }: { previsao: PrevisaoSubtarefa }) {
+  return (
+    <div className="w-full rounded-lg border border-dashed p-4 text-left opacity-80">
+      <div className="mb-2 flex flex-wrap gap-2">
+        <Badge variant="secondary" className="gap-1 text-[10px]">
+          <ListTodo className="h-3 w-3" />
+          Subtarefa
+        </Badge>
+        <Badge variant="outline" className={TAREFA_PRIORIDADE_COLORS[previsao.prioridade]}>
+          {previsao.prioridade}
+        </Badge>
+        <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+          Previsão
+        </Badge>
+      </div>
+      <p className="font-medium text-muted-foreground">{previsao.titulo}</p>
+      <p className="mt-1 text-xs text-muted-foreground">de: {previsao.tarefa_titulo}</p>
     </div>
   );
 }

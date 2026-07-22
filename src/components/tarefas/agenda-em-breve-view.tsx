@@ -31,7 +31,7 @@ import {
   toLocalDateKey,
 } from "@/utils/agenda-datas";
 import { useQuery } from "@tanstack/react-query";
-import { listPrevisoesOcorrencia, type PrevisaoOcorrencia } from "@/services/tarefa-recorrencia";
+import { listPrevisoesOcorrencia, type PrevisaoOcorrencia, type PrevisaoSubtarefa } from "@/services/tarefa-recorrencia";
 import { compareByClassificar, TAREFA_PRIORIDADE_BAND_CLASS } from "@/utils/tarefas";
 import { isSerieModelo } from "@/utils/recorrencia";
 
@@ -53,7 +53,8 @@ function buildYearOptions(): number[] {
 type EmBreveItem =
   | { kind: "tarefa"; tarefa: TarefaWithRelations }
   | { kind: "subtarefa"; subtarefa: SubtarefaAgendaItem }
-  | { kind: "previsao"; previsao: PrevisaoOcorrencia };
+  | { kind: "previsao"; previsao: PrevisaoOcorrencia }
+  | { kind: "previsao_subtarefa"; previsao: PrevisaoSubtarefa };
 
 function EmBrevePrevisaoCard({ previsao }: { previsao: PrevisaoOcorrencia }) {
   return (
@@ -68,6 +69,27 @@ function EmBrevePrevisaoCard({ previsao }: { previsao: PrevisaoOcorrencia }) {
       </p>
       <p className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground">
         Previsão · recorrência
+      </p>
+    </div>
+  );
+}
+
+function EmBrevePrevisaoSubtarefaCard({ previsao }: { previsao: PrevisaoSubtarefa }) {
+  return (
+    <div
+      className={cn(
+        "w-full rounded-md border border-dashed border-l-4 bg-muted/30 px-2 py-1.5 text-left opacity-80",
+        TAREFA_PRIORIDADE_BAND_CLASS[previsao.prioridade],
+      )}
+    >
+      <p className="line-clamp-2 text-xs font-medium leading-snug text-muted-foreground">
+        {previsao.titulo}
+      </p>
+      <p className="mt-0.5 truncate text-[10px] text-muted-foreground">
+        de: {previsao.tarefa_titulo}
+      </p>
+      <p className="mt-0.5 text-[9px] uppercase tracking-wide text-muted-foreground">
+        Previsão · subtarefa
       </p>
     </div>
   );
@@ -165,7 +187,7 @@ export function AgendaEmBreveView({
     { enabled: !!usuarioId },
   );
 
-  const { data: previsoes, isLoading: loadingPrevisoes } = useQuery({
+  const { data: previsoesBundle, isLoading: loadingPrevisoes } = useQuery({
     queryKey: ["recorrencia-previsoes", rangeDe, rangeAte],
     queryFn: () => listPrevisoesOcorrencia(rangeDe, rangeAte),
     enabled: !!usuarioId,
@@ -189,29 +211,48 @@ export function AgendaEmBreveView({
       if (!key || !map.has(key)) continue;
       map.get(key)!.push({ kind: "subtarefa", subtarefa: s });
     }
-    for (const p of previsoes ?? []) {
+    for (const p of previsoesBundle?.tarefas ?? []) {
       const key = toLocalDateKey(p.data_inicio);
       if (!key || !map.has(key)) continue;
       map.get(key)!.push({ kind: "previsao", previsao: p });
+    }
+    for (const p of previsoesBundle?.subtarefas ?? []) {
+      const key = toLocalDateKey(p.data_inicio);
+      if (!key || !map.has(key)) continue;
+      map.get(key)!.push({ kind: "previsao_subtarefa", previsao: p });
     }
     for (const [key, items] of map) {
       map.set(
         key,
         [...items].sort((a, b) => {
-          if (a.kind === "previsao" || b.kind === "previsao") {
-            if (a.kind === "previsao" && b.kind === "previsao") {
-              return a.previsao.titulo.localeCompare(b.previsao.titulo, "pt-BR");
+          const aPrev = a.kind === "previsao" || a.kind === "previsao_subtarefa";
+          const bPrev = b.kind === "previsao" || b.kind === "previsao_subtarefa";
+          if (aPrev || bPrev) {
+            if (aPrev && bPrev) {
+              const ta = a.kind === "previsao" || a.kind === "previsao_subtarefa" ? a.previsao.titulo : "";
+              const tb = b.kind === "previsao" || b.kind === "previsao_subtarefa" ? b.previsao.titulo : "";
+              return ta.localeCompare(tb, "pt-BR");
             }
-            return a.kind === "previsao" ? 1 : -1;
+            return aPrev ? 1 : -1;
           }
-          const left = a.kind === "tarefa" ? a.tarefa : a.subtarefa;
-          const right = b.kind === "tarefa" ? b.tarefa : b.subtarefa;
-          return compareByClassificar(left, right, classificar);
+          if (a.kind === "tarefa" && b.kind === "tarefa") {
+            return compareByClassificar(a.tarefa, b.tarefa, classificar);
+          }
+          if (a.kind === "subtarefa" && b.kind === "subtarefa") {
+            return compareByClassificar(a.subtarefa, b.subtarefa, classificar);
+          }
+          if (a.kind === "tarefa" && b.kind === "subtarefa") {
+            return compareByClassificar(a.tarefa, b.subtarefa, classificar);
+          }
+          if (a.kind === "subtarefa" && b.kind === "tarefa") {
+            return compareByClassificar(a.subtarefa, b.tarefa, classificar);
+          }
+          return 0;
         }),
       );
     }
     return map;
-  }, [tarefas, subtarefas, previsoes, days, classificar]);
+  }, [tarefas, subtarefas, previsoesBundle, days, classificar]);
 
   const selectedMonth = windowStart.getMonth();
   const selectedYear = windowStart.getFullYear();
@@ -357,9 +398,14 @@ export function AgendaEmBreveView({
                         onOpen={() => onOpenSubtarefa(item.subtarefa)}
                         compact
                       />
-                    ) : (
+                    ) : item.kind === "previsao" ? (
                       <EmBrevePrevisaoCard
                         key={`previsao-${item.previsao.serie_raiz_id}-${item.previsao.data_inicio}`}
+                        previsao={item.previsao}
+                      />
+                    ) : (
+                      <EmBrevePrevisaoSubtarefaCard
+                        key={`previsao-sub-${item.previsao.serie_raiz_id}-${item.previsao.modelo_subtarefa_id}-${item.previsao.data_inicio}`}
                         previsao={item.previsao}
                       />
                     ),

@@ -54,14 +54,39 @@ function dayPrefix(iso: string | null | undefined): string | null {
   return toLocalDateKey(iso);
 }
 
+function parseDay(isoOrKey: string): Date {
+  if (isoOrKey.includes("T")) return startOfDay(new Date(isoOrKey));
+  return startOfDay(new Date(isoOrKey + "T12:00:00"));
+}
+
+/** Deslocamento em dias civis da subtarefa em relação à âncora da série. */
+export function offsetDiasSubtarefa(
+  subtarefaDataInicio: string | null | undefined,
+  ancoraIsoOrKey: string | null,
+): number | null {
+  if (!subtarefaDataInicio || !ancoraIsoOrKey) return null;
+  const subDay = parseDay(subtarefaDataInicio);
+  const ancoraDay = parseDay(ancoraIsoOrKey);
+  return Math.round((subDay.getTime() - ancoraDay.getTime()) / (24 * 60 * 60 * 1000));
+}
+
+type ModeloSubtarefaTemplate = {
+  id: string;
+  titulo: string;
+  prioridade: TarefaWithRelations["prioridade"];
+  data_inicio: string | null;
+  setor_id: string | null;
+  projeto_id: string | null;
+};
+
 /**
  * Copia subtarefas do modelo para a ocorrência, com datas deslocadas
- * pelo mesmo offset relativo à data do modelo.
+ * pelo offset relativo à âncora da série (não à "próxima prevista").
  */
 async function cloneSubtarefasDoModelo(
   modeloId: string,
   ocorrenciaId: string,
-  modeloDataInicio: string | null,
+  ancoraIsoOrKey: string | null,
   ocorrenciaDataInicio: string,
 ): Promise<void> {
   const { data: subtarefas, error } = await supabase
@@ -76,17 +101,12 @@ async function cloneSubtarefasDoModelo(
   if (error) throw error;
   if (!subtarefas?.length) return;
 
-  const modeloDay = modeloDataInicio ? startOfDay(new Date(modeloDataInicio)) : null;
   const ocorrenciaDay = startOfDay(new Date(ocorrenciaDataInicio));
 
   const rows = subtarefas.map((s) => {
-    let dataInicio: string | null = null;
-    if (s.data_inicio && modeloDay) {
-      const subDay = startOfDay(new Date(s.data_inicio));
-      const offsetMs = subDay.getTime() - modeloDay.getTime();
-      const offsetDays = Math.round(offsetMs / (24 * 60 * 60 * 1000));
-      dataInicio = addDays(ocorrenciaDay, offsetDays).toISOString();
-    }
+    const offset = offsetDiasSubtarefa(s.data_inicio, ancoraIsoOrKey);
+    const dataInicio =
+      offset === null ? null : addDays(ocorrenciaDay, offset).toISOString();
 
     return {
       id: crypto.randomUUID(),
@@ -127,6 +147,8 @@ async function materializarOcorrencia(
 
   const novaId = crypto.randomUUID();
   const serieRaizId = modelo.serie_raiz_id === modelo.id ? modelo.id : (modelo.serie_raiz_id ?? modelo.id);
+  const config = parseRecorrencia(modelo.recorrencia);
+  const ancora = getAncoraSerie(modelo, config);
 
   const { data, error } = await supabase
     .from("tarefas")
@@ -158,7 +180,7 @@ async function materializarOcorrencia(
   await cloneSubtarefasDoModelo(
     serieRaizId,
     novaId,
-    modelo.data_inicio,
+    ancora,
     dataInicioIso,
   ).catch(() => undefined);
 
@@ -287,6 +309,7 @@ export async function materializarOcorrenciasDevidas(): Promise<number> {
 }
 
 export type PrevisaoOcorrencia = {
+  kind: "tarefa";
   serie_raiz_id: string;
   data_inicio: string;
   titulo: string;
@@ -296,14 +319,37 @@ export type PrevisaoOcorrencia = {
   previsao: true;
 };
 
-/** Previsões futuras (não materializadas) no intervalo — só para Em Breve / Calendário. */
+export type PrevisaoSubtarefa = {
+  kind: "subtarefa";
+  serie_raiz_id: string;
+  modelo_subtarefa_id: string;
+  data_inicio: string;
+  titulo: string;
+  tarefa_titulo: string;
+  prioridade: TarefaWithRelations["prioridade"];
+  setor: TarefaWithRelations["setor"];
+  projeto: TarefaWithRelations["projeto"];
+  previsao: true;
+};
+
+export type PrevisaoAgendaItem = PrevisaoOcorrencia | PrevisaoSubtarefa;
+
+export type PrevisoesAgenda = {
+  tarefas: PrevisaoOcorrencia[];
+  subtarefas: PrevisaoSubtarefa[];
+};
+
+/**
+ * Previsões futuras (não materializadas) no intervalo — Em Breve / Calendário.
+ * Inclui ocorrências da tarefa e subtarefas com data relativa (offset da âncora).
+ */
 export async function listPrevisoesOcorrencia(
   deIsoDate: string,
   ateIsoDate: string,
-): Promise<PrevisaoOcorrencia[]> {
+): Promise<PrevisoesAgenda> {
   const de = startOfDay(new Date(deIsoDate + "T12:00:00"));
   const ate = endOfDay(new Date(ateIsoDate + "T12:00:00"));
-  const hoje = startOfDay(new Date());
+  const hojeFim = endOfDay(new Date());
 
   const { data: candidatas, error } = await supabase
     .from("tarefas")
@@ -315,7 +361,8 @@ export async function listPrevisoesOcorrencia(
   if (error) throw error;
 
   const modelos = ((candidatas ?? []) as TarefaWithRelations[]).filter((t) => isSerieModelo(t));
-  const previsoes: PrevisaoOcorrencia[] = [];
+  const previsoesTarefa: PrevisaoOcorrencia[] = [];
+  const previsoesSub: PrevisaoSubtarefa[] = [];
 
   for (const modelo of modelos) {
     const config = parseRecorrencia(modelo.recorrencia);
@@ -335,35 +382,85 @@ export async function listPrevisoesOcorrencia(
     );
 
     const ancora = getAncoraSerie(modelo, config);
-    const ancoraIso = ancora?.includes("T")
-      ? ancora
-      : ancora
-        ? `${ancora}T12:00:00`
-        : null;
+    const ancoraIso = ancora
+      ? ancora.includes("T")
+        ? ancora
+        : `${ancora}T12:00:00`
+      : null;
 
-    const datas = expandirDatasOcorrencia(ancoraIso, config, de, ate, {
-      max: 120,
+    const { data: templatesRaw } = await supabase
+      .from("subtarefas")
+      .select("id, titulo, prioridade, data_inicio, setor_id, projeto_id")
+      .eq("tarefa_id", modelo.id)
+      .not("data_inicio", "is", null);
+
+    const templates = (templatesRaw ?? []) as ModeloSubtarefaTemplate[];
+    const offsets = templates
+      .map((t) => offsetDiasSubtarefa(t.data_inicio, ancora))
+      .filter((o): o is number => o !== null);
+    const maxOffset = offsets.length ? Math.max(...offsets) : 0;
+    const minOffset = offsets.length ? Math.min(...offsets) : 0;
+
+    // Pais cuja subtarefa pode cair no intervalo [de, ate]
+    const expandDe = addDays(de, -Math.max(0, maxOffset));
+    const expandAte = addDays(ate, -Math.min(0, minOffset));
+
+    const datasPai = expandirDatasOcorrencia(ancoraIso, config, expandDe, expandAte, {
+      max: 200,
     });
 
-    for (const data of datas) {
-      // Previsão só para datas futuras (ainda não materializadas)
-      if (data.getTime() <= endOfDay(hoje).getTime()) continue;
-      const key = toLocalDateKey(data)!;
-      if (diasExistentes.has(key)) continue;
+    for (const dataPai of datasPai) {
+      // Só previsões futuras; materializadas já têm linhas reais
+      if (dataPai.getTime() <= hojeFim.getTime()) continue;
+      const paiKey = toLocalDateKey(dataPai)!;
+      if (diasExistentes.has(paiKey)) continue;
 
-      previsoes.push({
-        serie_raiz_id: modelo.id,
-        data_inicio: data.toISOString(),
-        titulo: modelo.titulo,
-        prioridade: modelo.prioridade,
-        setor: modelo.setor,
-        projeto: modelo.projeto,
-        previsao: true,
-      });
+      if (dataPai.getTime() >= de.getTime() && dataPai.getTime() <= ate.getTime()) {
+        previsoesTarefa.push({
+          kind: "tarefa",
+          serie_raiz_id: modelo.id,
+          data_inicio: dataPai.toISOString(),
+          titulo: modelo.titulo,
+          prioridade: modelo.prioridade,
+          setor: modelo.setor,
+          projeto: modelo.projeto,
+          previsao: true,
+        });
+      }
+
+      for (const template of templates) {
+        const offset = offsetDiasSubtarefa(template.data_inicio, ancora);
+        if (offset === null) continue;
+        const dataSub = addDays(startOfDay(dataPai), offset);
+        if (dataSub.getTime() <= hojeFim.getTime()) continue;
+        if (dataSub.getTime() < de.getTime() || dataSub.getTime() > ate.getTime()) continue;
+
+        previsoesSub.push({
+          kind: "subtarefa",
+          serie_raiz_id: modelo.id,
+          modelo_subtarefa_id: template.id,
+          data_inicio: dataSub.toISOString(),
+          titulo: template.titulo,
+          tarefa_titulo: modelo.titulo,
+          prioridade: template.prioridade,
+          setor:
+            template.setor_id && modelo.setor?.id === template.setor_id
+              ? modelo.setor
+              : modelo.setor,
+          projeto:
+            template.projeto_id && modelo.projeto?.id === template.projeto_id
+              ? modelo.projeto
+              : modelo.projeto,
+          previsao: true,
+        });
+      }
     }
   }
 
-  return previsoes.sort((a, b) => a.data_inicio.localeCompare(b.data_inicio));
+  previsoesTarefa.sort((a, b) => a.data_inicio.localeCompare(b.data_inicio));
+  previsoesSub.sort((a, b) => a.data_inicio.localeCompare(b.data_inicio));
+
+  return { tarefas: previsoesTarefa, subtarefas: previsoesSub };
 }
 
 export type EscopoEdicaoSerie = "somente_esta" | "esta_e_futuras";
