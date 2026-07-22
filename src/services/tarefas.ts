@@ -909,7 +909,7 @@ export async function listSubtarefasAgenda(
       ${SUBTAREFA_SELECT},
       setor:setores(id, nome, cor),
       projeto:projetos(id, nome),
-      tarefa:tarefas!inner(id, titulo, concluida, deleted_at, setor_id, projeto_id)
+      tarefa:tarefas!inner(id, titulo, concluida, deleted_at, setor_id, projeto_id, serie_raiz_id)
     `,
     )
     .eq("concluida", false)
@@ -963,7 +963,7 @@ async function listSubtarefasVisualizando(
       setor:setores(id, nome, cor),
       projeto:projetos(id, nome),
       tarefa:tarefas!inner(
-        id, titulo, concluida, deleted_at, setor_id, projeto_id, criado_por, visibilidade
+        id, titulo, concluida, deleted_at, setor_id, projeto_id, criado_por, visibilidade, serie_raiz_id
       )
     `,
     )
@@ -1042,10 +1042,19 @@ async function finalizeSubtarefasAgendaQuery(
         deleted_at: string | null;
         setor_id: string | null;
         projeto_id: string | null;
+        serie_raiz_id?: string | null;
       } | null;
     }
   >)
     .filter((row) => {
+      // Subtarefas do Modelo da Série são template — não entram na Agenda operacional
+      // (só previsões / ocorrências materializadas).
+      if (
+        row.tarefa?.serie_raiz_id &&
+        row.tarefa.serie_raiz_id === row.tarefa.id
+      ) {
+        return false;
+      }
       if (setorFilter) {
         const setorId = row.setor_id ?? row.tarefa?.setor_id ?? null;
         if (setorId !== setorFilter) return false;
