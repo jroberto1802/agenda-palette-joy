@@ -51,11 +51,17 @@ Variáveis de CLI do Supabase (`SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`) 
 ## Scripts
 
 ```bash
-npm run dev        # servidor de desenvolvimento
-npm run build      # build de produção
+npm run dev        # servidor de desenvolvimento (http://localhost:8080)
+npm run build      # build de produção (Vite + Nitro)
 npm run preview    # preview do build
 npm run lint       # ESLint
 npm run format     # Prettier
+```
+
+Produção (após `npm run build`), conforme o preset Nitro:
+
+```bash
+node .output/server/index.mjs
 ```
 
 ## Estrutura
