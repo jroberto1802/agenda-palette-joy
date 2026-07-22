@@ -3,6 +3,7 @@ import {
   expandirDatasOcorrencia,
   getAncoraSerie,
   isSerieModelo,
+  offsetDiasSubtarefaNoCiclo,
   parseRecorrencia,
   serializeRecorrencia,
 } from "@/utils/recorrencia";
@@ -54,63 +55,6 @@ function dayPrefix(iso: string | null | undefined): string | null {
   return toLocalDateKey(iso);
 }
 
-function parseDay(isoOrKey: string): Date {
-  if (isoOrKey.includes("T")) return startOfDay(new Date(isoOrKey));
-  return startOfDay(new Date(isoOrKey + "T12:00:00"));
-}
-
-/** Deslocamento em dias civis entre duas datas (civil). */
-export function offsetDiasSubtarefa(
-  subtarefaDataInicio: string | null | undefined,
-  referenciaIsoOrKey: string | null,
-): number | null {
-  if (!subtarefaDataInicio || !referenciaIsoOrKey) return null;
-  const subDay = parseDay(subtarefaDataInicio);
-  const refDay = parseDay(referenciaIsoOrKey);
-  return Math.round((subDay.getTime() - refDay.getTime()) / (24 * 60 * 60 * 1000));
-}
-
-/**
- * Data-base do ciclo no modelo para calcular offsets das subtarefas-template.
- * Usa a ocorrência da recorrência (âncora) em/antes da subtarefa mais cedo,
- * para que +0/+1/+2 fiquem corretos mesmo se a "próxima" do modelo já avançou.
- */
-export function referenciaCicloModeloSubtarefas(
-  templates: { data_inicio: string | null }[],
-  ancora: string | null,
-  config: RecorrenciaConfig,
-): string | null {
-  const dated = templates
-    .map((t) => t.data_inicio)
-    .filter((d): d is string => !!d)
-    .map(parseDay)
-    .sort((a, b) => a.getTime() - b.getTime());
-
-  if (dated.length === 0) return ancora;
-
-  const earliest = dated[0]!;
-  const ancoraIso = ancora
-    ? ancora.includes("T")
-      ? ancora
-      : `${ancora}T12:00:00`
-    : null;
-
-  if (ancoraIso && config) {
-    const ocorrencias = expandirDatasOcorrencia(
-      ancoraIso,
-      config,
-      parseDay(ancoraIso),
-      earliest,
-      { max: 500 },
-    );
-    if (ocorrencias.length > 0) {
-      return toLocalDateKey(ocorrencias[ocorrencias.length - 1]!)!;
-    }
-  }
-
-  return toLocalDateKey(earliest);
-}
-
 type ModeloSubtarefaTemplate = {
   id: string;
   titulo: string;
@@ -121,8 +65,8 @@ type ModeloSubtarefaTemplate = {
 };
 
 /**
- * Copia subtarefas do modelo para a ocorrência, com datas = ocorrência + offset
- * (offset relativo ao ciclo da série no modelo, não à "próxima prevista").
+ * Após criar a ocorrência da tarefa, gera UM conjunto de subtarefas filhas.
+ * Data = data da ocorrência + offset (sem recorrência própria).
  */
 async function cloneSubtarefasDoModelo(
   modeloId: string,
@@ -143,17 +87,16 @@ async function cloneSubtarefasDoModelo(
   if (error) throw error;
   if (!subtarefas?.length) return;
 
-  const referencia =
-    config != null
-      ? referenciaCicloModeloSubtarefas(subtarefas, ancoraIsoOrKey, config)
-      : ancoraIsoOrKey;
-
   const ocorrenciaDay = startOfDay(new Date(ocorrenciaDataInicio));
 
   const rows = subtarefas.map((s) => {
-    const offset = offsetDiasSubtarefa(s.data_inicio, referencia);
-    const dataInicio =
-      offset === null ? null : addDays(ocorrenciaDay, offset).toISOString();
+    let dataInicio: string | null = null;
+    if (s.data_inicio && config) {
+      const offset = offsetDiasSubtarefaNoCiclo(s.data_inicio, ancoraIsoOrKey, config);
+      if (offset !== null) {
+        dataInicio = addDays(ocorrenciaDay, offset).toISOString();
+      }
+    }
 
     return {
       id: crypto.randomUUID(),
@@ -166,6 +109,8 @@ async function cloneSubtarefasDoModelo(
       setor_id: s.setor_id,
       visibilidade: s.visibilidade,
       lembretes: s.lembretes,
+      // Subtarefas nunca têm recorrência própria
+      recorrencia: null,
       posicao: s.posicao,
       concluida: false,
       concluido_por: null,
@@ -388,11 +333,11 @@ export type PrevisoesAgenda = {
 };
 
 /**
- * Previsões futuras (não materializadas) no intervalo — Em Breve / Calendário.
+ * Previsões futuras — Em Breve / Calendário.
  *
- * 1) Gera datas da tarefa principal pela regra de recorrência.
- * 2) Para cada ocorrência futura ainda não materializada, calcula subtarefas
- *    com offset relativo àquela ocorrência (um conjunto por ciclo — sem repetir dias).
+ * Recorrência: SOMENTE a tarefa principal.
+ * Subtarefas: após cada ocorrência da tarefa, exatamente UM conjunto
+ * (data = ocorrência + offset). Sem recorrência própria.
  */
 export async function listPrevisoesOcorrencia(
   deIsoDate: string,
@@ -414,7 +359,6 @@ export async function listPrevisoesOcorrencia(
   const modelos = ((candidatas ?? []) as TarefaWithRelations[]).filter((t) => isSerieModelo(t));
   const previsoesTarefa: PrevisaoOcorrencia[] = [];
   const previsoesSub: PrevisaoSubtarefa[] = [];
-  const subSeen = new Set<string>();
 
   for (const modelo of modelos) {
     const config = parseRecorrencia(modelo.recorrencia);
@@ -434,42 +378,34 @@ export async function listPrevisoesOcorrencia(
     );
 
     const ancora = getAncoraSerie(modelo, config);
-    const ancoraIso = ancora
-      ? ancora.includes("T")
-        ? ancora
-        : `${ancora}T12:00:00`
-      : null;
+    const ancoraKey = ancora ? toLocalDateKey(ancora) ?? ancora : null;
+    const ancoraIso = ancoraKey ? `${ancoraKey}T12:00:00` : null;
 
+    // Templates do modelo: só offsets fixos (+0, +1…), sem expandir recorrência neles
     const { data: templatesRaw } = await supabase
       .from("subtarefas")
       .select("id, titulo, prioridade, data_inicio, setor_id, projeto_id")
-      .eq("tarefa_id", modelo.id)
-      .not("data_inicio", "is", null);
+      .eq("tarefa_id", modelo.id);
 
     const templates = (templatesRaw ?? []) as ModeloSubtarefaTemplate[];
-    const referenciaCiclo = referenciaCicloModeloSubtarefas(templates, ancora, config);
+    const templatesComOffset: Array<{ template: ModeloSubtarefaTemplate; offset: number }> = [];
+    for (const t of templates) {
+      const offset = offsetDiasSubtarefaNoCiclo(t.data_inicio, ancora, config);
+      if (offset === null) continue;
+      templatesComOffset.push({ template: t, offset });
+    }
 
-    const templateOffsets = templates.map((t) => ({
-      template: t,
-      offset: offsetDiasSubtarefa(t.data_inicio, referenciaCiclo),
-    }));
+    const maxOffset = templatesComOffset.length
+      ? Math.max(...templatesComOffset.map((t) => t.offset))
+      : 0;
 
-    const offsetsValidos = templateOffsets
-      .map((t) => t.offset)
-      .filter((o): o is number => o !== null);
-    const maxOffset = offsetsValidos.length ? Math.max(...offsetsValidos) : 0;
-    const minOffset = offsetsValidos.length ? Math.min(...offsetsValidos) : 0;
-
-    // Pais cuja subtarefa (pai + offset) pode cair no intervalo visível
-    const expandDe = addDays(de, -Math.max(0, maxOffset));
-    const expandAte = addDays(ate, -Math.min(0, minOffset));
-
-    const datasPai = expandirDatasOcorrencia(ancoraIso, config, expandDe, expandAte, {
-      max: 120,
+    // 1) Datas da TAREFA PRINCIPAL (única coisa que usa o motor de recorrência)
+    const expandDe = addDays(de, -maxOffset);
+    const datasPai = expandirDatasOcorrencia(ancoraIso, config, expandDe, ate, {
+      max: 60,
     });
 
     for (const dataPai of datasPai) {
-      // Só previsões futuras; materializadas já têm linhas reais (tarefa + subtarefas)
       if (dataPai.getTime() <= hojeFim.getTime()) continue;
       const paiKey = toLocalDateKey(dataPai)!;
       if (diasExistentes.has(paiKey)) continue;
@@ -489,16 +425,13 @@ export async function listPrevisoesOcorrencia(
         });
       }
 
-      // Um único conjunto de subtarefas por ocorrência da tarefa principal
-      for (const { template, offset } of templateOffsets) {
-        if (offset === null) continue;
+      // 2) UM conjunto de subtarefas para ESTA ocorrência (sem recorrência)
+      for (const { template, offset } of templatesComOffset) {
         const dataSub = addDays(paiDay, offset);
         if (dataSub.getTime() <= hojeFim.getTime()) continue;
-        if (dataSub.getTime() < de.getTime() || dataSub.getTime() > ate.getTime()) continue;
-
-        const subKey = `${template.id}|${toLocalDateKey(dataSub)}`;
-        if (subSeen.has(subKey)) continue;
-        subSeen.add(subKey);
+        if (dataSub.getTime() < de.getTime() || dataSub.getTime() > ate.getTime()) {
+          continue;
+        }
 
         previsoesSub.push({
           kind: "subtarefa",

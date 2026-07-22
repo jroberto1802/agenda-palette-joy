@@ -277,6 +277,55 @@ export function getAncoraSerie(
   return toLocalDateKey(modelo.data_inicio) ?? modelo.data_inicio ?? null;
 }
 
+function parseDayLocal(isoOrKey: string): Date {
+  if (isoOrKey.includes("T")) return startOfDay(new Date(isoOrKey));
+  return startOfDay(new Date(`${isoOrKey}T12:00:00`));
+}
+
+/**
+ * Offset em dias da subtarefa-template em relação à ocorrência da tarefa
+ * no mesmo ciclo (última ocorrência da série em/antes da data da subtarefa).
+ *
+ * Subtarefas NÃO têm recorrência própria — só um deslocamento fixo (+0, +1, +2…)
+ * aplicado a cada ocorrência da tarefa principal.
+ */
+export function offsetDiasSubtarefaNoCiclo(
+  subtarefaDataInicio: string | null | undefined,
+  ancora: string | null,
+  config: RecorrenciaConfig,
+): number | null {
+  if (!subtarefaDataInicio) return null;
+
+  const subDay = parseDayLocal(subtarefaDataInicio);
+  const ancoraKey = ancora ? toLocalDateKey(ancora) ?? ancora : null;
+  const ancoraIso = ancoraKey ? `${ancoraKey}T12:00:00` : null;
+
+  let parentDay: Date;
+  if (ancoraIso) {
+    const ocorrencias = expandirDatasOcorrencia(
+      ancoraIso,
+      config,
+      parseDayLocal(ancoraIso),
+      subDay,
+      { max: 600 },
+    );
+    parentDay =
+      ocorrencias.length > 0
+        ? ocorrencias[ocorrencias.length - 1]!
+        : parseDayLocal(ancoraIso);
+  } else {
+    parentDay = subDay;
+  }
+
+  const offset = Math.round(
+    (subDay.getTime() - parentDay.getTime()) / (24 * 60 * 60 * 1000),
+  );
+
+  // Deslocamentos típicos de subtarefa dentro do ciclo (não meses à frente)
+  if (offset < 0 || offset > 31) return null;
+  return offset;
+}
+
 export function sameCalendarDay(a: string | null | undefined, b: Date): boolean {
   const key = toLocalDateKey(a);
   if (!key) return false;

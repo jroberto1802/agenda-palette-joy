@@ -45,14 +45,11 @@ import {
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
 import { listProjetoMembros } from "@/services/projetos";
 import type {
-  RecorrenciaConfig,
-  RecorrenciaTipo,
   SubtarefaDetail,
   SubtarefaFormData,
   TarefaVisibilidade,
   TarefaWithRelations,
 } from "@/types";
-import { parseRecorrencia } from "@/utils/recorrencia";
 import { isAdmin, isGerente } from "@/utils/permissions";
 import {
   TAREFA_PRIORIDADE_COLORS,
@@ -122,7 +119,6 @@ function toFormValues(
     "projeto_id" | "setor_id" | "visibilidade" | "observadores"
   > | null,
 ): SubtarefaPanelSchema {
-  const rec = parseRecorrencia(subtarefa?.recorrencia);
   const atribuidoIds = subtarefa?.responsaveis?.map((r) => r.usuario_id) ?? [];
   const inheritedVisibilidade =
     (subtarefa?.visibilidade as TarefaVisibilidade | null | undefined) ??
@@ -148,24 +144,11 @@ function toFormValues(
           ? parentObservadores
           : ownObservadores,
     lembretes: parseLembretes(subtarefa?.lembretes),
-    recorrencia_tipo:
-      rec?.tipo && rec.tipo !== "personalizada" && rec.tipo !== "anual"
-        ? rec.tipo
-        : "nenhuma",
-    recorrencia_dias_semana: rec?.dias_semana ?? [],
-    recorrencia_dia_mes: rec?.dia_mes ?? 1,
-    recorrencia_data_fim: rec?.data_fim ? new Date(rec.data_fim) : null,
-  };
-}
-
-function toRecorrenciaPayload(values: SubtarefaPanelSchema): RecorrenciaConfig | null {
-  if (values.recorrencia_tipo === "nenhuma") return null;
-  return {
-    tipo: values.recorrencia_tipo as RecorrenciaTipo,
-    dias_semana:
-      values.recorrencia_tipo === "semanal" ? values.recorrencia_dias_semana : undefined,
-    dia_mes: values.recorrencia_tipo === "mensal" ? values.recorrencia_dia_mes : undefined,
-    data_fim: values.recorrencia_data_fim ? values.recorrencia_data_fim.toISOString() : null,
+    // Campos mantidos no schema (toolbar com hideRecorrencia) — sempre nenhuma
+    recorrencia_tipo: "nenhuma",
+    recorrencia_dias_semana: [],
+    recorrencia_dia_mes: 1,
+    recorrencia_data_fim: null,
   };
 }
 
@@ -181,7 +164,8 @@ function toPayload(
     atribuido_ids: values.atribuido_ids,
     prioridade: values.prioridade,
     data_inicio: values.data_inicio ? values.data_inicio.toISOString() : null,
-    recorrencia: toRecorrenciaPayload(values),
+    // Subtarefas não possuem recorrência — só a tarefa principal
+    recorrencia: null,
     visibilidade: values.visibilidade,
     observador_ids: values.observador_ids,
     lembretes: values.lembretes,

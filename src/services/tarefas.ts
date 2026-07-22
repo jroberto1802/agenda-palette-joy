@@ -1200,7 +1200,7 @@ async function insertSubtarefaCopia(params: {
     setor_id: source.setor_id,
     visibilidade: source.visibilidade,
     lembretes: source.lembretes,
-    recorrencia: source.recorrencia,
+    recorrencia: null,
     concluida: false,
     concluido_por: null,
     criado_por: userId,
@@ -1541,7 +1541,8 @@ export async function updateSubtarefa(
     data_inicio: payload.data_inicio,
     visibilidade: payload.visibilidade,
     lembretes: payload.lembretes as unknown as Json,
-    recorrencia: serializeRecorrencia(payload.recorrencia) as Json | null,
+    // Recorrência existe só na tarefa principal — subtarefa nunca guarda regra própria
+    recorrencia: null,
     updated_at: new Date().toISOString(),
   };
 
