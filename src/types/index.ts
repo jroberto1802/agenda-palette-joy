@@ -106,6 +106,7 @@ export type RecorrenciaTipo =
   | "diaria"
   | "semanal"
   | "mensal"
+  | "anual"
   | "personalizada";
 
 export type RecorrenciaUnidade = "dias" | "semanas" | "meses";
@@ -116,11 +117,16 @@ export type RecorrenciaConfig = {
   dias_semana?: number[];
   /** Mensal: dia do mês (1–28) */
   dia_mes?: number;
-  /** Personalizada: intervalo (a cada X) */
+  /**
+   * Personalizada: a cada X dias/semanas/meses.
+   * Anual: a cada X anos (padrão 1).
+   */
   intervalo?: number;
   unidade?: RecorrenciaUnidade;
   /** Personalizada: datas livres YYYY-MM-DD */
   datas_livres?: string[];
+  /** Âncora estável da série (YYYY-MM-DD) — não muda ao avançar a próxima prevista. */
+  data_ancora?: string | null;
   data_fim?: string | null;
 };
 

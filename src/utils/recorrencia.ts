@@ -2,6 +2,7 @@ import {
   addDays,
   addMonths,
   addWeeks,
+  addYears,
   format,
   isAfter,
   isBefore,
@@ -19,6 +20,7 @@ export const RECORRENCIA_LABELS: Record<RecorrenciaTipo, string> = {
   diaria: "Diária",
   semanal: "Semanal",
   mensal: "Mensal",
+  anual: "Anual",
   personalizada: "Personalizada",
 };
 
@@ -52,6 +54,7 @@ export function parseRecorrencia(raw: unknown): RecorrenciaConfig | null {
     datas_livres: Array.isArray(r.datas_livres)
       ? (r.datas_livres as string[]).filter((d) => typeof d === "string")
       : undefined,
+    data_ancora: typeof r.data_ancora === "string" ? r.data_ancora : null,
     data_fim: typeof r.data_fim === "string" ? r.data_fim : null,
   };
 }
@@ -61,12 +64,14 @@ export function serializeRecorrencia(config: RecorrenciaConfig | null): Recorren
   return config;
 }
 
+/** Modelo permanente da série (`serie_raiz_id === id`). */
 export function isSerieModelo(
   tarefa: { id: string; serie_raiz_id?: string | null },
 ): boolean {
   return !!tarefa.serie_raiz_id && tarefa.serie_raiz_id === tarefa.id;
 }
 
+/** Ocorrência materializada (`serie_raiz_id` aponta para o modelo). */
 export function isSerieOcorrencia(
   tarefa: { id: string; serie_raiz_id?: string | null },
 ): boolean {
@@ -109,6 +114,10 @@ export function calcularProximaData(
       next.setDate(Math.min(dia, 28));
       return next;
     }
+    case "anual": {
+      const n = config.intervalo && config.intervalo > 0 ? config.intervalo : 1;
+      return addYears(from, n);
+    }
     case "personalizada": {
       if (config.datas_livres?.length) {
         const sorted = [...config.datas_livres].sort();
@@ -131,8 +140,35 @@ export function deveGerarProximaOcorrencia(config: RecorrenciaConfig, proximaDat
 }
 
 /**
+ * Próxima ocorrência prevista a partir de hoje (ou de `aPartirDe`).
+ * Se a âncora ainda é futura, retorna a âncora.
+ */
+export function calcularProximaOcorrenciaPrevista(
+  ancora: string | null,
+  config: RecorrenciaConfig,
+  aPartirDe: Date = new Date(),
+): Date | null {
+  const limite = startOfDay(aPartirDe);
+  let cursor = ancora ? startOfDay(parseISO(ancora)) : limite;
+
+  if (!isBefore(cursor, limite) && withinEnd(cursor, config)) {
+    return cursor;
+  }
+
+  let guard = 0;
+  while (guard < 5000) {
+    const next = calcularProximaData(cursor.toISOString(), config);
+    if (!next || !deveGerarProximaOcorrencia(config, next)) return null;
+    cursor = startOfDay(next);
+    if (!isBefore(cursor, limite)) return cursor;
+    guard++;
+  }
+  return null;
+}
+
+/**
  * Expande datas de ocorrência no intervalo [de, ate] (inclusive),
- * a partir da âncora (data do modelo / primeira ocorrência).
+ * a partir da âncora (data âncora da série — tipicamente a primeira data).
  */
 export function expandirDatasOcorrencia(
   ancora: string | null,
@@ -159,8 +195,6 @@ export function expandirDatasOcorrencia(
 
   let cursor = ancora ? startOfDay(parseISO(ancora)) : rangeStart;
 
-  // Se a âncora está depois do fim do range, nada a expandir a partir dela no range.
-  // Se está antes, avança até entrar no range (sem incluir âncora se for anterior).
   let guard = 0;
   while (isBefore(cursor, rangeStart) && guard < 5000) {
     const next = calcularProximaData(cursor.toISOString(), config);
@@ -169,7 +203,6 @@ export function expandirDatasOcorrencia(
     guard++;
   }
 
-  // Inclui a âncora se cair no range
   if (
     !isBefore(cursor, rangeStart) &&
     !isAfter(cursor, rangeEnd) &&
@@ -205,6 +238,11 @@ export function formatRecorrencia(config: RecorrenciaConfig | null): string {
     }
     case "mensal":
       return `Mensal • Dia ${config.dia_mes ?? "—"}${fim}`;
+    case "anual": {
+      const n = config.intervalo && config.intervalo > 0 ? config.intervalo : 1;
+      if (n === 1) return `Anual${fim}`;
+      return `Anual • A cada ${n} anos${fim}`;
+    }
     case "personalizada": {
       if (config.datas_livres?.length) {
         return `Personalizada • ${config.datas_livres.length} data(s)${fim}`;
@@ -227,6 +265,16 @@ export function formatRecorrencia(config: RecorrenciaConfig | null): string {
     default:
       return "Nenhuma";
   }
+}
+
+/** Âncora estável da série (data_ancora na regra ou data_inicio do modelo). */
+export function getAncoraSerie(
+  modelo: { data_inicio?: string | null; recorrencia?: unknown },
+  config?: RecorrenciaConfig | null,
+): string | null {
+  const parsed = config ?? parseRecorrencia(modelo.recorrencia);
+  if (parsed?.data_ancora) return parsed.data_ancora;
+  return toLocalDateKey(modelo.data_inicio) ?? modelo.data_inicio ?? null;
 }
 
 export function sameCalendarDay(a: string | null | undefined, b: Date): boolean {

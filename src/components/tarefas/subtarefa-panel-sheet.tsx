@@ -149,7 +149,9 @@ function toFormValues(
           : ownObservadores,
     lembretes: parseLembretes(subtarefa?.lembretes),
     recorrencia_tipo:
-      rec?.tipo && rec.tipo !== "personalizada" ? rec.tipo : "nenhuma",
+      rec?.tipo && rec.tipo !== "personalizada" && rec.tipo !== "anual"
+        ? rec.tipo
+        : "nenhuma",
     recorrencia_dias_semana: rec?.dias_semana ?? [],
     recorrencia_dia_mes: rec?.dia_mes ?? 1,
     recorrencia_data_fim: rec?.data_fim ? new Date(rec.data_fim) : null,

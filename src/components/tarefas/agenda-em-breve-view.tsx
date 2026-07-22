@@ -33,6 +33,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { listPrevisoesOcorrencia, type PrevisaoOcorrencia } from "@/services/tarefa-recorrencia";
 import { compareByClassificar, TAREFA_PRIORIDADE_BAND_CLASS } from "@/utils/tarefas";
+import { isSerieModelo } from "@/utils/recorrencia";
 
 const MONTH_OPTIONS = Array.from({ length: 12 }, (_, monthIndex) => ({
   value: String(monthIndex),
@@ -178,6 +179,7 @@ export function AgendaEmBreveView({
       map.set(toLocalDateKey(day)!, []);
     }
     for (const t of tarefas ?? []) {
+      if (isSerieModelo(t)) continue;
       const key = toLocalDateKey(t.data_inicio);
       if (!key || !map.has(key)) continue;
       map.get(key)!.push({ kind: "tarefa", tarefa: t });

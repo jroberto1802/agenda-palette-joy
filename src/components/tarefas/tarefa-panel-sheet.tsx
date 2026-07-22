@@ -84,7 +84,7 @@ import type {
   TarefaVisibilidade,
   TarefaWithRelations,
 } from "@/types";
-import { isSerieOcorrencia, parseRecorrencia, pertenceASerie } from "@/utils/recorrencia";
+import { isSerieOcorrencia, parseRecorrencia } from "@/utils/recorrencia";
 import { isAdmin, isGerente } from "@/utils/permissions";
 import {
   TAREFA_PRIORIDADE_COLORS,
@@ -118,7 +118,7 @@ const tarefaPanelSchema = z
     ]),
     observador_ids: z.array(z.string()),
     lembretes: z.array(z.enum(["no_prazo", "1h_antes", "1d_antes", "1sem_antes"])),
-    recorrencia_tipo: z.enum(["nenhuma", "diaria", "semanal", "mensal", "personalizada"]),
+    recorrencia_tipo: z.enum(["nenhuma", "diaria", "semanal", "mensal", "anual", "personalizada"]),
     recorrencia_dias_semana: z.array(z.number()),
     recorrencia_dia_mes: z.number().min(1).max(28),
     recorrencia_intervalo: z.number().min(1),
@@ -269,7 +269,10 @@ function toFormValues(
   };
 }
 
-function toRecorrenciaPayload(values: TarefaPanelSchema): RecorrenciaConfig | null {
+function toRecorrenciaPayload(
+  values: TarefaPanelSchema,
+  existing?: RecorrenciaConfig | null,
+): RecorrenciaConfig | null {
   if (values.recorrencia_tipo === "nenhuma") return null;
   return {
     tipo: values.recorrencia_tipo as RecorrenciaTipo,
@@ -277,16 +280,24 @@ function toRecorrenciaPayload(values: TarefaPanelSchema): RecorrenciaConfig | nu
       values.recorrencia_tipo === "semanal" ? values.recorrencia_dias_semana : undefined,
     dia_mes: values.recorrencia_tipo === "mensal" ? values.recorrencia_dia_mes : undefined,
     intervalo:
-      values.recorrencia_tipo === "personalizada" ? values.recorrencia_intervalo : undefined,
+      values.recorrencia_tipo === "personalizada" || values.recorrencia_tipo === "anual"
+        ? values.recorrencia_intervalo
+        : undefined,
     unidade:
       values.recorrencia_tipo === "personalizada" ? values.recorrencia_unidade : undefined,
     datas_livres:
       values.recorrencia_tipo === "personalizada" ? values.recorrencia_datas_livres : undefined,
-    data_fim: values.recorrencia_data_fim ? values.recorrencia_data_fim.toISOString() : null,
+    data_ancora: existing?.data_ancora ?? null,
+    data_fim: values.recorrencia_data_fim
+      ? values.recorrencia_data_fim.toISOString()
+      : (existing?.data_fim ?? null),
   };
 }
 
-function toPayload(values: TarefaPanelSchema): TarefaFormData {
+function toPayload(
+  values: TarefaPanelSchema,
+  existingRecorrencia?: RecorrenciaConfig | null,
+): TarefaFormData {
   return {
     titulo: values.titulo,
     descricao: values.descricao,
@@ -297,7 +308,7 @@ function toPayload(values: TarefaPanelSchema): TarefaFormData {
     prioridade: values.prioridade,
     data_inicio: values.data_inicio ? values.data_inicio.toISOString() : null,
     tags: parseTags(values.tagsInput),
-    recorrencia: toRecorrenciaPayload(values),
+    recorrencia: toRecorrenciaPayload(values, existingRecorrencia),
     visibilidade: values.visibilidade,
     observador_ids: values.observador_ids,
     lembretes: values.lembretes,
@@ -634,7 +645,7 @@ export function TarefaPanelSheet({
     }
     if (!tarefaId) return;
 
-    if (escopo && tarefa && pertenceASerie(tarefa)) {
+    if (escopo && tarefa && isSerieOcorrencia(tarefa)) {
       await updateTarefaEscopo.mutateAsync({ id: tarefaId, data: payload, escopo });
     } else {
       await updateTarefa.mutateAsync({ id: tarefaId, data: payload });
@@ -646,12 +657,17 @@ export function TarefaPanelSheet({
   const handleSave = form.handleSubmit(
     async (values) => {
       try {
-        const payload = toPayload(values);
+        const existingRec =
+          tarefa && isSerieOcorrencia(tarefa)
+            ? (modeloRecorrencia ?? null)
+            : parseRecorrencia(tarefa?.recorrencia);
+        const payload = toPayload(values, existingRec);
+        // Escopo só para ocorrência; modelo da série salva direto
         if (
           !isCreate &&
           tarefaId &&
           tarefa &&
-          pertenceASerie(tarefa) &&
+          isSerieOcorrencia(tarefa) &&
           form.formState.isDirty
         ) {
           setPendingSeriePayload(payload);

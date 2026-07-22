@@ -22,7 +22,8 @@ import {
 import { notifyUsers } from "@/services/notificacoes";
 import { localDateRangeToIsoBounds, startOfTodayLocal, toLocalDateKey } from "@/utils/agenda-datas";
 import { sortSubtarefasList } from "@/utils/tarefas";
-import { serializeRecorrencia } from "@/utils/recorrencia";
+import { serializeRecorrencia, isSerieModelo, isSerieOcorrencia } from "@/utils/recorrencia";
+import { atualizarProximaDataModelo, materializarOcorrenciasDevidas } from "@/services/tarefa-recorrencia";
 import type {
   DashboardKpis,
   Profile,
@@ -417,6 +418,15 @@ export async function createTarefa(payload: TarefaFormData): Promise<TarefaWithR
     throw new Error("Selecione ao menos uma pessoa para visibilidade específica.");
   }
 
+  const recorrencia = serializeRecorrencia(normalized.recorrencia);
+  const ancoraKey = normalized.data_inicio
+    ? toLocalDateKey(normalized.data_inicio)
+    : null;
+  const recorrenciaComAncora =
+    recorrencia && ancoraKey
+      ? { ...recorrencia, data_ancora: recorrencia.data_ancora ?? ancoraKey }
+      : recorrencia;
+
   const { error } = await supabase
     .from("tarefas")
     .insert({
@@ -429,8 +439,8 @@ export async function createTarefa(payload: TarefaFormData): Promise<TarefaWithR
       prioridade: normalized.prioridade,
       data_inicio: normalized.data_inicio,
       tags: normalized.tags,
-      recorrencia: serializeRecorrencia(normalized.recorrencia),
-      serie_raiz_id: serializeRecorrencia(normalized.recorrencia) ? tarefaId : null,
+      recorrencia: recorrenciaComAncora,
+      serie_raiz_id: recorrenciaComAncora ? tarefaId : null,
       visibilidade: normalized.visibilidade,
       lembretes: serializeLembretes(normalized.lembretes),
       criado_por: user.id,
@@ -483,6 +493,11 @@ export async function createTarefa(payload: TarefaFormData): Promise<TarefaWithR
       criadoPor: user.id,
     });
 
+    if (recorrenciaComAncora) {
+      await materializarOcorrenciasDevidas().catch(() => undefined);
+      await atualizarProximaDataModelo(tarefaId).catch(() => undefined);
+    }
+
     return tarefa;
   }
 
@@ -507,6 +522,18 @@ export async function createTarefa(payload: TarefaFormData): Promise<TarefaWithR
     responsavelIds: atribuidoIds,
     criadoPor: user.id,
   });
+
+  // Modelo permanente: materializa ocorrências devidas e atualiza próxima prevista
+  if (recorrenciaComAncora) {
+    await materializarOcorrenciasDevidas().catch(() => undefined);
+    await atualizarProximaDataModelo(tarefaId).catch(() => undefined);
+    const { data: refreshed } = await supabase
+      .from("tarefas")
+      .select(TAREFA_SELECT)
+      .eq("id", tarefaId)
+      .single();
+    if (refreshed) return refreshed as TarefaWithRelations;
+  }
 
   return tarefa;
 }
@@ -549,6 +576,17 @@ export async function updateTarefa(
     observadorIds: anterioresObservadores,
   });
 
+  const recorrenciaSerialized = serializeRecorrencia(payload.recorrencia);
+  const ancoraUpdate =
+    payload.data_inicio != null ? toLocalDateKey(payload.data_inicio) : null;
+  const recorrenciaUpdate =
+    recorrenciaSerialized && ancoraUpdate
+      ? {
+          ...recorrenciaSerialized,
+          data_ancora: recorrenciaSerialized.data_ancora ?? ancoraUpdate,
+        }
+      : recorrenciaSerialized;
+
   const updateData: TablesUpdate<"tarefas"> = {
     titulo: payload.titulo,
     descricao: payload.descricao || null,
@@ -558,13 +596,14 @@ export async function updateTarefa(
     prioridade: payload.prioridade,
     data_inicio: payload.data_inicio,
     tags: payload.tags,
-    recorrencia: serializeRecorrencia(payload.recorrencia),
+    recorrencia: recorrenciaUpdate,
     visibilidade: payload.visibilidade,
     lembretes: serializeLembretes(payload.lembretes),
   };
 
   // Se o formulário define recorrência nesta tarefa e ela ainda não é série, torna-a modelo
-  if (serializeRecorrencia(payload.recorrencia)) {
+  let promoveuModelo = false;
+  if (recorrenciaUpdate) {
     const { data: meta } = await supabase
       .from("tarefas")
       .select("serie_raiz_id")
@@ -572,6 +611,7 @@ export async function updateTarefa(
       .single();
     if (!meta?.serie_raiz_id) {
       updateData.serie_raiz_id = id;
+      promoveuModelo = true;
     }
   }
 
@@ -634,6 +674,17 @@ export async function updateTarefa(
     }
   }
 
+  if (promoveuModelo || (isSerieModelo(tarefa) && recorrenciaUpdate)) {
+    await materializarOcorrenciasDevidas().catch(() => undefined);
+    await atualizarProximaDataModelo(id).catch(() => undefined);
+    const { data: refreshed } = await supabase
+      .from("tarefas")
+      .select(TAREFA_SELECT)
+      .eq("id", id)
+      .single();
+    if (refreshed) return refreshed as TarefaWithRelations;
+  }
+
   return tarefa;
 }
 
@@ -688,9 +739,16 @@ export async function updateTarefaConclusao(
 ): Promise<TarefaWithRelations> {
   const { data: anterior } = await supabase
     .from("tarefas")
-    .select("concluida")
+    .select("id, concluida, serie_raiz_id")
     .eq("id", id)
     .single();
+
+  // Modelo da série é permanente: nunca conclui / não vai para Finalizados
+  if (anterior && isSerieModelo(anterior) && concluida) {
+    throw new Error(
+      "O Modelo da Série não pode ser concluído. Conclua apenas as ocorrências individuais.",
+    );
+  }
 
   const updateData: TablesUpdate<"tarefas"> = {
     concluida,
@@ -721,6 +779,11 @@ export async function updateTarefaConclusao(
         atorNome: ator?.nome ?? "Alguém",
       }).catch(() => undefined);
     }
+  }
+
+  // Após concluir ocorrência, atualiza próxima prevista no modelo
+  if (concluida && isSerieOcorrencia(tarefa) && tarefa.serie_raiz_id) {
+    await atualizarProximaDataModelo(tarefa.serie_raiz_id).catch(() => undefined);
   }
 
   return tarefa;

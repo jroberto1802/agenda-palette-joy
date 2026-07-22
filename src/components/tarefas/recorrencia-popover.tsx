@@ -77,12 +77,13 @@ export function RecorrenciaPopover({
       tipo,
       dias_semana: tipo === "semanal" ? diasSemana : undefined,
       dia_mes: tipo === "mensal" ? diaMes : undefined,
-      intervalo: tipo === "personalizada" ? intervalo : undefined,
+      intervalo: tipo === "personalizada" || tipo === "anual" ? intervalo : undefined,
       unidade: tipo === "personalizada" ? unidade : undefined,
       datas_livres:
         tipo === "personalizada" && datasLivres.length > 0
           ? datasLivres.map((d) => toLocalDateKey(d)!).filter(Boolean)
           : undefined,
+      data_ancora: value?.data_ancora ?? null,
       data_fim: value?.data_fim ?? null,
     });
   };
@@ -207,6 +208,23 @@ export function RecorrenciaPopover({
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+            )}
+
+            {tipo === "anual" && (
+              <div className="flex items-center gap-2">
+                <Label className="shrink-0 text-xs">A cada</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  className="h-9 w-16"
+                  value={intervalo}
+                  disabled={!canEdit}
+                  onChange={(e) => setIntervalo(Math.max(1, Number(e.target.value) || 1))}
+                />
+                <span className="text-xs text-muted-foreground">
+                  {intervalo === 1 ? "ano (mesma data)" : "anos (mesma data)"}
+                </span>
               </div>
             )}
 

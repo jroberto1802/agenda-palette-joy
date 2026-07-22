@@ -20,6 +20,7 @@ import { useTarefasCalendario } from "@/hooks/use-tarefas";
 import { listPrevisoesOcorrencia, type PrevisaoOcorrencia } from "@/services/tarefa-recorrencia";
 import type { TarefaWithRelations } from "@/types";
 import { toLocalDateKey } from "@/utils/agenda-datas";
+import { isSerieModelo } from "@/utils/recorrencia";
 import { TAREFA_PRIORIDADE_COLORS, formatResponsaveisLabel } from "@/utils/tarefas";
 import { cn } from "@/lib/utils";
 
@@ -40,7 +41,11 @@ export function TarefaCalendarioView({
   const rangeDe = toLocalDateKey(startOfMonth(mesAtual))!;
   const rangeAte = toLocalDateKey(endOfMonth(mesAtual))!;
 
-  const { data: tarefas, isLoading } = useTarefasCalendario(inicio, fim);
+  const { data: tarefasRaw, isLoading } = useTarefasCalendario(inicio, fim);
+  const tarefas = useMemo(
+    () => (tarefasRaw ?? []).filter((t) => !isSerieModelo(t)),
+    [tarefasRaw],
+  );
   const { data: previsoes, isLoading: loadingPrevisoes } = useQuery({
     queryKey: ["recorrencia-previsoes", rangeDe, rangeAte],
     queryFn: () => listPrevisoesOcorrencia(rangeDe, rangeAte),

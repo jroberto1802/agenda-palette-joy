@@ -1,5 +1,7 @@
 import {
+  calcularProximaOcorrenciaPrevista,
   expandirDatasOcorrencia,
+  getAncoraSerie,
   isSerieModelo,
   parseRecorrencia,
   serializeRecorrencia,
@@ -163,9 +165,43 @@ async function materializarOcorrencia(
   return data as TarefaWithRelations;
 }
 
+/** Atualiza `data_inicio` do modelo para a próxima ocorrência prevista. */
+export async function atualizarProximaDataModelo(modeloId: string): Promise<void> {
+  const { data: modelo, error } = await supabase
+    .from("tarefas")
+    .select("id, data_inicio, recorrencia, serie_raiz_id")
+    .eq("id", modeloId)
+    .single();
+  if (error || !modelo) return;
+
+  const config = parseRecorrencia(modelo.recorrencia);
+  if (!config || !isSerieModelo(modelo)) return;
+
+  const ancora = getAncoraSerie(modelo, config);
+  const proxima = calcularProximaOcorrenciaPrevista(ancora, config, new Date());
+  const proximaIso = proxima ? proxima.toISOString() : null;
+
+  // Garante data_ancora na regra
+  const ancoraKey = toLocalDateKey(ancora) ?? ancora;
+  const nextConfig: RecorrenciaConfig = {
+    ...config,
+    data_ancora: config.data_ancora ?? ancoraKey,
+  };
+
+  await supabase
+    .from("tarefas")
+    .update({
+      data_inicio: proximaIso,
+      recorrencia: serializeRecorrencia(nextConfig),
+      concluida: false,
+      data_conclusao: null,
+    })
+    .eq("id", modeloId);
+}
+
 /**
- * Materializa ocorrências cuja data prevista é hoje ou anterior
- * (ainda não existentes como linha), para cada modelo de série do usuário.
+ * Reabre modelos concluídos (modelo é permanente) e materializa ocorrências devidas.
+ * O modelo NÃO conta como ocorrência — só linhas filhas (`serie_raiz_id !== id`).
  */
 export async function materializarOcorrenciasDevidas(): Promise<number> {
   const hoje = startOfDay(new Date());
@@ -187,27 +223,52 @@ export async function materializarOcorrenciasDevidas(): Promise<number> {
   let criadas = 0;
 
   for (const modelo of modelosSerie) {
+    if (modelo.concluida) {
+      await supabase
+        .from("tarefas")
+        .update({ concluida: false, data_conclusao: null })
+        .eq("id", modelo.id);
+    }
+
     const config = parseRecorrencia(modelo.recorrencia);
     if (!config) continue;
 
-    const ancora = modelo.data_inicio;
-    const de = ancora ? startOfDay(new Date(ancora)) : addDays(hoje, -365);
-    const datas = expandirDatasOcorrencia(ancora, config, de, hojeFim, { max: 400 });
+    // Persist âncora se ainda não existir
+    if (!config.data_ancora && modelo.data_inicio) {
+      const ancoraKey = toLocalDateKey(modelo.data_inicio);
+      if (ancoraKey) {
+        await supabase
+          .from("tarefas")
+          .update({
+            recorrencia: serializeRecorrencia({ ...config, data_ancora: ancoraKey }),
+          })
+          .eq("id", modelo.id);
+        config.data_ancora = ancoraKey;
+      }
+    }
+
+    const ancora = getAncoraSerie(modelo, config);
+    const de = ancora ? startOfDay(new Date(ancora.includes("T") ? ancora : ancora + "T12:00:00")) : addDays(hoje, -365);
+    const datas = expandirDatasOcorrencia(
+      ancora?.includes("T") ? ancora : ancora ? `${ancora}T12:00:00` : null,
+      config,
+      de,
+      hojeFim,
+      { max: 400 },
+    );
 
     const { data: existentes } = await supabase
       .from("tarefas")
-      .select("id, data_inicio")
+      .select("id, data_inicio, serie_raiz_id")
       .eq("serie_raiz_id", modelo.id)
-      .is("deleted_at", null);
+      .is("deleted_at", null)
+      .neq("id", modelo.id); // só ocorrências, nunca o modelo
 
     const diasExistentes = new Set(
       (existentes ?? [])
         .map((e) => dayPrefix(e.data_inicio))
         .filter((d): d is string => !!d),
     );
-
-    const modeloDay = dayPrefix(modelo.data_inicio);
-    if (modeloDay) diasExistentes.add(modeloDay);
 
     for (const data of datas) {
       const key = toLocalDateKey(data)!;
@@ -218,6 +279,8 @@ export async function materializarOcorrenciasDevidas(): Promise<number> {
       diasExistentes.add(key);
       criadas++;
     }
+
+    await atualizarProximaDataModelo(modelo.id);
   }
 
   return criadas;
@@ -260,19 +323,25 @@ export async function listPrevisoesOcorrencia(
 
     const { data: existentes } = await supabase
       .from("tarefas")
-      .select("data_inicio")
+      .select("id, data_inicio")
       .eq("serie_raiz_id", modelo.id)
-      .is("deleted_at", null);
+      .is("deleted_at", null)
+      .neq("id", modelo.id);
 
     const diasExistentes = new Set(
       (existentes ?? [])
         .map((e) => dayPrefix(e.data_inicio))
         .filter((d): d is string => !!d),
     );
-    const modeloDay = dayPrefix(modelo.data_inicio);
-    if (modeloDay) diasExistentes.add(modeloDay);
 
-    const datas = expandirDatasOcorrencia(modelo.data_inicio, config, de, ate, {
+    const ancora = getAncoraSerie(modelo, config);
+    const ancoraIso = ancora?.includes("T")
+      ? ancora
+      : ancora
+        ? `${ancora}T12:00:00`
+        : null;
+
+    const datas = expandirDatasOcorrencia(ancoraIso, config, de, ate, {
       max: 120,
     });
 

@@ -23,6 +23,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
 import { ConclusaoBolinha } from "@/components/tarefas/conclusao-bolinha";
 import { DescricaoPreview } from "@/components/tarefas/descricao-preview";
+import { SerieModeloBadge } from "@/components/tarefas/serie-modelo-badge";
 import { MinhaAgendaBadge } from "@/components/tarefas/subtarefa-row";
 import { TarefaActionsMenu } from "@/components/tarefas/tarefa-actions-menu";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +31,7 @@ import { useReorderTarefasLista, useSyncTarefaBoardItens, useTarefaBoardItens } 
 import { cn } from "@/lib/utils";
 import type { TarefaWithRelations } from "@/types";
 import { formatDate, getVencimentoVariant } from "@/utils/formatters";
+import { isSerieModelo } from "@/utils/recorrencia";
 import {
   TAREFA_PRIORIDADE_BAND_CLASS,
   TAREFA_PRIORIDADE_COLORS,
@@ -58,6 +60,7 @@ export function TarefaListRowContent({
   showAtrasadaBadge?: boolean;
 }) {
   const vencimentoVariant = getVencimentoVariant(tarefa.data_inicio, tarefa.concluida);
+  const ehModelo = isSerieModelo(tarefa);
 
   return (
     <div
@@ -68,7 +71,7 @@ export function TarefaListRowContent({
       )}
     >
       {dragHandle}
-      {onToggleConcluida && (
+      {onToggleConcluida && !ehModelo && (
         <ConclusaoBolinha
           concluida={tarefa.concluida}
           kind="tarefa"
@@ -86,6 +89,7 @@ export function TarefaListRowContent({
           {tarefa.titulo}
         </p>
         <DescricaoPreview descricao={tarefa.descricao} />
+        {ehModelo && <SerieModeloBadge tarefa={tarefa} />}
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           {showAtrasadaBadge && (
             <Badge variant="destructive" className="gap-1 px-1.5 py-0 text-[10px]">
@@ -110,7 +114,7 @@ export function TarefaListRowContent({
               <span className="truncate">{formatResponsaveisLabel(tarefa)}</span>
             </span>
           )}
-          {tarefa.data_inicio && (
+          {tarefa.data_inicio && !ehModelo && (
             <span
               className={cn(
                 "inline-flex items-center gap-1",

@@ -2,6 +2,7 @@ import { CalendarIcon } from "lucide-react";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
 import { ConclusaoBolinha } from "@/components/tarefas/conclusao-bolinha";
 import { DescricaoPreview } from "@/components/tarefas/descricao-preview";
+import { SerieModeloBadge } from "@/components/tarefas/serie-modelo-badge";
 import { MinhaAgendaBadge } from "@/components/tarefas/subtarefa-row";
 import { TarefaActionsMenu } from "@/components/tarefas/tarefa-actions-menu";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TAREFA_CARD_FIXED_CLASS } from "@/lib/layout";
 import type { TarefaWithRelations } from "@/types";
 import { formatDate, getVencimentoVariant } from "@/utils/formatters";
+import { isSerieModelo } from "@/utils/recorrencia";
 import {
   TAREFA_PRIORIDADE_BAND_CLASS,
   TAREFA_PRIORIDADE_COLORS,
@@ -41,9 +43,11 @@ export function TarefaCard({
   onToggleConcluida: (concluida: boolean) => void | Promise<void>;
   onOpen?: () => void;
 }) {
-  const podeAlternarConcluida = canToggleConcluida ?? canEdit;
+  const podeAlternarConcluida =
+    (canToggleConcluida ?? canEdit) && !isSerieModelo(tarefa);
   const vencimentoVariant = getVencimentoVariant(tarefa.data_inicio, tarefa.concluida);
   const responsaveis = getTarefaResponsaveis(tarefa);
+  const ehModelo = isSerieModelo(tarefa);
 
   return (
     <Card
@@ -71,13 +75,15 @@ export function TarefaCard({
       <CardHeader className="shrink-0 space-y-0 p-3 pb-1.5">
         <div className="flex items-start justify-between gap-2">
           <div className="flex min-w-0 flex-1 items-start gap-2">
-            <ConclusaoBolinha
-              concluida={tarefa.concluida}
-              kind="tarefa"
-              disabled={!podeAlternarConcluida}
-              onToggle={onToggleConcluida}
-              className="mt-0.5"
-            />
+            {!ehModelo && (
+              <ConclusaoBolinha
+                concluida={tarefa.concluida}
+                kind="tarefa"
+                disabled={!podeAlternarConcluida}
+                onToggle={onToggleConcluida}
+                className="mt-0.5"
+              />
+            )}
             <div className="min-w-0 flex-1 space-y-1">
               <div className="flex min-w-0 items-center gap-1 overflow-hidden">
                 <Badge
@@ -119,6 +125,7 @@ export function TarefaCard({
               >
                 {tarefa.titulo}
               </CardTitle>
+              {ehModelo && <SerieModeloBadge tarefa={tarefa} />}
             </div>
           </div>
 

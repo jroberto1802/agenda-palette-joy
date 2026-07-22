@@ -28,6 +28,7 @@ import {
   type TarefaClassificar,
 } from "@/utils/agenda-classificar-preference";
 import { startOfTodayLocal, toLocalDateKey } from "@/utils/agenda-datas";
+import { isSerieModelo } from "@/utils/recorrencia";
 import { compareByClassificar } from "@/utils/tarefas";
 
 type AgendaHojeItem =
@@ -194,7 +195,7 @@ export function AgendaHojeView({
 
   const itemsHoje = useMemo((): AgendaHojeItem[] => {
     const tarefasDoDia = (tarefas ?? []).filter(
-      (t) => toLocalDateKey(t.data_inicio) === hojeKey,
+      (t) => !isSerieModelo(t) && toLocalDateKey(t.data_inicio) === hojeKey,
     );
     const subtarefasDoDia = (subtarefas ?? []).filter(
       (s) => toLocalDateKey(s.data_inicio) === hojeKey,
@@ -210,8 +211,8 @@ export function AgendaHojeView({
   }, [tarefas, subtarefas, hojeKey, classificarMode]);
 
   const itemsAtrasadas = useMemo((): AgendaHojeItem[] => {
-    const tarefasVencidas = (tarefasAtrasadas ?? []).filter((t) =>
-      isAtrasada(t.data_inicio, hojeKey),
+    const tarefasVencidas = (tarefasAtrasadas ?? []).filter(
+      (t) => !isSerieModelo(t) && isAtrasada(t.data_inicio, hojeKey),
     );
     const subtarefasVencidas = (subtarefasAtrasadas ?? []).filter((s) =>
       isAtrasada(s.data_inicio, hojeKey),
