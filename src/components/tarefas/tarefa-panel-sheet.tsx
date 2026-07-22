@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { CommentsThread } from "@/components/common/comments-thread";
 import { EditableOnDoubleClick } from "@/components/common/editable-on-double-click";
+import { ConfirmSerieEditDialog } from "@/components/tarefas/confirm-serie-edit-dialog";
 import { SubtarefaPanelSheet } from "@/components/tarefas/subtarefa-panel-sheet";
 import { SubtarefaRow } from "@/components/tarefas/subtarefa-row";
 import { MoverSubtarefaDialog } from "@/components/tarefas/mover-subtarefa-dialog";
@@ -68,7 +69,9 @@ import {
   useUpdateSubtarefaMeta,
   useUpdateTarefa,
   useUpdateTarefaComentario,
+  useUpdateTarefaComEscopoSerie,
 } from "@/hooks/use-tarefas";
+import { getModeloRecorrencia, type EscopoEdicaoSerie } from "@/services/tarefa-recorrencia";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
 import type {
   ProfileWithSetor,
@@ -81,7 +84,7 @@ import type {
   TarefaVisibilidade,
   TarefaWithRelations,
 } from "@/types";
-import { parseRecorrencia } from "@/utils/recorrencia";
+import { isSerieOcorrencia, parseRecorrencia, pertenceASerie } from "@/utils/recorrencia";
 import { isAdmin, isGerente } from "@/utils/permissions";
 import {
   TAREFA_PRIORIDADE_COLORS,
@@ -115,9 +118,12 @@ const tarefaPanelSchema = z
     ]),
     observador_ids: z.array(z.string()),
     lembretes: z.array(z.enum(["no_prazo", "1h_antes", "1d_antes", "1sem_antes"])),
-    recorrencia_tipo: z.enum(["nenhuma", "diaria", "semanal", "mensal"]),
+    recorrencia_tipo: z.enum(["nenhuma", "diaria", "semanal", "mensal", "personalizada"]),
     recorrencia_dias_semana: z.array(z.number()),
     recorrencia_dia_mes: z.number().min(1).max(28),
+    recorrencia_intervalo: z.number().min(1),
+    recorrencia_unidade: z.enum(["dias", "semanas", "meses"]),
+    recorrencia_datas_livres: z.array(z.string()),
     recorrencia_data_fim: z.date().nullable(),
   })
   .superRefine((data, ctx) => {
@@ -228,8 +234,9 @@ function toFormValues(
   defaultProjetoId?: string | null,
   defaultDataInicio?: Date | null,
   defaultAtribuidoIds?: string[],
+  recorrenciaOverride?: RecorrenciaConfig | null,
 ): TarefaPanelSchema {
-  const rec = parseRecorrencia(tarefa?.recorrencia);
+  const rec = recorrenciaOverride ?? parseRecorrencia(tarefa?.recorrencia);
   const atribuidoIds =
     tarefa?.responsaveis?.map((r) => r.usuario_id) ??
     (tarefa?.atribuido_a ? [tarefa.atribuido_a] : []);
@@ -255,6 +262,9 @@ function toFormValues(
     recorrencia_tipo: rec?.tipo ?? "nenhuma",
     recorrencia_dias_semana: rec?.dias_semana ?? [],
     recorrencia_dia_mes: rec?.dia_mes ?? 1,
+    recorrencia_intervalo: rec?.intervalo ?? 1,
+    recorrencia_unidade: rec?.unidade ?? "dias",
+    recorrencia_datas_livres: rec?.datas_livres ?? [],
     recorrencia_data_fim: rec?.data_fim ? new Date(rec.data_fim) : null,
   };
 }
@@ -266,6 +276,12 @@ function toRecorrenciaPayload(values: TarefaPanelSchema): RecorrenciaConfig | nu
     dias_semana:
       values.recorrencia_tipo === "semanal" ? values.recorrencia_dias_semana : undefined,
     dia_mes: values.recorrencia_tipo === "mensal" ? values.recorrencia_dia_mes : undefined,
+    intervalo:
+      values.recorrencia_tipo === "personalizada" ? values.recorrencia_intervalo : undefined,
+    unidade:
+      values.recorrencia_tipo === "personalizada" ? values.recorrencia_unidade : undefined,
+    datas_livres:
+      values.recorrencia_tipo === "personalizada" ? values.recorrencia_datas_livres : undefined,
     data_fim: values.recorrencia_data_fim ? values.recorrencia_data_fim.toISOString() : null,
   };
 }
@@ -326,6 +342,7 @@ export function TarefaPanelSheet({
 
   const createTarefa = useCreateTarefa();
   const updateTarefa = useUpdateTarefa();
+  const updateTarefaEscopo = useUpdateTarefaComEscopoSerie();
   const createSubtarefa = useCreateSubtarefa();
   const toggleSubtarefa = useToggleSubtarefa();
   const updateSubtarefaMeta = useUpdateSubtarefaMeta();
@@ -344,6 +361,13 @@ export function TarefaPanelSheet({
     initialAba ?? "comentarios",
   );
   const [editingField, setEditingField] = useState<EditableTarefaField | null>(null);
+  const [pendingSeriePayload, setPendingSeriePayload] = useState<TarefaFormData | null>(null);
+
+  const { data: modeloRecorrencia } = useQuery({
+    queryKey: ["serie-modelo-recorrencia", tarefa?.serie_raiz_id],
+    queryFn: () => getModeloRecorrencia(tarefa!.serie_raiz_id!),
+    enabled: !!tarefa && isSerieOcorrencia(tarefa) && !!tarefa.serie_raiz_id,
+  });
 
   useEffect(() => {
     if (!open) {
@@ -461,17 +485,29 @@ export function TarefaPanelSheet({
 
   useEffect(() => {
     if (!open) return;
+    const recorrenciaOverride =
+      tarefa && isSerieOcorrencia(tarefa) ? (modeloRecorrencia ?? null) : undefined;
     form.reset(
       toFormValues(
         tarefa ?? null,
         defaultProjetoId,
         tarefaId ? null : defaultDataInicio,
         tarefaId ? undefined : defaultAtribuidoIds,
+        recorrenciaOverride,
       ),
     );
     setNovaSubtarefa("");
     // eslint-disable-next-line react-hooks/exhaustive-deps -- defaults via keys estáveis
-  }, [open, tarefa, tarefaId, defaultProjetoId, defaultDataInicioKey, defaultAtribuidoIdsKey, form]);
+  }, [
+    open,
+    tarefa,
+    tarefaId,
+    defaultProjetoId,
+    defaultDataInicioKey,
+    defaultAtribuidoIdsKey,
+    modeloRecorrencia,
+    form,
+  ]);
 
   const criadorDisplay = useMemo(() => {
     if (tarefa?.criador) return tarefa.criador;
@@ -589,19 +625,39 @@ export function TarefaPanelSheet({
     comentarios,
   ]);
 
+  const applySave = async (payload: TarefaFormData, escopo?: EscopoEdicaoSerie) => {
+    if (isCreate) {
+      const created = await createTarefa.mutateAsync(payload);
+      toast.success("Tarefa criada");
+      onSaved?.(created.id);
+      return;
+    }
+    if (!tarefaId) return;
+
+    if (escopo && tarefa && pertenceASerie(tarefa)) {
+      await updateTarefaEscopo.mutateAsync({ id: tarefaId, data: payload, escopo });
+    } else {
+      await updateTarefa.mutateAsync({ id: tarefaId, data: payload });
+    }
+    toast.success("Tarefa atualizada");
+    setEditingField(null);
+  };
+
   const handleSave = form.handleSubmit(
     async (values) => {
       try {
         const payload = toPayload(values);
-        if (isCreate) {
-          const created = await createTarefa.mutateAsync(payload);
-          toast.success("Tarefa criada");
-          onSaved?.(created.id);
-        } else if (tarefaId) {
-          await updateTarefa.mutateAsync({ id: tarefaId, data: payload });
-          toast.success("Tarefa atualizada");
-          setEditingField(null);
+        if (
+          !isCreate &&
+          tarefaId &&
+          tarefa &&
+          pertenceASerie(tarefa) &&
+          form.formState.isDirty
+        ) {
+          setPendingSeriePayload(payload);
+          return;
         }
+        await applySave(payload);
       } catch (error) {
         toast.error("Erro ao salvar tarefa", {
           description: getSupabaseErrorMessage(error as Error),
@@ -627,6 +683,19 @@ export function TarefaPanelSheet({
     },
   );
 
+  const handleConfirmSerieEdit = async (escopo: EscopoEdicaoSerie) => {
+    if (!pendingSeriePayload) return;
+    try {
+      await applySave(pendingSeriePayload, escopo);
+      setPendingSeriePayload(null);
+    } catch (error) {
+      toast.error("Erro ao salvar tarefa", {
+        description: getSupabaseErrorMessage(error as Error),
+      });
+      throw error;
+    }
+  };
+
   const handleAddSubtarefa = async () => {
     if (!tarefaId || !novaSubtarefa.trim()) return;
     try {
@@ -639,7 +708,8 @@ export function TarefaPanelSheet({
     }
   };
 
-  const saving = createTarefa.isPending || updateTarefa.isPending;
+  const saving =
+    createTarefa.isPending || updateTarefa.isPending || updateTarefaEscopo.isPending;
   const showInteractions = !isCreate && !!tarefaId;
   const {
     formState: { errors: formErrors },
@@ -1092,6 +1162,15 @@ export function TarefaPanelSheet({
       onOpenChange={(open) => {
         if (!open) setMovingSubtarefa(null);
       }}
+    />
+
+    <ConfirmSerieEditDialog
+      open={!!pendingSeriePayload}
+      onOpenChange={(next) => {
+        if (!next) setPendingSeriePayload(null);
+      }}
+      loading={updateTarefaEscopo.isPending}
+      onConfirm={handleConfirmSerieEdit}
     />
     </>
   );

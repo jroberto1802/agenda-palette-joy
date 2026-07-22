@@ -20,14 +20,9 @@ import {
   resolveTarefaVisualizadorIds,
 } from "@/services/notificacao-events";
 import { notifyUsers } from "@/services/notificacoes";
-import {
-  calcularProximaData,
-  deveGerarProximaOcorrencia,
-  parseRecorrencia,
-  serializeRecorrencia,
-} from "@/utils/recorrencia";
 import { localDateRangeToIsoBounds, startOfTodayLocal, toLocalDateKey } from "@/utils/agenda-datas";
 import { sortSubtarefasList } from "@/utils/tarefas";
+import { serializeRecorrencia } from "@/utils/recorrencia";
 import type {
   DashboardKpis,
   Profile,
@@ -392,48 +387,6 @@ export async function listTarefasCalendario(
   return (data ?? []) as TarefaWithRelations[];
 }
 
-async function spawnProximaOcorrencia(tarefa: TarefaWithRelations): Promise<void> {
-  const config = parseRecorrencia(tarefa.recorrencia);
-  if (!config) return;
-
-  const proxima = calcularProximaData(tarefa.data_inicio, config);
-  if (!proxima || !deveGerarProximaOcorrencia(config, proxima)) return;
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return;
-
-  const responsavelIds =
-    tarefa.responsaveis?.map((r) => r.usuario_id).filter(Boolean) ??
-    (tarefa.atribuido_a ? [tarefa.atribuido_a] : []);
-
-  const novaId = crypto.randomUUID();
-
-  const { error } = await supabase.from("tarefas").insert({
-    id: novaId,
-    titulo: tarefa.titulo,
-    descricao: tarefa.descricao,
-    projeto_id: tarefa.projeto_id,
-    setor_id: tarefa.setor_id,
-    atribuido_a: primaryAtribuido(responsavelIds),
-    prioridade: tarefa.prioridade,
-    concluida: false,
-    data_inicio: proxima.toISOString(),
-    tags: tarefa.tags,
-    recorrencia: serializeRecorrencia(config),
-    visibilidade: tarefa.visibilidade,
-    lembretes: tarefa.lembretes,
-    criado_por: user.id,
-  });
-
-  if (error) throw error;
-
-  if (responsavelIds.length > 0) {
-    await syncResponsaveis(novaId, responsavelIds);
-  }
-}
-
 export async function createTarefa(payload: TarefaFormData): Promise<TarefaWithRelations> {
   const {
     data: { user },
@@ -477,6 +430,7 @@ export async function createTarefa(payload: TarefaFormData): Promise<TarefaWithR
       data_inicio: normalized.data_inicio,
       tags: normalized.tags,
       recorrencia: serializeRecorrencia(normalized.recorrencia),
+      serie_raiz_id: serializeRecorrencia(normalized.recorrencia) ? tarefaId : null,
       visibilidade: normalized.visibilidade,
       lembretes: serializeLembretes(normalized.lembretes),
       criado_por: user.id,
@@ -608,6 +562,18 @@ export async function updateTarefa(
     visibilidade: payload.visibilidade,
     lembretes: serializeLembretes(payload.lembretes),
   };
+
+  // Se o formulário define recorrência nesta tarefa e ela ainda não é série, torna-a modelo
+  if (serializeRecorrencia(payload.recorrencia)) {
+    const { data: meta } = await supabase
+      .from("tarefas")
+      .select("serie_raiz_id")
+      .eq("id", id)
+      .single();
+    if (!meta?.serie_raiz_id) {
+      updateData.serie_raiz_id = id;
+    }
+  }
 
   const { data, error } = await supabase
     .from("tarefas")
@@ -755,8 +721,6 @@ export async function updateTarefaConclusao(
         atorNome: ator?.nome ?? "Alguém",
       }).catch(() => undefined);
     }
-
-    await spawnProximaOcorrencia(tarefa).catch(() => undefined);
   }
 
   return tarefa;

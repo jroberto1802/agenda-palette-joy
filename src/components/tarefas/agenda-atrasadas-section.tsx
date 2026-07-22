@@ -3,25 +3,28 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { ConfirmDeleteDialog } from "@/components/common/confirm-delete-dialog";
 import { AgendaAtrasadasActionsMenu } from "@/components/tarefas/agenda-atrasadas-actions";
+import { ConfirmSerieDeleteDialog } from "@/components/tarefas/confirm-serie-delete-dialog";
 import { SubtarefaAgendaListRow } from "@/components/tarefas/subtarefa-agenda-item";
 import { TarefaListRowContent } from "@/components/tarefas/tarefa-list-view";
 import {
   useDeleteSubtarefa,
-  useSoftDeleteTarefa,
+  useSoftDeleteTarefaComEscopo,
   useToggleSubtarefa,
   useUpdateSubtarefaMeta,
   useUpdateTarefaConclusao,
   useUpdateTarefaDataInicio,
 } from "@/hooks/use-tarefas";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
+import type { EscopoExclusaoSerie } from "@/services/tarefa-recorrencia";
 import type { SubtarefaAgendaItem, TarefaWithRelations } from "@/types";
+import { pertenceASerie } from "@/utils/recorrencia";
 
 type AgendaAtrasadaItem =
   | { kind: "tarefa"; tarefa: TarefaWithRelations }
   | { kind: "subtarefa"; subtarefa: SubtarefaAgendaItem };
 
 type DeletingItem =
-  | { kind: "tarefa"; id: string; titulo: string }
+  | { kind: "tarefa"; id: string; titulo: string; isSerie: boolean }
   | { kind: "subtarefa"; id: string; titulo: string };
 
 export function AgendaAtrasadasSection({
@@ -35,7 +38,7 @@ export function AgendaAtrasadasSection({
 }) {
   const updateConclusao = useUpdateTarefaConclusao();
   const updateDataInicio = useUpdateTarefaDataInicio();
-  const softDelete = useSoftDeleteTarefa();
+  const softDelete = useSoftDeleteTarefaComEscopo();
   const toggleSubtarefaMut = useToggleSubtarefa();
   const updateSubtarefaMeta = useUpdateSubtarefaMeta();
   const deleteSubtarefa = useDeleteSubtarefa();
@@ -100,22 +103,30 @@ export function AgendaAtrasadasSection({
     toast.message("Item permanece atrasado");
   };
 
-  const handleDelete = async () => {
-    if (!deleting) return;
+  const handleDeleteTarefa = async (escopo: EscopoExclusaoSerie) => {
+    if (!deleting || deleting.kind !== "tarefa") return;
     try {
-      if (deleting.kind === "tarefa") {
-        await softDelete.mutateAsync(deleting.id);
-        toast.success("Tarefa excluída");
-      } else {
-        await deleteSubtarefa.mutateAsync(deleting.id);
-        toast.success("Subtarefa excluída");
-      }
+      await softDelete.mutateAsync({ id: deleting.id, escopo });
+      toast.success("Tarefa excluída");
       setDeleting(null);
     } catch (error) {
-      toast.error(
-        deleting.kind === "tarefa" ? "Erro ao excluir tarefa" : "Erro ao excluir subtarefa",
-        { description: getSupabaseErrorMessage(error as Error) },
-      );
+      toast.error("Erro ao excluir tarefa", {
+        description: getSupabaseErrorMessage(error as Error),
+      });
+      throw error;
+    }
+  };
+
+  const handleDeleteSubtarefa = async () => {
+    if (!deleting || deleting.kind !== "subtarefa") return;
+    try {
+      await deleteSubtarefa.mutateAsync(deleting.id);
+      toast.success("Subtarefa excluída");
+      setDeleting(null);
+    } catch (error) {
+      toast.error("Erro ao excluir subtarefa", {
+        description: getSupabaseErrorMessage(error as Error),
+      });
       throw error;
     }
   };
@@ -149,6 +160,7 @@ export function AgendaAtrasadasSection({
                         kind: "tarefa",
                         id: item.tarefa.id,
                         titulo: item.tarefa.titulo,
+                        isSerie: pertenceASerie(item.tarefa),
                       })
                     }
                   />
@@ -187,14 +199,24 @@ export function AgendaAtrasadasSection({
         )}
       </ul>
 
-      <ConfirmDeleteDialog
-        open={!!deleting}
+      <ConfirmSerieDeleteDialog
+        open={deleting?.kind === "tarefa"}
         onOpenChange={(open) => {
           if (!open) setDeleting(null);
         }}
-        itemKind={deleting?.kind === "subtarefa" ? "subtarefa" : "tarefa"}
-        itemName={deleting?.titulo}
-        onConfirm={handleDelete}
+        itemName={deleting?.kind === "tarefa" ? deleting.titulo : null}
+        isSerie={deleting?.kind === "tarefa" ? deleting.isSerie : false}
+        onConfirm={handleDeleteTarefa}
+      />
+
+      <ConfirmDeleteDialog
+        open={deleting?.kind === "subtarefa"}
+        onOpenChange={(open) => {
+          if (!open) setDeleting(null);
+        }}
+        itemKind="subtarefa"
+        itemName={deleting?.kind === "subtarefa" ? deleting.titulo : null}
+        onConfirm={handleDeleteSubtarefa}
       />
     </section>
   );

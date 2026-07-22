@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft, Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { ConfirmDeleteDialog } from "@/components/common/confirm-delete-dialog";
+import { ConfirmSerieDeleteDialog } from "@/components/tarefas/confirm-serie-delete-dialog";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -15,12 +15,14 @@ import { usePessoas } from "@/hooks/use-pessoas";
 import { useProjetos } from "@/hooks/use-projetos";
 import { useProfile } from "@/hooks/use-profile";
 import { useSetores } from "@/hooks/use-setores";
-import { useSoftDeleteTarefa, useUpdateTarefaConclusao } from "@/hooks/use-tarefas";
+import { useSoftDeleteTarefaComEscopo, useUpdateTarefaConclusao } from "@/hooks/use-tarefas";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
+import type { EscopoExclusaoSerie } from "@/services/tarefa-recorrencia";
 import type { TarefaWithRelations } from "@/types";
 import { readAgendaClassificarPreference } from "@/utils/agenda-classificar-preference";
 import { readAgendaViewPreference } from "@/utils/agenda-view-preference";
 import { isAdmin, isAdminOrGerente, isGerente } from "@/utils/permissions";
+import { pertenceASerie } from "@/utils/recorrencia";
 import { canEditTarefa, canToggleTarefaConclusao } from "@/utils/tarefas";
 
 export const Route = createFileRoute("/_authenticated/equipe_/$pessoaId")({
@@ -51,7 +53,7 @@ function EquipePessoaAgendaPage() {
   const [deleting, setDeleting] = useState<TarefaWithRelations | null>(null);
 
   const updateConclusao = useUpdateTarefaConclusao();
-  const softDelete = useSoftDeleteTarefa();
+  const softDelete = useSoftDeleteTarefaComEscopo();
 
   useEffect(() => {
     if (!profile?.id) return;
@@ -120,10 +122,10 @@ function EquipePessoaAgendaPage() {
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = async (escopo: EscopoExclusaoSerie) => {
     if (!deleting) return;
     try {
-      await softDelete.mutateAsync(deleting.id);
+      await softDelete.mutateAsync({ id: deleting.id, escopo });
       toast.success("Tarefa excluída");
       setDeleting(null);
       if (panelId === deleting.id) {
@@ -279,18 +281,13 @@ function EquipePessoaAgendaPage() {
         onSaved={(id) => setPanelId(id)}
       />
 
-      <ConfirmDeleteDialog
+      <ConfirmSerieDeleteDialog
         open={!!deleting}
         onOpenChange={(open) => {
           if (!open) setDeleting(null);
         }}
-        itemKind="tarefa"
         itemName={deleting?.titulo}
-        description={
-          deleting
-            ? `Excluir a tarefa "${deleting.titulo}"? Ela será removida da listagem (exclusão lógica). Esta ação não pode ser desfeita.`
-            : undefined
-        }
+        isSerie={!!deleting && pertenceASerie(deleting)}
         onConfirm={handleDelete}
       />
     </div>

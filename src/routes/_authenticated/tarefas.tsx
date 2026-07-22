@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { ConfirmDeleteDialog } from "@/components/common/confirm-delete-dialog";
+import { ConfirmSerieDeleteDialog } from "@/components/tarefas/confirm-serie-delete-dialog";
 import { AgendaEmBreveView } from "@/components/tarefas/agenda-em-breve-view";
 import { AgendaHojeView } from "@/components/tarefas/agenda-hoje-view";
 import {
@@ -22,13 +22,15 @@ import { usePessoas } from "@/hooks/use-pessoas";
 import { useProjetos } from "@/hooks/use-projetos";
 import { useProfile } from "@/hooks/use-profile";
 import { useSetores } from "@/hooks/use-setores";
-import { useSoftDeleteTarefa, useUpdateTarefaConclusao } from "@/hooks/use-tarefas";
+import { useSoftDeleteTarefaComEscopo, useUpdateTarefaConclusao } from "@/hooks/use-tarefas";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
+import type { EscopoExclusaoSerie } from "@/services/tarefa-recorrencia";
 import type { SubtarefaAgendaItem, TarefaWithRelations } from "@/types";
 import { localDateAtNoon, startOfTodayLocal } from "@/utils/agenda-datas";
 import { readAgendaClassificarPreference } from "@/utils/agenda-classificar-preference";
 import { readAgendaViewPreference } from "@/utils/agenda-view-preference";
 import { isAdmin, isGerente } from "@/utils/permissions";
+import { pertenceASerie } from "@/utils/recorrencia";
 import { canEditTarefa, canToggleTarefaConclusao } from "@/utils/tarefas";
 
 type AgendaSearch = {
@@ -133,7 +135,7 @@ function AgendaPage() {
   }, [search.tarefaId, search.aba, search.comentarioId, search.subtarefaId]);
 
   const updateConclusao = useUpdateTarefaConclusao();
-  const softDelete = useSoftDeleteTarefa();
+  const softDelete = useSoftDeleteTarefaComEscopo();
 
   const pessoasAtivas = useMemo(
     () => (pessoas ?? []).filter((p) => p.ativo),
@@ -201,10 +203,10 @@ function AgendaPage() {
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = async (escopo: EscopoExclusaoSerie) => {
     if (!deleting) return;
     try {
-      await softDelete.mutateAsync(deleting.id);
+      await softDelete.mutateAsync({ id: deleting.id, escopo });
       toast.success("Tarefa excluída");
       setDeleting(null);
       if (panelId === deleting.id) {
@@ -387,18 +389,13 @@ function AgendaPage() {
         initialSubtarefaId={panelSubtarefaId}
       />
 
-      <ConfirmDeleteDialog
+      <ConfirmSerieDeleteDialog
         open={!!deleting}
         onOpenChange={(open) => {
           if (!open) setDeleting(null);
         }}
-        itemKind="tarefa"
         itemName={deleting?.titulo}
-        description={
-          deleting
-            ? `Excluir a tarefa "${deleting.titulo}"? Ela será removida da listagem (exclusão lógica). Esta ação não pode ser desfeita.`
-            : undefined
-        }
+        isSerie={!!deleting && pertenceASerie(deleting)}
         onConfirm={handleDelete}
       />
     </div>

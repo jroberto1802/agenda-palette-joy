@@ -101,12 +101,26 @@ export type TarefaWithRelations = Tarefa & {
   }[];
 };
 
-export type RecorrenciaTipo = "nenhuma" | "diaria" | "semanal" | "mensal";
+export type RecorrenciaTipo =
+  | "nenhuma"
+  | "diaria"
+  | "semanal"
+  | "mensal"
+  | "personalizada";
+
+export type RecorrenciaUnidade = "dias" | "semanas" | "meses";
 
 export type RecorrenciaConfig = {
   tipo: RecorrenciaTipo;
+  /** Semanal: 0=Dom … 6=Sáb */
   dias_semana?: number[];
+  /** Mensal: dia do mês (1–28) */
   dia_mes?: number;
+  /** Personalizada: intervalo (a cada X) */
+  intervalo?: number;
+  unidade?: RecorrenciaUnidade;
+  /** Personalizada: datas livres YYYY-MM-DD */
+  datas_livres?: string[];
   data_fim?: string | null;
 };
 

@@ -31,6 +31,12 @@ import {
   updateTarefaConclusao,
   updateTarefaDataInicio,
 } from "@/services/tarefas";
+import {
+  softDeleteTarefaComEscopo,
+  updateTarefaComEscopoSerie,
+  type EscopoEdicaoSerie,
+  type EscopoExclusaoSerie,
+} from "@/services/tarefa-recorrencia";
 import type {
   SubtarefaAgendaFilters,
   SubtarefaDetail,
@@ -166,6 +172,31 @@ export function useSoftDeleteTarefa() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => softDeleteTarefa(id),
+    onSuccess: () => invalidateTarefas(queryClient),
+  });
+}
+
+export function useSoftDeleteTarefaComEscopo() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, escopo }: { id: string; escopo: EscopoExclusaoSerie }) =>
+      softDeleteTarefaComEscopo(id, escopo),
+    onSuccess: () => invalidateTarefas(queryClient),
+  });
+}
+
+export function useUpdateTarefaComEscopoSerie() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      data,
+      escopo,
+    }: {
+      id: string;
+      data: TarefaFormData;
+      escopo: EscopoEdicaoSerie;
+    }) => updateTarefaComEscopoSerie(id, data, escopo, updateTarefa),
     onSuccess: () => invalidateTarefas(queryClient),
   });
 }

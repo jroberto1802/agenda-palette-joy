@@ -42,6 +42,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { useEmpresaConfig } from "@/hooks/use-empresa";
+import { useMaterializarRecorrencias } from "@/hooks/use-materializar-recorrencias";
 import { useProfile } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
 import { EMPRESA_NOME_PADRAO } from "@/services/empresa";
@@ -146,6 +147,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { data: empresa } = useEmpresaConfig();
   const { mode, toggleMode } = useTheme();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  useMaterializarRecorrencias();
 
   const [novaTarefaOpen, setNovaTarefaOpen] = useState(false);
   const [novaTarefaId, setNovaTarefaId] = useState<string | null>(null);

@@ -4,7 +4,7 @@ import { ptBR } from "date-fns/locale";
 import { ArrowLeft, Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { ConfirmDeleteDialog } from "@/components/common/confirm-delete-dialog";
+import { ConfirmSerieDeleteDialog } from "@/components/tarefas/confirm-serie-delete-dialog";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,12 +21,14 @@ import { usePessoas } from "@/hooks/use-pessoas";
 import { useProjeto, useProjetoMembros } from "@/hooks/use-projetos";
 import { useProfile } from "@/hooks/use-profile";
 import { useSetores } from "@/hooks/use-setores";
-import { useSoftDeleteTarefa, useUpdateTarefaConclusao } from "@/hooks/use-tarefas";
+import { useSoftDeleteTarefaComEscopo, useUpdateTarefaConclusao } from "@/hooks/use-tarefas";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
+import type { EscopoExclusaoSerie } from "@/services/tarefa-recorrencia";
 import type { TarefaWithRelations } from "@/types";
 import { readAgendaClassificarPreference } from "@/utils/agenda-classificar-preference";
 import { readAgendaViewPreference } from "@/utils/agenda-view-preference";
 import { canManageProjetoMembros, isAdmin, isGerente } from "@/utils/permissions";
+import { pertenceASerie } from "@/utils/recorrencia";
 import { PROJETO_STATUS_BADGE_CLASS, PROJETO_STATUS_LABELS } from "@/utils/projetos";
 import { canEditTarefa, canToggleTarefaConclusao } from "@/utils/tarefas";
 import { cn } from "@/lib/utils";
@@ -55,7 +57,7 @@ function ProjetoDetailPage() {
   const [deleting, setDeleting] = useState<TarefaWithRelations | null>(null);
 
   const updateConclusao = useUpdateTarefaConclusao();
-  const softDelete = useSoftDeleteTarefa();
+  const softDelete = useSoftDeleteTarefaComEscopo();
 
   useEffect(() => {
     if (!profile?.id) return;
@@ -122,10 +124,10 @@ function ProjetoDetailPage() {
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = async (escopo: EscopoExclusaoSerie) => {
     if (!deleting) return;
     try {
-      await softDelete.mutateAsync(deleting.id);
+      await softDelete.mutateAsync({ id: deleting.id, escopo });
       toast.success("Tarefa excluída");
       setDeleting(null);
       if (panelId === deleting.id) {
@@ -269,18 +271,13 @@ function ProjetoDetailPage() {
         canManage={canManageProjetoMembros(profile, projeto)}
       />
 
-      <ConfirmDeleteDialog
+      <ConfirmSerieDeleteDialog
         open={!!deleting}
         onOpenChange={(open) => {
           if (!open) setDeleting(null);
         }}
-        itemKind="tarefa"
         itemName={deleting?.titulo}
-        description={
-          deleting
-            ? `Excluir a tarefa "${deleting.titulo}"? Ela será removida da listagem (exclusão lógica). Esta ação não pode ser desfeita.`
-            : undefined
-        }
+        isSerie={!!deleting && pertenceASerie(deleting)}
         onConfirm={handleDelete}
       />
     </div>

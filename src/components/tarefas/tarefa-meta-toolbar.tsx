@@ -36,10 +36,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { RecorrenciaPopover } from "@/components/tarefas/recorrencia-popover";
 import { cn } from "@/lib/utils";
 import type {
   ProfileWithSetor,
   Projeto,
+  RecorrenciaConfig,
+  RecorrenciaTipo,
   SetorWithGerente,
   TarefaLembreteOpcao,
   TarefaPrioridade,
@@ -52,6 +55,8 @@ import {
   TAREFA_VISIBILIDADE_LABELS,
   TAREFA_VISIBILIDADE_OPTIONS,
 } from "@/utils/tarefas";
+import { formatRecorrencia, parseRecorrencia } from "@/utils/recorrencia";
+import { useState } from "react";
 
 /** Acima de Dialog/Sheet (z-50) e do drawer de subtarefa (z-[70]). */
 const META_OVERLAY_Z = "z-[100]";
@@ -117,7 +122,7 @@ function DatePopoverBody({
       <Calendar
         mode="single"
         selected={value ?? undefined}
-        onSelect={onChange}
+        onSelect={(date) => onChange(date ?? null)}
         locale={ptBR}
         initialFocus
       />
@@ -150,6 +155,8 @@ export function TarefaMetaToolbar({
   pessoasAtivas,
   emptyResponsavelLabel,
   requireResponsavel = true,
+  /** Subtarefas não possuem recorrência própria. */
+  hideRecorrencia = false,
 }: {
   form: UseFormReturn<TarefaMetaFormValues & Record<string, unknown>>;
   canEdit: boolean;
@@ -164,7 +171,9 @@ export function TarefaMetaToolbar({
   emptyResponsavelLabel: string;
   /** Na tarefa principal é obrigatório; subtarefa pode ficar sem responsável. */
   requireResponsavel?: boolean;
+  hideRecorrencia?: boolean;
 }) {
+  const [recorrenciaOpen, setRecorrenciaOpen] = useState(false);
   const projetoId = form.watch("projeto_id");
   const setorId = form.watch("setor_id");
   const atribuidoIds = form.watch("atribuido_ids") ?? [];
@@ -172,6 +181,26 @@ export function TarefaMetaToolbar({
   const dataInicio = form.watch("data_inicio");
   const prioridade = form.watch("prioridade");
   const lembretes = form.watch("lembretes") ?? [];
+  const recorrenciaTipo = (form.watch("recorrencia_tipo") as RecorrenciaTipo | undefined) ?? "nenhuma";
+  const recorrenciaDias = (form.watch("recorrencia_dias_semana") as number[] | undefined) ?? [];
+  const recorrenciaDiaMes = (form.watch("recorrencia_dia_mes") as number | undefined) ?? 1;
+  const recorrenciaIntervalo = (form.watch("recorrencia_intervalo") as number | undefined) ?? 1;
+  const recorrenciaUnidade =
+    (form.watch("recorrencia_unidade") as RecorrenciaConfig["unidade"] | undefined) ?? "dias";
+  const recorrenciaDatasLivres =
+    (form.watch("recorrencia_datas_livres") as string[] | undefined) ?? [];
+
+  const recorrenciaAtual: RecorrenciaConfig | null =
+    recorrenciaTipo === "nenhuma"
+      ? null
+      : {
+          tipo: recorrenciaTipo,
+          dias_semana: recorrenciaDias,
+          dia_mes: recorrenciaDiaMes,
+          intervalo: recorrenciaIntervalo,
+          unidade: recorrenciaUnidade,
+          datas_livres: recorrenciaDatasLivres,
+        };
 
   const projetoNome = projetos.find((p) => p.id === projetoId)?.nome;
   const setorNome = setores.find((s) => s.id === setorId)?.nome;
@@ -542,22 +571,51 @@ export function TarefaMetaToolbar({
           )}
         />
 
-        {/* Recorrência (stub) */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <span>
-              <MetaIconButton label="Recorrência" disabled={!canEdit}>
-                <RefreshCw className="h-4 w-4" />
-              </MetaIconButton>
-            </span>
-          </PopoverTrigger>
-          <PopoverContent className={cn("w-64 p-3", META_OVERLAY_Z)} align="start">
-            <p className="text-sm font-medium">Recorrência</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Funcionalidade disponível em breve.
-            </p>
-          </PopoverContent>
-        </Popover>
+        {/* Recorrência — apenas tarefas */}
+        {!hideRecorrencia && (
+          <RecorrenciaPopover
+            value={parseRecorrencia(recorrenciaAtual)}
+            canEdit={canEdit}
+            open={recorrenciaOpen}
+            onOpenChange={setRecorrenciaOpen}
+            confirmAlteracao={!!parseRecorrencia(recorrenciaAtual)}
+            onConfirm={(config) => {
+              form.setValue("recorrencia_tipo", config?.tipo ?? "nenhuma", {
+                shouldDirty: true,
+              });
+              form.setValue("recorrencia_dias_semana", config?.dias_semana ?? [], {
+                shouldDirty: true,
+              });
+              form.setValue("recorrencia_dia_mes", config?.dia_mes ?? 1, {
+                shouldDirty: true,
+              });
+              form.setValue("recorrencia_intervalo", config?.intervalo ?? 1, {
+                shouldDirty: true,
+              });
+              form.setValue("recorrencia_unidade", config?.unidade ?? "dias", {
+                shouldDirty: true,
+              });
+              form.setValue("recorrencia_datas_livres", config?.datas_livres ?? [], {
+                shouldDirty: true,
+              });
+            }}
+            trigger={
+              <span>
+                <MetaIconButton
+                  label={
+                    parseRecorrencia(recorrenciaAtual)
+                      ? formatRecorrencia(parseRecorrencia(recorrenciaAtual))
+                      : "Recorrência"
+                  }
+                  active={!!parseRecorrencia(recorrenciaAtual)}
+                  disabled={!canEdit}
+                >
+                  <RefreshCw className="h-4 w-4" />
+                </MetaIconButton>
+              </span>
+            }
+          />
+        )}
       </div>
     </TooltipProvider>
   );

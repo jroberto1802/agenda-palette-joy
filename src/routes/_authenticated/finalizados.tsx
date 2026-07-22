@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { ConfirmDeleteDialog } from "@/components/common/confirm-delete-dialog";
+import { ConfirmSerieDeleteDialog } from "@/components/tarefas/confirm-serie-delete-dialog";
 import {
   createAgendaBoardState,
   TarefaAgendaBoard,
@@ -12,11 +12,13 @@ import { usePessoas } from "@/hooks/use-pessoas";
 import { useProjetos } from "@/hooks/use-projetos";
 import { useProfile } from "@/hooks/use-profile";
 import { useSetores } from "@/hooks/use-setores";
-import { useSoftDeleteTarefa, useUpdateTarefaConclusao } from "@/hooks/use-tarefas";
+import { useSoftDeleteTarefaComEscopo, useUpdateTarefaConclusao } from "@/hooks/use-tarefas";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
+import type { EscopoExclusaoSerie } from "@/services/tarefa-recorrencia";
 import type { TarefaWithRelations } from "@/types";
 import { readAgendaViewPreference } from "@/utils/agenda-view-preference";
 import { isAdmin, isGerente } from "@/utils/permissions";
+import { pertenceASerie } from "@/utils/recorrencia";
 import { canEditTarefa, canToggleTarefaConclusao } from "@/utils/tarefas";
 
 type FinalizadosSearch = {
@@ -68,7 +70,7 @@ function FinalizadosPage() {
   }, [profile?.id]);
 
   const updateConclusao = useUpdateTarefaConclusao();
-  const softDelete = useSoftDeleteTarefa();
+  const softDelete = useSoftDeleteTarefaComEscopo();
 
   const pessoasAtivas = useMemo(
     () => (pessoas ?? []).filter((p) => p.ativo),
@@ -109,10 +111,10 @@ function FinalizadosPage() {
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = async (escopo: EscopoExclusaoSerie) => {
     if (!deleting) return;
     try {
-      await softDelete.mutateAsync(deleting.id);
+      await softDelete.mutateAsync({ id: deleting.id, escopo });
       toast.success("Tarefa excluída");
       setDeleting(null);
       if (panelId === deleting.id) {
@@ -175,18 +177,13 @@ function FinalizadosPage() {
         onSaved={(id) => setPanelId(id)}
       />
 
-      <ConfirmDeleteDialog
+      <ConfirmSerieDeleteDialog
         open={!!deleting}
         onOpenChange={(open) => {
           if (!open) setDeleting(null);
         }}
-        itemKind="tarefa"
         itemName={deleting?.titulo}
-        description={
-          deleting
-            ? `Excluir a tarefa "${deleting.titulo}"? Ela será removida da listagem (exclusão lógica). Esta ação não pode ser desfeita.`
-            : undefined
-        }
+        isSerie={!!deleting && pertenceASerie(deleting)}
         onConfirm={handleDelete}
       />
     </div>

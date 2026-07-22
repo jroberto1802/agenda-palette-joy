@@ -148,7 +148,8 @@ function toFormValues(
           ? parentObservadores
           : ownObservadores,
     lembretes: parseLembretes(subtarefa?.lembretes),
-    recorrencia_tipo: rec?.tipo ?? "nenhuma",
+    recorrencia_tipo:
+      rec?.tipo && rec.tipo !== "personalizada" ? rec.tipo : "nenhuma",
     recorrencia_dias_semana: rec?.dias_semana ?? [],
     recorrencia_dia_mes: rec?.dia_mes ?? 1,
     recorrencia_data_fim: rec?.data_fim ? new Date(rec.data_fim) : null,
@@ -503,6 +504,7 @@ export function SubtarefaPanelSheet({
                       canEdit={canEdit}
                       canEditVisibility={canEditVisibility}
                       hideProjetoSetor
+                      hideRecorrencia
                       projetos={projetos ?? []}
                       setores={setoresPermitidos}
                       pessoasParaResponsavel={pessoasParaResponsavel}

@@ -1111,6 +1111,7 @@ export type Database = {
           prioridade: "P1" | "P2" | "P3" | "P4";
           projeto_id: string | null;
           recorrencia: Json | null;
+          serie_raiz_id: string | null;
           setor_id: string | null;
           tags: string[];
           titulo: string;
@@ -1136,6 +1137,7 @@ export type Database = {
           prioridade?: "P1" | "P2" | "P3" | "P4";
           projeto_id?: string | null;
           recorrencia?: Json | null;
+          serie_raiz_id?: string | null;
           setor_id?: string | null;
           tags?: string[];
           titulo: string;
@@ -1161,6 +1163,7 @@ export type Database = {
           prioridade?: "P1" | "P2" | "P3" | "P4";
           projeto_id?: string | null;
           recorrencia?: Json | null;
+          serie_raiz_id?: string | null;
           setor_id?: string | null;
           tags?: string[];
           titulo?: string;
