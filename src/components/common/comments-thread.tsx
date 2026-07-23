@@ -1,4 +1,4 @@
-import { Check, Pencil, Reply, Trash2, X } from "lucide-react";
+import { Check, CircleCheck, Pencil, Reply, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   CommentBody,
@@ -8,8 +8,13 @@ import {
 import { ConfirmDeleteDialog } from "@/components/common/confirm-delete-dialog";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
 import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import type { Papel, Profile } from "@/types";
+import type { ComentarioReacao, Papel, Profile } from "@/types";
 import {
   canMutateComentario,
   getComentarioEditadoLabel,
@@ -35,12 +40,103 @@ export type ThreadComentario = {
     nome_completo: string;
     avatar_url?: string | null;
   } | null;
+  reacoes?: ComentarioReacao[];
 };
 
 function commentPreview(conteudo: string) {
   const trimmed = conteudo.trim().replace(/\s+/g, " ");
   if (trimmed.length <= 80) return trimmed;
   return `${trimmed.slice(0, 80)}…`;
+}
+
+function CommentReacoes({
+  reacoes,
+  currentUserId,
+  canReact,
+  reacting,
+  onToggle,
+}: {
+  reacoes: ComentarioReacao[];
+  currentUserId?: string;
+  canReact: boolean;
+  reacting: boolean;
+  onToggle?: () => Promise<void>;
+}) {
+  const count = reacoes.length;
+  const reactedByMe = !!currentUserId && reacoes.some((r) => r.usuario_id === currentUserId);
+  const sorted = useMemo(
+    () =>
+      [...reacoes].sort((a, b) =>
+        (a.usuario?.nome_completo ?? "").localeCompare(b.usuario?.nome_completo ?? "", "pt-BR"),
+      ),
+    [reacoes],
+  );
+
+  return (
+    <div className="mt-1 flex items-center gap-1">
+      {canReact && onToggle && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className={cn(
+            "h-6 w-6",
+            reactedByMe
+              ? "text-emerald-600 hover:text-emerald-700"
+              : "text-muted-foreground opacity-0 group-hover:opacity-100",
+          )}
+          aria-label={reactedByMe ? "Remover reação" : "Reagir com check"}
+          aria-pressed={reactedByMe}
+          disabled={reacting}
+          onClick={() => void onToggle()}
+        >
+          <CircleCheck
+            className={cn("h-3.5 w-3.5", reactedByMe && "fill-emerald-600 text-emerald-600")}
+          />
+        </Button>
+      )}
+
+      {count > 0 && (
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              className={cn(
+                "inline-flex h-6 items-center gap-1 rounded-full border px-1.5 text-xs transition-colors",
+                reactedByMe
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                  : "border-border bg-muted/40 text-muted-foreground hover:bg-muted",
+              )}
+              aria-label={`${count} reação${count === 1 ? "" : "ões"}`}
+            >
+              <CircleCheck className="h-3 w-3 fill-emerald-600 text-emerald-600" />
+              <span>{count}</span>
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-56 p-2">
+            <p className="mb-1.5 px-1 text-xs font-medium text-muted-foreground">
+              Quem reagiu
+            </p>
+            <ul className="max-h-48 space-y-1 overflow-y-auto">
+              {sorted.map((r) => (
+                <li key={r.usuario_id} className="flex items-center gap-2 rounded-md px-1 py-1">
+                  <ProfileAvatar
+                    name={r.usuario?.nome_completo ?? "?"}
+                    avatarUrl={r.usuario?.avatar_url}
+                    className="h-6 w-6 shrink-0"
+                  />
+                  <span className="truncate text-sm">
+                    {r.usuario?.nome_completo ?? "Usuário"}
+                    {r.usuario_id === currentUserId ? " (você)" : ""}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </PopoverContent>
+        </Popover>
+      )}
+    </div>
+  );
 }
 
 export function CommentsThread({
@@ -51,6 +147,7 @@ export function CommentsThread({
   canComment,
   /** Quando false, desativa edição/exclusão (ex.: avisos). */
   allowMutate = true,
+  canReact = true,
   highlightId = null,
   idPrefix,
   pending = false,
@@ -58,6 +155,7 @@ export function CommentsThread({
   onSubmit,
   onDelete,
   onEdit,
+  onToggleReacao,
 }: {
   comentarios: ThreadComentario[];
   pessoasMencionaveis: MentionPessoa[];
@@ -65,6 +163,8 @@ export function CommentsThread({
   currentUserProfile?: Profile | null;
   canComment: boolean;
   allowMutate?: boolean;
+  /** Permite reagir (check). Default true quando onToggleReacao é passado. */
+  canReact?: boolean;
   highlightId?: string | null;
   idPrefix: string;
   pending?: boolean;
@@ -72,6 +172,7 @@ export function CommentsThread({
   onSubmit: (conteudo: string, parentId: string | null) => Promise<void>;
   onDelete?: (id: string) => Promise<void>;
   onEdit?: (id: string, conteudo: string) => Promise<void>;
+  onToggleReacao?: (comentarioId: string) => Promise<void>;
 }) {
   const [texto, setTexto] = useState("");
   const [replyingTo, setReplyingTo] = useState<ThreadComentario | null>(null);
@@ -80,6 +181,7 @@ export function CommentsThread({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTexto, setEditTexto] = useState("");
   const [editSaving, setEditSaving] = useState(false);
+  const [reactingId, setReactingId] = useState<string | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
 
   const profileForPerms = useMemo(() => {
@@ -145,6 +247,16 @@ export function CommentsThread({
     }
   };
 
+  const handleToggleReacao = async (comentarioId: string) => {
+    if (!onToggleReacao || reactingId) return;
+    setReactingId(comentarioId);
+    try {
+      await onToggleReacao(comentarioId);
+    } finally {
+      setReactingId(null);
+    }
+  };
+
   const renderItem = (c: ThreadComentario, isReply: boolean) => {
     const canMutate =
       allowMutate &&
@@ -152,6 +264,7 @@ export function CommentsThread({
       (!!onDelete || !!onEdit);
     const editLabel = getComentarioEditadoLabel(c);
     const isEditing = editingId === c.id;
+    const reacoes = c.reacoes ?? [];
 
     return (
       <div
@@ -169,11 +282,13 @@ export function CommentsThread({
           className="h-8 w-8 shrink-0"
         />
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm font-medium">{c.usuario?.nome_completo}</p>
-            <p className="text-xs text-muted-foreground">{formatDateTime(c.created_at)}</p>
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0">
+            <p className="text-sm font-medium leading-tight">{c.usuario?.nome_completo}</p>
+            <p className="text-xs leading-tight text-muted-foreground">
+              {formatDateTime(c.created_at)}
+            </p>
             {editLabel && (
-              <p className="text-xs italic text-muted-foreground">{editLabel}</p>
+              <p className="text-xs italic leading-tight text-muted-foreground">{editLabel}</p>
             )}
             {!isEditing && (
               <div className="ml-auto flex items-center gap-1">
@@ -260,7 +375,22 @@ export function CommentsThread({
               </div>
             </div>
           ) : (
-            <CommentBody content={c.conteudo} pessoas={pessoasMencionaveis} className="mt-0.5" />
+            <>
+              <CommentBody
+                content={c.conteudo}
+                pessoas={pessoasMencionaveis}
+                className="mt-0 leading-snug"
+              />
+              {onToggleReacao && (
+                <CommentReacoes
+                  reacoes={reacoes}
+                  currentUserId={currentUserId}
+                  canReact={canReact}
+                  reacting={reactingId === c.id}
+                  onToggle={() => handleToggleReacao(c.id)}
+                />
+              )}
+            </>
           )}
         </div>
       </div>

@@ -30,7 +30,12 @@ const AVISO_SELECT_LITE = `
 
 const COMENTARIO_SELECT = `
   *,
-  usuario:profiles!usuario_id(id, nome_completo, avatar_url)
+  usuario:profiles!usuario_id(id, nome_completo, avatar_url),
+  reacoes:aviso_comentario_reacoes(
+    usuario_id,
+    created_at,
+    usuario:profiles!aviso_comentario_reacoes_usuario_id_fkey(id, nome_completo, avatar_url)
+  )
 `;
 
 export async function listAvisos(): Promise<AvisoWithRelations[]> {

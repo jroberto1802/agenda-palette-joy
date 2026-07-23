@@ -18,7 +18,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useAvisoDetail, useCreateAvisoComentario, useSetAvisoLido } from "@/hooks/use-avisos";
+import { useAvisoDetail, useCreateAvisoComentario, useSetAvisoLido, useToggleAvisoComentarioReacao } from "@/hooks/use-avisos";
 import { usePessoas } from "@/hooks/use-pessoas";
 import { LARGE_MODAL_CONTENT_CLASS } from "@/lib/layout";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
@@ -56,6 +56,7 @@ export function AvisoDetailSheet({
   const { data: aviso, isLoading } = useAvisoDetail(avisoId);
   const { data: pessoas } = usePessoas();
   const createComentario = useCreateAvisoComentario();
+  const toggleComentarioReacao = useToggleAvisoComentarioReacao();
   const setAvisoLido = useSetAvisoLido();
   const [sideTab, setSideTab] = useState("comentarios");
 
@@ -274,6 +275,7 @@ export function AvisoDetailSheet({
                             currentUserId={userId}
                             canComment={!readOnly}
                             allowMutate={false}
+                            canReact={!readOnly}
                             highlightId={highlightComentarioId}
                             idPrefix="aviso-comentario"
                             pending={createComentario.isPending}
@@ -286,6 +288,16 @@ export function AvisoDetailSheet({
                                 });
                               } catch (error) {
                                 toast.error("Erro ao comentar", {
+                                  description: getSupabaseErrorMessage(error as Error),
+                                });
+                                throw error;
+                              }
+                            }}
+                            onToggleReacao={async (comentarioId) => {
+                              try {
+                                await toggleComentarioReacao.mutateAsync(comentarioId);
+                              } catch (error) {
+                                toast.error("Erro ao reagir", {
                                   description: getSupabaseErrorMessage(error as Error),
                                 });
                                 throw error;

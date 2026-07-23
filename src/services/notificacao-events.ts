@@ -396,6 +396,46 @@ export async function notifyTarefaResposta(params: {
   });
 }
 
+export async function notifyTarefaComentarioReacao(params: {
+  usuarioIds: string[];
+  tarefaId: string;
+  titulo: string;
+  comentarioId: string;
+  atorNome: string;
+}) {
+  await notifyEvent({
+    usuarioIds: params.usuarioIds,
+    tipo: "tarefa_comentario_reacao",
+    mensagem: `${params.atorNome} reagiu ao seu comentário na tarefa ${params.titulo}`,
+    referencia_tipo: "tarefa",
+    referencia_id: params.tarefaId,
+    meta: { aba: "comentarios", comentario_id: params.comentarioId },
+  });
+}
+
+export async function notifySubtarefaComentarioReacao(params: {
+  usuarioIds: string[];
+  tarefaId: string;
+  subtarefaId: string;
+  tarefaTitulo: string;
+  subtarefaTitulo: string;
+  comentarioId: string;
+  atorNome: string;
+}) {
+  await notifyEvent({
+    usuarioIds: params.usuarioIds,
+    tipo: "tarefa_comentario_reacao",
+    mensagem: `${params.atorNome} reagiu ao seu comentário na subtarefa ${params.subtarefaTitulo} (${params.tarefaTitulo})`,
+    referencia_tipo: "tarefa",
+    referencia_id: params.tarefaId,
+    meta: {
+      aba: "comentarios",
+      comentario_id: params.comentarioId,
+      subtarefa_id: params.subtarefaId,
+    },
+  });
+}
+
 export async function notifyAvisoNovo(params: {
   usuarioIds: string[];
   avisoId: string;
@@ -456,6 +496,23 @@ export async function notifyAvisoResposta(params: {
     usuarioIds: params.usuarioIds,
     tipo: "aviso_resposta",
     mensagem: `${params.atorNome} respondeu seu comentário no aviso ${params.titulo}`,
+    referencia_tipo: "aviso",
+    referencia_id: params.avisoId,
+    meta: { comentario_id: params.comentarioId },
+  });
+}
+
+export async function notifyAvisoComentarioReacao(params: {
+  usuarioIds: string[];
+  avisoId: string;
+  titulo: string;
+  comentarioId: string;
+  atorNome: string;
+}) {
+  await notifyEvent({
+    usuarioIds: params.usuarioIds,
+    tipo: "aviso_comentario_reacao",
+    mensagem: `${params.atorNome} reagiu ao seu comentário no aviso ${params.titulo}`,
     referencia_tipo: "aviso",
     referencia_id: params.avisoId,
     meta: { comentario_id: params.comentarioId },

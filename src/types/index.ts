@@ -244,9 +244,16 @@ export type SubtarefaFormData = {
   lembretes: TarefaLembreteOpcao[];
 };
 
+export type ComentarioReacao = {
+  usuario_id: string;
+  created_at: string;
+  usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
+};
+
 export type SubtarefaComentario = Tables<"subtarefa_comentarios"> & {
   usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url" | "papel"> | null;
   editor?: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
+  reacoes?: ComentarioReacao[];
 };
 
 export type SubtarefaDetail = SubtarefaWithAuthors & {
@@ -262,6 +269,7 @@ export type SubtarefaDetail = SubtarefaWithAuthors & {
 export type TarefaComentario = Tables<"tarefa_comentarios"> & {
   usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url" | "papel"> | null;
   editor?: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
+  reacoes?: ComentarioReacao[];
 };
 
 export type TarefaDetail = TarefaWithRelations & {
@@ -283,6 +291,7 @@ export type AvisoWithRelations = Aviso & {
 
 export type AvisoComentario = Tables<"aviso_comentarios"> & {
   usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
+  reacoes?: ComentarioReacao[];
 };
 
 export type AvisoDetail = AvisoWithRelations & {

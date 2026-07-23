@@ -801,7 +801,23 @@ export async function softDeleteTarefa(id: string): Promise<void> {
 const COMENTARIO_SELECT = `
   *,
   usuario:profiles!usuario_id(id, nome_completo, avatar_url, papel),
-  editor:profiles!editado_por(id, nome_completo, avatar_url)
+  editor:profiles!editado_por(id, nome_completo, avatar_url),
+  reacoes:tarefa_comentario_reacoes(
+    usuario_id,
+    created_at,
+    usuario:profiles!tarefa_comentario_reacoes_usuario_id_fkey(id, nome_completo, avatar_url)
+  )
+`;
+
+const SUBTAREFA_COMENTARIO_SELECT = `
+  *,
+  usuario:profiles!usuario_id(id, nome_completo, avatar_url, papel),
+  editor:profiles!editado_por(id, nome_completo, avatar_url),
+  reacoes:subtarefa_comentario_reacoes(
+    usuario_id,
+    created_at,
+    usuario:profiles!subtarefa_comentario_reacoes_usuario_id_fkey(id, nome_completo, avatar_url)
+  )
 `;
 
 export async function getTarefaDetail(id: string): Promise<TarefaDetail> {
@@ -862,7 +878,7 @@ const SUBTAREFA_DETAIL_SELECT = `
     usuario_id,
     usuario:profiles!subtarefa_observadores_usuario_id_fkey(id, nome_completo, avatar_url)
   ),
-  comentarios:subtarefa_comentarios(${COMENTARIO_SELECT}),
+  comentarios:subtarefa_comentarios(${SUBTAREFA_COMENTARIO_SELECT}),
   anexos:subtarefa_anexos(id, subtarefa_id, storage_path, nome, tipo, tamanho, created_at),
   tarefa:tarefas!subtarefas_tarefa_id_fkey(id, titulo)
 `;
@@ -1615,7 +1631,7 @@ export async function createSubtarefaComentario(
       conteudo,
       parent_id: parentId,
     })
-    .select(COMENTARIO_SELECT)
+    .select(SUBTAREFA_COMENTARIO_SELECT)
     .single();
 
   if (error) throw error;
@@ -1677,7 +1693,7 @@ export async function updateSubtarefaComentario(
       editado_por: user.id,
     })
     .eq("id", id)
-    .select(COMENTARIO_SELECT)
+    .select(SUBTAREFA_COMENTARIO_SELECT)
     .single();
 
   if (error) throw error;

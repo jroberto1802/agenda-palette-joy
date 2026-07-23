@@ -12,10 +12,12 @@ export type NotificacaoTipo =
   | "tarefa_comentario"
   | "tarefa_mencao"
   | "tarefa_resposta"
+  | "tarefa_comentario_reacao"
   | "aviso_novo"
   | "aviso_comentario"
   | "aviso_mencao"
   | "aviso_resposta"
+  | "aviso_comentario_reacao"
   | "sistema";
 
 export type NotificacaoAba = "comentarios" | "anexos";
@@ -40,10 +42,12 @@ export const NOTIFICACAO_TIPO_LABELS: Record<NotificacaoTipo, string> = {
   tarefa_comentario: "Novo comentário",
   tarefa_mencao: "Menção em comentário",
   tarefa_resposta: "Resposta ao seu comentário",
+  tarefa_comentario_reacao: "Reação ao seu comentário",
   aviso_novo: "Novo aviso",
   aviso_comentario: "Comentário em aviso",
   aviso_mencao: "Menção em aviso",
   aviso_resposta: "Resposta ao seu comentário",
+  aviso_comentario_reacao: "Reação ao seu comentário",
   sistema: "Sistema",
 };
 
@@ -62,7 +66,7 @@ export function getNotificacaoIconKind(
 ): "tarefa" | "aviso" | "comentario" | "anexo" | "sistema" {
   if (!tipo || typeof tipo !== "string") return "sistema";
   if (tipo.startsWith("aviso_")) return "aviso";
-  if (tipo.includes("comentario") || tipo.includes("mencao") || tipo.includes("resposta")) {
+  if (tipo.includes("comentario") || tipo.includes("mencao") || tipo.includes("resposta") || tipo.includes("reacao")) {
     return "comentario";
   }
   if (tipo.includes("anexo")) return "anexo";

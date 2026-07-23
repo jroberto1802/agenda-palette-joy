@@ -52,6 +52,39 @@ export type Database = {
           },
         ];
       };
+      aviso_comentario_reacoes: {
+        Row: {
+          comentario_id: string;
+          created_at: string;
+          usuario_id: string;
+        };
+        Insert: {
+          comentario_id: string;
+          created_at?: string;
+          usuario_id: string;
+        };
+        Update: {
+          comentario_id?: string;
+          created_at?: string;
+          usuario_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "aviso_comentario_reacoes_comentario_id_fkey",
+            columns: ["comentario_id"],
+            isOneToOne: false,
+            referencedRelation: "aviso_comentarios",
+            referencedColumns: ["id"],
+          },
+          {
+            foreignKeyName: "aviso_comentario_reacoes_usuario_id_fkey",
+            columns: ["usuario_id"],
+            isOneToOne: false,
+            referencedRelation: "profiles",
+            referencedColumns: ["id"],
+          },
+        ];
+      };
       aviso_lido_por: {
         Row: {
           aviso_id: string;
@@ -733,6 +766,39 @@ export type Database = {
           },
         ];
       };
+      subtarefa_comentario_reacoes: {
+        Row: {
+          comentario_id: string;
+          created_at: string;
+          usuario_id: string;
+        };
+        Insert: {
+          comentario_id: string;
+          created_at?: string;
+          usuario_id: string;
+        };
+        Update: {
+          comentario_id?: string;
+          created_at?: string;
+          usuario_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "subtarefa_comentario_reacoes_comentario_id_fkey",
+            columns: ["comentario_id"],
+            isOneToOne: false,
+            referencedRelation: "subtarefa_comentarios",
+            referencedColumns: ["id"],
+          },
+          {
+            foreignKeyName: "subtarefa_comentario_reacoes_usuario_id_fkey",
+            columns: ["usuario_id"],
+            isOneToOne: false,
+            referencedRelation: "profiles",
+            referencedColumns: ["id"],
+          },
+        ];
+      };
       subtarefa_anexos: {
         Row: {
           created_at: string;
@@ -954,6 +1020,39 @@ export type Database = {
           },
           {
             foreignKeyName: "tarefa_comentarios_usuario_id_fkey",
+            columns: ["usuario_id"],
+            isOneToOne: false,
+            referencedRelation: "profiles",
+            referencedColumns: ["id"],
+          },
+        ];
+      };
+      tarefa_comentario_reacoes: {
+        Row: {
+          comentario_id: string;
+          created_at: string;
+          usuario_id: string;
+        };
+        Insert: {
+          comentario_id: string;
+          created_at?: string;
+          usuario_id: string;
+        };
+        Update: {
+          comentario_id?: string;
+          created_at?: string;
+          usuario_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tarefa_comentario_reacoes_comentario_id_fkey",
+            columns: ["comentario_id"],
+            isOneToOne: false,
+            referencedRelation: "tarefa_comentarios",
+            referencedColumns: ["id"],
+          },
+          {
+            foreignKeyName: "tarefa_comentario_reacoes_usuario_id_fkey",
             columns: ["usuario_id"],
             isOneToOne: false,
             referencedRelation: "profiles",

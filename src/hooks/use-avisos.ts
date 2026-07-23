@@ -9,6 +9,7 @@ import {
   setAvisoLido,
   updateAviso,
 } from "@/services/avisos";
+import { toggleComentarioReacao } from "@/services/comentario-reacoes";
 import type { AvisoFormData } from "@/types";
 
 export function useAvisos() {
@@ -71,6 +72,14 @@ export function useSetAvisoLido() {
   return useMutation({
     mutationFn: ({ avisoId, lido }: { avisoId: string; lido: boolean }) =>
       setAvisoLido(avisoId, lido),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: avisoKeys.all }),
+  });
+}
+
+export function useToggleAvisoComentarioReacao() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (comentarioId: string) => toggleComentarioReacao("aviso", comentarioId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: avisoKeys.all }),
   });
 }

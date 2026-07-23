@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { subtarefaKeys, tarefaKeys } from "@/lib/query-keys";
+import { toggleComentarioReacao } from "@/services/comentario-reacoes";
 import {
   createSubtarefa,
   createSubtarefaComentario,
@@ -449,5 +450,30 @@ export function useUpdateTarefaComentario() {
     mutationFn: ({ id, conteudo }: { id: string; conteudo: string }) =>
       updateTarefaComentario(id, conteudo),
     onSuccess: () => invalidateTarefas(queryClient),
+  });
+}
+
+export function useToggleTarefaComentarioReacao() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (comentarioId: string) => toggleComentarioReacao("tarefa", comentarioId),
+    onSuccess: () => invalidateTarefas(queryClient),
+  });
+}
+
+export function useToggleSubtarefaComentarioReacao() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      comentarioId,
+      subtarefaId,
+    }: {
+      comentarioId: string;
+      subtarefaId: string;
+    }) => toggleComentarioReacao("subtarefa", comentarioId),
+    onSuccess: (_data, { subtarefaId }) => {
+      invalidateTarefas(queryClient);
+      queryClient.invalidateQueries({ queryKey: subtarefaKeys.detail(subtarefaId) });
+    },
   });
 }

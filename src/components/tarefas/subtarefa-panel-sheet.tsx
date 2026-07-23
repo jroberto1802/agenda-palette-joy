@@ -39,6 +39,7 @@ import {
   useCreateSubtarefaComentario,
   useDeleteSubtarefaComentario,
   useSubtarefaDetail,
+  useToggleSubtarefaComentarioReacao,
   useUpdateSubtarefa,
   useUpdateSubtarefaComentario,
 } from "@/hooks/use-tarefas";
@@ -198,6 +199,7 @@ export function SubtarefaPanelSheet({
   const createComentario = useCreateSubtarefaComentario();
   const deleteComentario = useDeleteSubtarefaComentario();
   const updateComentario = useUpdateSubtarefaComentario();
+  const toggleComentarioReacao = useToggleSubtarefaComentarioReacao();
 
   const [sideTab, setSideTab] = useState<"comentarios" | "anexos">(
     initialAba ?? "comentarios",
@@ -679,6 +681,20 @@ export function SubtarefaPanelSheet({
                                 });
                               } catch (error) {
                                 toast.error("Erro ao editar comentário", {
+                                  description: getSupabaseErrorMessage(error as Error),
+                                });
+                                throw error;
+                              }
+                            }}
+                            canReact={canCommentOrAttach}
+                            onToggleReacao={async (comentarioId) => {
+                              try {
+                                await toggleComentarioReacao.mutateAsync({
+                                  comentarioId,
+                                  subtarefaId: subtarefa.id,
+                                });
+                              } catch (error) {
+                                toast.error("Erro ao reagir", {
                                   description: getSupabaseErrorMessage(error as Error),
                                 });
                                 throw error;

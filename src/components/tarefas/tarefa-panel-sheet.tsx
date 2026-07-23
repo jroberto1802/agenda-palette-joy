@@ -66,6 +66,7 @@ import {
   useReorderSubtarefas,
   useTarefaDetail,
   useToggleSubtarefa,
+  useToggleTarefaComentarioReacao,
   useUpdateSubtarefaMeta,
   useUpdateTarefa,
   useUpdateTarefaComentario,
@@ -363,6 +364,7 @@ export function TarefaPanelSheet({
   const createComentario = useCreateTarefaComentario();
   const deleteComentario = useDeleteTarefaComentario();
   const updateComentario = useUpdateTarefaComentario();
+  const toggleComentarioReacao = useToggleTarefaComentarioReacao();
 
   const [novaSubtarefa, setNovaSubtarefa] = useState("");
   const [subtarefaOrder, setSubtarefaOrder] = useState<string[]>([]);
@@ -1137,6 +1139,17 @@ export function TarefaPanelSheet({
                                   await updateComentario.mutateAsync({ id, conteudo });
                                 } catch (error) {
                                   toast.error("Erro ao editar comentário", {
+                                    description: getSupabaseErrorMessage(error as Error),
+                                  });
+                                  throw error;
+                                }
+                              }}
+                              canReact={canCommentOrAttach}
+                              onToggleReacao={async (comentarioId) => {
+                                try {
+                                  await toggleComentarioReacao.mutateAsync(comentarioId);
+                                } catch (error) {
+                                  toast.error("Erro ao reagir", {
                                     description: getSupabaseErrorMessage(error as Error),
                                   });
                                   throw error;
