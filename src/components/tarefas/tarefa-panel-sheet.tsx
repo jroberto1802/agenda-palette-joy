@@ -15,7 +15,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ChevronRight, GripVertical, MessageSquare, Paperclip, Plus, Save } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -28,6 +28,11 @@ import { MoverSubtarefaDialog } from "@/components/tarefas/mover-subtarefa-dialo
 import { TarefaAnexosSection } from "@/components/tarefas/tarefa-anexos-section";
 import { TarefaMetaToolbar } from "@/components/tarefas/tarefa-meta-toolbar";
 import { TarefaPeopleStrip } from "@/components/tarefas/tarefa-people-strip";
+import {
+  filterPessoasPorEscopo,
+  getTarefaEscopoIds,
+  VISIBILIDADE_PESSOAS,
+} from "@/utils/escopo-tarefa";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -128,25 +133,11 @@ const tarefaPanelSchema = z
     recorrencia_data_fim: z.date().nullable(),
   })
   .superRefine((data, ctx) => {
-    if (data.visibilidade === "todos_setor" && !data.setor_id) {
+    if (data.atribuido_ids.length === 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'Setor é obrigatório para visibilidade "Todos do setor".',
-        path: ["setor_id"],
-      });
-    }
-    if (data.visibilidade === "todos_projeto" && !data.projeto_id) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Projeto é obrigatório para visibilidade "Todos do projeto".',
-        path: ["projeto_id"],
-      });
-    }
-    if (data.visibilidade === "pessoas_especificas" && data.observador_ids.length === 0) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Selecione ao menos uma pessoa.",
-        path: ["observador_ids"],
+        message: "Selecione ao menos um responsável.",
+        path: ["atribuido_ids"],
       });
     }
   });
@@ -188,6 +179,7 @@ function SortableSubtarefaRow({
   onUpdateMeta: (meta: {
     data_inicio?: string | null;
     atribuido_ids?: string[];
+    observador_ids?: string[];
     visibilidade?: SubtarefaWithAuthors["visibilidade"];
   }) => Promise<void>;
 }) {
@@ -257,8 +249,10 @@ function toFormValues(
         ? new Date(defaultDataInicio)
         : null,
     tagsInput: tarefa?.tags?.join(", ") ?? "",
-    visibilidade: (tarefa?.visibilidade as TarefaVisibilidade | undefined) ?? "somente_para_mim",
-    observador_ids: tarefa?.observadores?.map((o) => o.usuario_id) ?? [],
+    visibilidade: VISIBILIDADE_PESSOAS,
+    observador_ids: tarefa
+      ? (tarefa.observadores?.map((o) => o.usuario_id) ?? [])
+      : [...(atribuidoIds.length ? atribuidoIds : (defaultAtribuidoIds ?? []))],
     lembretes: parseLembretes(tarefa?.lembretes),
     recorrencia_tipo: rec?.tipo ?? "nenhuma",
     recorrencia_dias_semana: rec?.dias_semana ?? [],
@@ -310,7 +304,7 @@ function toPayload(
     data_inicio: values.data_inicio ? values.data_inicio.toISOString() : null,
     tags: parseTags(values.tagsInput),
     recorrencia: toRecorrenciaPayload(values, existingRecorrencia),
-    visibilidade: values.visibilidade,
+    visibilidade: VISIBILIDADE_PESSOAS,
     observador_ids: values.observador_ids,
     lembretes: values.lembretes,
   };
@@ -373,6 +367,8 @@ export function TarefaPanelSheet({
   const [sideTab, setSideTab] = useState<"comentarios" | "anexos">(
     initialAba ?? "comentarios",
   );
+  /** Na criação, Visibilidade acompanha Responsáveis até edição manual. */
+  const visibilidadeManualRef = useRef(false);
   const [editingField, setEditingField] = useState<EditableTarefaField | null>(null);
   const [pendingSeriePayload, setPendingSeriePayload] = useState<TarefaFormData | null>(null);
 
@@ -498,6 +494,7 @@ export function TarefaPanelSheet({
 
   useEffect(() => {
     if (!open) return;
+    visibilidadeManualRef.current = !isCreate;
     const recorrenciaOverride =
       tarefa && isSerieOcorrencia(tarefa) ? (modeloRecorrencia ?? null) : undefined;
     form.reset(
@@ -520,7 +517,15 @@ export function TarefaPanelSheet({
     defaultAtribuidoIdsKey,
     modeloRecorrencia,
     form,
+    isCreate,
   ]);
+
+  // Criação: Visibilidade = Responsáveis até o usuário editar a Visibilidade.
+  useEffect(() => {
+    if (!open || !isCreate || visibilidadeManualRef.current) return;
+    form.setValue("observador_ids", atribuidoIds ?? [], { shouldDirty: false });
+    form.setValue("visibilidade", VISIBILIDADE_PESSOAS, { shouldDirty: false });
+  }, [open, isCreate, atribuidoIds, form]);
 
   const criadorDisplay = useMemo(() => {
     if (tarefa?.criador) return tarefa.criador;
@@ -614,29 +619,21 @@ export function TarefaPanelSheet({
   };
 
   const pessoasMencionaveis = useMemo(() => {
-    const ids = new Set<string>([...(atribuidoIds ?? []), ...(observadorIds ?? [])]);
-    if (criadorDisplay?.id) ids.add(criadorDisplay.id);
-    if (projetoId) {
-      for (const m of projetoMembros ?? []) ids.add(m.id);
-    } else if (setorId) {
-      for (const p of pessoasAtivas) {
-        if (p.setor_id === setorId) ids.add(p.id);
-      }
-    }
-    for (const c of comentarios) {
-      if (c.usuario_id) ids.add(c.usuario_id);
-    }
-    return pessoasAtivas.filter((p) => ids.has(p.id));
+    const escopoIds = getTarefaEscopoIds({
+      criado_por: criadorDisplay?.id ?? tarefa?.criado_por,
+      responsaveis: (atribuidoIds ?? []).map((usuario_id) => ({ usuario_id })),
+      observadores: (observadorIds ?? []).map((usuario_id) => ({ usuario_id })),
+    });
+    return filterPessoasPorEscopo(pessoasAtivas, escopoIds);
   }, [
     atribuidoIds,
     observadorIds,
     criadorDisplay?.id,
-    projetoId,
-    projetoMembros,
-    setorId,
+    tarefa?.criado_por,
     pessoasAtivas,
-    comentarios,
   ]);
+
+  const pessoasEscopoTarefa = pessoasMencionaveis;
 
   const applySave = async (payload: TarefaFormData, escopo?: EscopoEdicaoSerie) => {
     if (isCreate) {
@@ -843,12 +840,16 @@ export function TarefaPanelSheet({
                       projetos={projetos ?? []}
                       setores={setoresPermitidos}
                       pessoasParaResponsavel={pessoasParaResponsavel}
-                      pessoasAtivas={pessoasAtivas}
+                      pessoasParaVisibilidade={pessoasAtivas}
+                      onVisibilidadeManualChange={() => {
+                        visibilidadeManualRef.current = true;
+                      }}
                       emptyResponsavelLabel={
                         projetoId
                           ? "Defina a equipe do projeto antes de atribuir responsáveis"
                           : "Nenhuma pessoa disponível"
                       }
+                      emptyVisibilidadeLabel="Nenhuma pessoa disponível"
                     />
 
                     <TarefaPeopleStrip
@@ -990,7 +991,7 @@ export function TarefaPanelSheet({
                                     key={sub.id}
                                     subtarefa={sub}
                                     canEdit={canEdit}
-                                    pessoasDisponiveis={pessoasMencionaveis}
+                                    pessoasDisponiveis={pessoasEscopoTarefa}
                                     onOpen={() => setSubtarefaDrawerId(sub.id)}
                                     onToggle={async (concluida) => {
                                       applySubtarefaConclusaoOrder(sub.id, concluida);

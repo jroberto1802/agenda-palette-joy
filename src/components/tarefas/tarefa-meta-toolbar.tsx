@@ -52,8 +52,6 @@ import {
   TAREFA_LEMBRETE_LABELS,
   TAREFA_PRIORIDADE_DOT,
   TAREFA_PRIORIDADE_LABELS,
-  TAREFA_VISIBILIDADE_LABELS,
-  TAREFA_VISIBILIDADE_OPTIONS,
 } from "@/utils/tarefas";
 import { parseRecorrencia } from "@/utils/recorrencia";
 
@@ -118,11 +116,13 @@ export function TarefaMetaToolbar({
   projetos,
   setores,
   pessoasParaResponsavel,
-  pessoasAtivas,
+  pessoasParaVisibilidade,
   emptyResponsavelLabel,
+  emptyVisibilidadeLabel = "Nenhuma pessoa disponível",
   requireResponsavel = true,
   /** Subtarefas não possuem recorrência própria. */
   hideRecorrencia = false,
+  onVisibilidadeManualChange,
 }: {
   form: UseFormReturn<TarefaMetaFormValues & Record<string, unknown>>;
   canEdit: boolean;
@@ -133,16 +133,19 @@ export function TarefaMetaToolbar({
   projetos: Pick<Projeto, "id" | "nome">[];
   setores: SetorWithGerente[];
   pessoasParaResponsavel: ProfileWithSetor[];
-  pessoasAtivas: ProfileWithSetor[];
+  /** Lista do seletor de Visibilidade (tarefa: todos; subtarefa: escopo da pai). */
+  pessoasParaVisibilidade: ProfileWithSetor[];
   emptyResponsavelLabel: string;
+  emptyVisibilidadeLabel?: string;
   /** Na tarefa principal é obrigatório; subtarefa pode ficar sem responsável. */
   requireResponsavel?: boolean;
   hideRecorrencia?: boolean;
+  /** Chamado quando o usuário edita a Visibilidade manualmente (desliga sync com responsáveis). */
+  onVisibilidadeManualChange?: () => void;
 }) {
   const projetoId = form.watch("projeto_id");
   const setorId = form.watch("setor_id");
   const atribuidoIds = form.watch("atribuido_ids") ?? [];
-  const visibilidade = form.watch("visibilidade");
   const dataInicio = form.watch("data_inicio");
   const prioridade = form.watch("prioridade");
   const lembretes = form.watch("lembretes") ?? [];
@@ -357,66 +360,48 @@ export function TarefaMetaToolbar({
           )}
         />
 
-        {/* Visibilidade */}
+        {/* Visibilidade — seletor de pessoas (mesmo componente dos Responsáveis) */}
         <FormField
           control={form.control}
-          name="visibilidade"
+          name="observador_ids"
           render={({ field }) => (
             <FormItem className="space-y-0">
               <Popover>
                 <PopoverTrigger asChild>
                   <span>
                     <MetaIconButton
-                      label={`Visibilidade: ${TAREFA_VISIBILIDADE_LABELS[field.value]}`}
-                      active={field.value !== "somente_para_mim"}
+                      label={
+                        field.value?.length
+                          ? `Visibilidade: ${field.value.length}`
+                          : "Visibilidade"
+                      }
+                      active={(field.value?.length ?? 0) > 0}
                       disabled={!canEditVisibility}
                     >
                       <Eye className="h-4 w-4" />
                     </MetaIconButton>
                   </span>
                 </PopoverTrigger>
-                <PopoverContent className={cn("w-80 space-y-3 p-3", META_OVERLAY_Z)} align="start">
+                <PopoverContent className={cn("w-80 space-y-2 p-3", META_OVERLAY_Z)} align="start">
                   <p className="text-xs font-medium text-muted-foreground">Visibilidade</p>
-                  <Select
-                    value={field.value}
-                    onValueChange={(v) => field.onChange(v as TarefaVisibilidade)}
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    Criador e responsáveis sempre têm acesso, mesmo fora desta lista.
+                  </p>
+                  <PessoasMultiSelect
+                    pessoas={pessoasParaVisibilidade}
+                    value={field.value ?? []}
+                    onChange={(ids) => {
+                      field.onChange(ids);
+                      form.setValue("visibilidade", "pessoas_especificas", {
+                        shouldDirty: true,
+                      });
+                      onVisibilidadeManualChange?.();
+                    }}
                     disabled={!canEditVisibility}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent className={META_OVERLAY_Z}>
-                      {TAREFA_VISIBILIDADE_OPTIONS.map((value) => (
-                        <SelectItem key={value} value={value}>
-                          {TAREFA_VISIBILIDADE_LABELS[value]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  {visibilidade === "pessoas_especificas" && (
-                    <FormField
-                      control={form.control}
-                      name="observador_ids"
-                      render={({ field: obsField }) => (
-                        <FormItem className="space-y-2">
-                          <p className="text-xs text-muted-foreground">Pessoas com acesso</p>
-                          <PessoasMultiSelect
-                            pessoas={pessoasAtivas}
-                            value={obsField.value}
-                            onChange={obsField.onChange}
-                            disabled={!canEditVisibility}
-                            placeholder="Selecione visualizadores"
-                            emptyLabel="Nenhuma pessoa disponível"
-                            searchPlaceholder="Buscar visualizador..."
-                          />
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
+                    placeholder="Selecione pessoas"
+                    emptyLabel={emptyVisibilidadeLabel}
+                    searchPlaceholder="Buscar por nome..."
+                  />
                   <FormMessage />
                 </PopoverContent>
               </Popover>

@@ -178,3 +178,22 @@ export function extractMentionedUserIds(
 
   return [...mentioned];
 }
+
+/**
+ * Bloqueia @ de pessoas fora da lista permitida (mesmo se digitadas manualmente).
+ * Compara menções resolvidas contra todos os perfis ativos vs. candidatos do escopo.
+ */
+export function assertMentionsDentroDoEscopo(
+  conteudo: string,
+  permitidos: { id: string; nome_completo: string }[],
+  todosAtivos: { id: string; nome_completo: string }[],
+  mensagem: string,
+): void {
+  if (!conteudo.includes("@")) return;
+  const mencionados = extractMentionedUserIds(conteudo, todosAtivos);
+  if (mencionados.length === 0) return;
+  const allowed = new Set(permitidos.map((p) => p.id));
+  if (mencionados.some((id) => !allowed.has(id))) {
+    throw new Error(mensagem);
+  }
+}

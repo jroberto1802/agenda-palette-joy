@@ -335,6 +335,7 @@ export function useUpdateSubtarefaMeta() {
       data: {
         data_inicio?: string | null;
         atribuido_ids?: string[];
+        observador_ids?: string[];
         visibilidade?: import("@/types").Subtarefa["visibilidade"];
       };
     }) => updateSubtarefaMeta(id, data),

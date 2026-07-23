@@ -1,7 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
 import { notifyUsers } from "@/services/notificacoes";
 import type { NotificacaoMeta, NotificacaoTipo } from "@/utils/notificacoes";
-import { extractMentionedUserIds } from "@/utils/notificacoes";
+import { assertMentionsDentroDoEscopo, extractMentionedUserIds } from "@/utils/notificacoes";
+import { MENCAO_FORA_DO_ESCOPO_MSG } from "@/utils/escopo-tarefa";
 import { formatDate } from "@/utils/formatters";
 import { TAREFA_PRIORIDADE_LABELS } from "@/utils/tarefas";
 import type { TarefaPrioridade, TarefaVisibilidade } from "@/types";
@@ -535,13 +536,31 @@ export async function resolveMentionIds(
   return extractMentionedUserIds(conteudo, pessoas ?? []);
 }
 
-/** Pessoas elegíveis para @ em uma tarefa (projeto/setor/responsáveis/acesso). */
+/** Bloqueia menções a usuários fora do escopo do item. */
+export async function assertMentionsPermitidas(
+  conteudo: string,
+  permitidos: { id: string; nome_completo: string }[],
+): Promise<void> {
+  if (!conteudo.includes("@")) return;
+  const { data: todos } = await supabase
+    .from("profiles")
+    .select("id, nome_completo")
+    .eq("ativo", true);
+  assertMentionsDentroDoEscopo(
+    conteudo,
+    permitidos,
+    todos ?? [],
+    MENCAO_FORA_DO_ESCOPO_MSG,
+  );
+}
+
+/** Pessoas elegíveis para @ em uma tarefa — somente o escopo (criador + responsáveis + visibilidade). */
 export async function listTarefaMencionaveis(
   tarefaId: string,
 ): Promise<{ id: string; nome_completo: string; avatar_url: string | null }[]> {
   const { data: tarefa } = await supabase
     .from("tarefas")
-    .select("criado_por, setor_id, projeto_id")
+    .select("criado_por")
     .eq("id", tarefaId)
     .single();
 
@@ -558,21 +577,6 @@ export async function listTarefaMencionaveis(
   for (const row of responsaveis ?? []) ids.add(row.usuario_id);
   for (const row of observadores ?? []) ids.add(row.usuario_id);
 
-  if (tarefa.projeto_id) {
-    const { data: membros } = await supabase
-      .from("projeto_membros")
-      .select("usuario_id")
-      .eq("projeto_id", tarefa.projeto_id);
-    for (const row of membros ?? []) ids.add(row.usuario_id);
-  } else if (tarefa.setor_id) {
-    const { data: doSetor } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("ativo", true)
-      .eq("setor_id", tarefa.setor_id);
-    for (const row of doSetor ?? []) ids.add(row.id);
-  }
-
   if (ids.size === 0) return [];
 
   const { data: pessoas } = await supabase
@@ -588,13 +592,13 @@ export async function listTarefaMencionaveis(
   }));
 }
 
-/** Pessoas elegíveis para @ em uma subtarefa (responsáveis/observadores/acesso da tarefa pai). */
+/** Pessoas elegíveis para @ em uma subtarefa — somente o escopo da subtarefa. */
 export async function listSubtarefaMencionaveis(
   subtarefaId: string,
 ): Promise<{ id: string; nome_completo: string; avatar_url: string | null }[]> {
   const { data: subtarefa } = await supabase
     .from("subtarefas")
-    .select("criado_por, tarefa_id, setor_id, projeto_id")
+    .select("criado_por, tarefa_id")
     .eq("id", subtarefaId)
     .single();
 
@@ -603,7 +607,7 @@ export async function listSubtarefaMencionaveis(
   const ids = new Set<string>();
   if (subtarefa.criado_por) ids.add(subtarefa.criado_por);
 
-  const [{ data: responsaveis }, { data: observadores }, mencionaveisTarefa] = await Promise.all([
+  const [{ data: responsaveis }, { data: observadores }] = await Promise.all([
     supabase
       .from("subtarefa_responsaveis")
       .select("usuario_id")
@@ -612,27 +616,10 @@ export async function listSubtarefaMencionaveis(
       .from("subtarefa_observadores")
       .select("usuario_id")
       .eq("subtarefa_id", subtarefaId),
-    listTarefaMencionaveis(subtarefa.tarefa_id),
   ]);
 
   for (const row of responsaveis ?? []) ids.add(row.usuario_id);
   for (const row of observadores ?? []) ids.add(row.usuario_id);
-  for (const pessoa of mencionaveisTarefa) ids.add(pessoa.id);
-
-  if (subtarefa.projeto_id) {
-    const { data: membros } = await supabase
-      .from("projeto_membros")
-      .select("usuario_id")
-      .eq("projeto_id", subtarefa.projeto_id);
-    for (const row of membros ?? []) ids.add(row.usuario_id);
-  } else if (subtarefa.setor_id) {
-    const { data: doSetor } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("ativo", true)
-      .eq("setor_id", subtarefa.setor_id);
-    for (const row of doSetor ?? []) ids.add(row.id);
-  }
 
   if (ids.size === 0) return [];
 

@@ -95,7 +95,7 @@ export function TarefaPeopleStrip({
   projetoNome?: string | null;
   className?: string;
 }) {
-  const showVisualizadores = visibilidade !== "somente_para_mim";
+  const showVisualizadores = true;
   const createdLabel =
     createdAt != null
       ? format(createdAt instanceof Date ? createdAt : new Date(createdAt), "dd MMM yyyy", {

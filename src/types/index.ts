@@ -227,6 +227,7 @@ export type SubtarefaAgendaFilters = {
 export type SubtarefaMetaUpdate = {
   data_inicio?: string | null;
   atribuido_ids?: string[];
+  observador_ids?: string[];
   visibilidade?: Subtarefa["visibilidade"];
 };
 

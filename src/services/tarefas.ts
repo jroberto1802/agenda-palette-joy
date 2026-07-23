@@ -5,6 +5,7 @@ import {
   getCurrentActor,
   getSubtarefaStakeholderIds,
   getTarefaStakeholderIds,
+  assertMentionsPermitidas,
   listSubtarefaMencionaveis,
   listTarefaMencionaveis,
   notifySubtarefaMencao,
@@ -21,6 +22,12 @@ import {
 } from "@/services/notificacao-events";
 import { notifyUsers } from "@/services/notificacoes";
 import { localDateRangeToIsoBounds, startOfTodayLocal, toLocalDateKey } from "@/utils/agenda-datas";
+import {
+  assertIdsNoEscopo,
+  getTarefaEscopoIds,
+  usuarioNoEscopoSubtarefa,
+  VISIBILIDADE_PESSOAS,
+} from "@/utils/escopo-tarefa";
 import { sortSubtarefasList } from "@/utils/tarefas";
 import { serializeRecorrencia, isSerieModelo, isSerieOcorrencia } from "@/utils/recorrencia";
 import { atualizarProximaDataModelo, materializarOcorrenciasDevidas } from "@/services/tarefa-recorrencia";
@@ -181,6 +188,98 @@ async function listObservadorIds(tarefaId: string): Promise<string[]> {
 
   if (error) throw error;
   return (data ?? []).map((row) => row.usuario_id);
+}
+
+export type SubtarefaDependenciaEscopo = {
+  id: string;
+  titulo: string;
+  papel: "responsavel" | "visualizador";
+};
+
+/** Subtarefas em que a pessoa ainda é responsável ou visualizador. */
+export async function listSubtarefaDependenciasDaPessoaNaTarefa(
+  tarefaId: string,
+  usuarioId: string,
+): Promise<SubtarefaDependenciaEscopo[]> {
+  const { data: subtarefas, error } = await supabase
+    .from("subtarefas")
+    .select(
+      "id, titulo, responsaveis:subtarefa_responsaveis(usuario_id), observadores:subtarefa_observadores(usuario_id)",
+    )
+    .eq("tarefa_id", tarefaId);
+  if (error) throw error;
+
+  const deps: SubtarefaDependenciaEscopo[] = [];
+  for (const s of subtarefas ?? []) {
+    const isResp = (s.responsaveis ?? []).some(
+      (r: { usuario_id: string }) => r.usuario_id === usuarioId,
+    );
+    const isObs = (s.observadores ?? []).some(
+      (o: { usuario_id: string }) => o.usuario_id === usuarioId,
+    );
+    if (isResp) deps.push({ id: s.id, titulo: s.titulo, papel: "responsavel" });
+    else if (isObs) deps.push({ id: s.id, titulo: s.titulo, papel: "visualizador" });
+  }
+  return deps;
+}
+
+/**
+ * Impede remover pessoa do escopo da tarefa se ainda houver dependência em subtarefa.
+ * (Mesmo espírito do fluxo de transferência de responsabilidade do projeto.)
+ */
+async function assertRemocoesEscopoTarefaPermitidas(
+  tarefaId: string,
+  nextResponsavelIds: string[],
+  nextObservadorIds: string[],
+): Promise<void> {
+  const [atuaisResp, atuaisObs, { data: tarefaMeta }] = await Promise.all([
+    listResponsavelIds(tarefaId),
+    listObservadorIds(tarefaId),
+    supabase.from("tarefas").select("criado_por").eq("id", tarefaId).single(),
+  ]);
+  // Criador permanece no escopo mesmo fora das listas de resp/visibilidade.
+  const nextScope = new Set([...nextResponsavelIds, ...nextObservadorIds]);
+  if (tarefaMeta?.criado_por) nextScope.add(tarefaMeta.criado_por);
+
+  const removed = [...new Set([...atuaisResp, ...atuaisObs])].filter(
+    (id) => !nextScope.has(id),
+  );
+  if (removed.length === 0) return;
+
+  for (const usuarioId of removed) {
+    const deps = await listSubtarefaDependenciasDaPessoaNaTarefa(tarefaId, usuarioId);
+    if (deps.length === 0) continue;
+    const titulos = deps
+      .slice(0, 3)
+      .map((d) => d.titulo)
+      .join(", ");
+    const more = deps.length > 3 ? ` e mais ${deps.length - 3}` : "";
+    throw new Error(
+      `Não é possível remover esta pessoa do escopo enquanto ela ainda for responsável ou visualizador de subtarefa(s): ${titulos}${more}. Transfira ou ajuste as subtarefas antes.`,
+    );
+  }
+}
+
+async function getTarefaEscopoIdsFromDb(tarefaId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("tarefas")
+    .select(
+      `
+      criado_por,
+      atribuido_a,
+      responsaveis:tarefa_responsaveis(usuario_id),
+      observadores:tarefa_observadores(usuario_id)
+    `,
+    )
+    .eq("id", tarefaId)
+    .single();
+  if (error) throw error;
+  return getTarefaEscopoIds({
+    criado_por: data?.criado_por,
+    atribuido_a: data?.atribuido_a,
+    responsaveis: data?.responsaveis ?? [],
+    observadores: data?.observadores ?? [],
+  });
 }
 
 /** Notifica quem passou a ter acesso de visualização (exclui responsáveis, criador e o ator). */
@@ -403,20 +502,10 @@ export async function createTarefa(payload: TarefaFormData): Promise<TarefaWithR
     throw new Error("Selecione ao menos um responsável.");
   }
 
-  if (normalized.visibilidade === "todos_setor" && !normalized.setor_id) {
-    throw new Error('Setor é obrigatório para visibilidade "Todos do setor".');
-  }
-
-  if (normalized.visibilidade === "todos_projeto" && !normalized.projeto_id) {
-    throw new Error('Projeto é obrigatório para visibilidade "Todos do projeto".');
-  }
-
-  if (
-    normalized.visibilidade === "pessoas_especificas" &&
-    normalized.observador_ids.length === 0
-  ) {
-    throw new Error("Selecione ao menos uma pessoa para visibilidade específica.");
-  }
+  // Novo modelo: Visibilidade = lista de pessoas (pessoas_especificas).
+  // Lista vazia = só criador + responsáveis (sempre têm acesso).
+  const visibilidade: TarefaFormData["visibilidade"] = "pessoas_especificas";
+  const observadorIds = [...new Set(normalized.observador_ids)];
 
   const recorrencia = serializeRecorrencia(normalized.recorrencia);
   const ancoraKey = normalized.data_inicio
@@ -441,7 +530,7 @@ export async function createTarefa(payload: TarefaFormData): Promise<TarefaWithR
       tags: normalized.tags,
       recorrencia: recorrenciaComAncora,
       serie_raiz_id: recorrenciaComAncora ? tarefaId : null,
-      visibilidade: normalized.visibilidade,
+      visibilidade,
       lembretes: serializeLembretes(normalized.lembretes),
       criado_por: user.id,
     });
@@ -449,10 +538,7 @@ export async function createTarefa(payload: TarefaFormData): Promise<TarefaWithR
   if (error) throw error;
 
   await syncResponsaveis(tarefaId, atribuidoIds);
-
-  if (normalized.visibilidade === "pessoas_especificas") {
-    await syncObservadores(tarefaId, normalized.observador_ids);
-  }
+  await syncObservadores(tarefaId, observadorIds);
 
   const { data, error: fetchError } = await supabase
     .from("tarefas")
@@ -480,10 +566,10 @@ export async function createTarefa(payload: TarefaFormData): Promise<TarefaWithR
     }).catch(() => undefined);
 
     const visualizadores = await resolveTarefaVisualizadorIds({
-      visibilidade: normalized.visibilidade,
+      visibilidade,
       setorId: normalized.setor_id,
       projetoId: normalized.projeto_id,
-      observadorIds: normalized.observador_ids,
+      observadorIds,
     });
     await notifyNovosVisualizadores({
       tarefaId: tarefa.id,
@@ -510,10 +596,10 @@ export async function createTarefa(payload: TarefaFormData): Promise<TarefaWithR
   }).catch(() => undefined);
 
   const visualizadores = await resolveTarefaVisualizadorIds({
-    visibilidade: normalized.visibilidade,
+    visibilidade,
     setorId: normalized.setor_id,
     projetoId: normalized.projeto_id,
-    observadorIds: normalized.observador_ids,
+    observadorIds,
   });
   await notifyNovosVisualizadores({
     tarefaId: tarefa.id,
@@ -547,17 +633,10 @@ export async function updateTarefa(
     throw new Error("Selecione ao menos um responsável.");
   }
 
-  if (payload.visibilidade === "todos_setor" && !payload.setor_id) {
-    throw new Error('Setor é obrigatório para visibilidade "Todos do setor".');
-  }
+  const visibilidade: TarefaFormData["visibilidade"] = "pessoas_especificas";
+  const observadorIds = [...new Set(payload.observador_ids)];
 
-  if (payload.visibilidade === "todos_projeto" && !payload.projeto_id) {
-    throw new Error('Projeto é obrigatório para visibilidade "Todos do projeto".');
-  }
-
-  if (payload.visibilidade === "pessoas_especificas" && payload.observador_ids.length === 0) {
-    throw new Error("Selecione ao menos uma pessoa para visibilidade específica.");
-  }
+  await assertRemocoesEscopoTarefaPermitidas(id, atribuidoIds, observadorIds);
 
   const anterioresIds = await listResponsavelIds(id);
   const [{ data: anteriorMeta }, anterioresObservadores] = await Promise.all([
@@ -570,7 +649,7 @@ export async function updateTarefa(
   ]);
 
   const anterioresVisualizadores = await resolveTarefaVisualizadorIds({
-    visibilidade: (anteriorMeta?.visibilidade ?? "somente_para_mim") as TarefaFormData["visibilidade"],
+    visibilidade: (anteriorMeta?.visibilidade ?? "pessoas_especificas") as TarefaFormData["visibilidade"],
     setorId: anteriorMeta?.setor_id,
     projetoId: anteriorMeta?.projeto_id,
     observadorIds: anterioresObservadores,
@@ -597,7 +676,7 @@ export async function updateTarefa(
     data_inicio: payload.data_inicio,
     tags: payload.tags,
     recorrencia: recorrenciaUpdate,
-    visibilidade: payload.visibilidade,
+    visibilidade,
     lembretes: serializeLembretes(payload.lembretes),
   };
 
@@ -626,12 +705,7 @@ export async function updateTarefa(
   const tarefa = data as TarefaWithRelations;
 
   await syncResponsaveis(id, atribuidoIds);
-
-  if (payload.visibilidade === "pessoas_especificas") {
-    await syncObservadores(id, payload.observador_ids);
-  } else {
-    await syncObservadores(id, []);
-  }
+  await syncObservadores(id, observadorIds);
 
   const novos = atribuidoIds.filter((uid) => !anterioresIds.includes(uid));
   if (novos.length > 0) {
@@ -644,10 +718,10 @@ export async function updateTarefa(
 
   const novosVisualizadores = (
     await resolveTarefaVisualizadorIds({
-      visibilidade: payload.visibilidade,
+      visibilidade,
       setorId: payload.setor_id,
       projetoId: payload.projeto_id,
-      observadorIds: payload.observador_ids,
+      observadorIds,
     })
   ).filter((uid) => !anterioresVisualizadores.includes(uid));
 
@@ -869,15 +943,15 @@ const SUBTAREFA_SELECT = `
   responsaveis:subtarefa_responsaveis(
     usuario_id,
     usuario:profiles!subtarefa_responsaveis_usuario_id_fkey(id, nome_completo, avatar_url)
+  ),
+  observadores:subtarefa_observadores(
+    usuario_id,
+    usuario:profiles!subtarefa_observadores_usuario_id_fkey(id, nome_completo, avatar_url)
   )
 `;
 
 const SUBTAREFA_DETAIL_SELECT = `
   ${SUBTAREFA_SELECT},
-  observadores:subtarefa_observadores(
-    usuario_id,
-    usuario:profiles!subtarefa_observadores_usuario_id_fkey(id, nome_completo, avatar_url)
-  ),
   comentarios:subtarefa_comentarios(${SUBTAREFA_COMENTARIO_SELECT}),
   anexos:subtarefa_anexos(id, subtarefa_id, storage_path, nome, tipo, tamanho, created_at),
   tarefa:tarefas!subtarefas_tarefa_id_fkey(id, titulo)
@@ -885,8 +959,8 @@ const SUBTAREFA_DETAIL_SELECT = `
 
 /**
  * Subtarefas para Agenda (Hoje / Em breve / Visualizando).
- * - Padrão: responsável da subtarefa ou da tarefa pai; com Data; abertas.
- * - `somente_visualizando`: visíveis por herança da pai, sem ser responsável.
+ * - Padrão: usuário no escopo da subtarefa como responsável (ou criador com data).
+ * - `somente_visualizando`: observador da subtarefa, sem ser responsável.
  */
 export async function listSubtarefasAgenda(
   filters: SubtarefaAgendaFilters,
@@ -898,25 +972,20 @@ export async function listSubtarefasAgenda(
     return listSubtarefasVisualizando(filters);
   }
 
-  const [{ data: subLinks, error: subLinksError }, { data: tarefaLinks, error: tarefaLinksError }] =
-    await Promise.all([
-      supabase
-        .from("subtarefa_responsaveis")
-        .select("subtarefa_id")
-        .eq("usuario_id", usuarioId),
-      supabase
-        .from("tarefa_responsaveis")
-        .select("tarefa_id")
-        .eq("usuario_id", usuarioId),
-    ]);
+  const [
+    { data: subLinks, error: subLinksError },
+  ] = await Promise.all([
+    supabase
+      .from("subtarefa_responsaveis")
+      .select("subtarefa_id")
+      .eq("usuario_id", usuarioId),
+  ]);
 
   if (subLinksError) throw subLinksError;
-  if (tarefaLinksError) throw tarefaLinksError;
 
   const subtarefaIds = [...new Set((subLinks ?? []).map((row) => row.subtarefa_id))];
-  const tarefaIds = [...new Set((tarefaLinks ?? []).map((row) => row.tarefa_id))];
 
-  if (subtarefaIds.length === 0 && tarefaIds.length === 0) return [];
+  if (subtarefaIds.length === 0) return [];
 
   let query = supabase
     .from("subtarefas")
@@ -928,24 +997,26 @@ export async function listSubtarefasAgenda(
       tarefa:tarefas!inner(id, titulo, concluida, deleted_at, setor_id, projeto_id, serie_raiz_id)
     `,
     )
+    .in("id", subtarefaIds)
     .eq("concluida", false)
     .not("data_inicio", "is", null)
     .eq("tarefa.concluida", false)
     .is("tarefa.deleted_at", null)
     .order("data_inicio", { ascending: true });
 
-  if (subtarefaIds.length > 0 && tarefaIds.length > 0) {
-    query = query.or(`id.in.(${subtarefaIds.join(",")}),tarefa_id.in.(${tarefaIds.join(",")})`);
-  } else if (subtarefaIds.length > 0) {
-    query = query.in("id", subtarefaIds);
-  } else {
-    query = query.in("tarefa_id", tarefaIds);
-  }
+  const rows = await finalizeSubtarefasAgendaQuery(query, filters);
 
-  return finalizeSubtarefasAgendaQuery(query, filters);
+  // Só entra na agenda se o usuário estiver no escopo da própria subtarefa.
+  return rows.filter((row) =>
+    usuarioNoEscopoSubtarefa(usuarioId, {
+      criado_por: row.criado_por,
+      responsaveis: row.responsaveis,
+      observadores: row.observadores,
+    }),
+  );
 }
 
-/** Subtarefas visíveis (RLS via pai) em que o usuário não é responsável. */
+/** Subtarefas em que o usuário é visualizador (observador), sem ser responsável. */
 async function listSubtarefasVisualizando(
   filters: SubtarefaAgendaFilters,
 ): Promise<SubtarefaAgendaItem[]> {
@@ -953,23 +1024,31 @@ async function listSubtarefasVisualizando(
 
   const [
     { data: mySubLinks, error: mySubError },
-    { data: myTarefaLinks, error: myTarefaError },
+    { data: myObsLinks, error: myObsError },
   ] = await Promise.all([
     supabase
       .from("subtarefa_responsaveis")
       .select("subtarefa_id")
       .eq("usuario_id", usuarioId),
     supabase
-      .from("tarefa_responsaveis")
-      .select("tarefa_id")
+      .from("subtarefa_observadores")
+      .select("subtarefa_id")
       .eq("usuario_id", usuarioId),
   ]);
 
   if (mySubError) throw mySubError;
-  if (myTarefaError) throw myTarefaError;
+  if (myObsError) throw myObsError;
 
   const excludeSubIds = new Set((mySubLinks ?? []).map((row) => row.subtarefa_id));
-  const excludeTarefaIds = new Set((myTarefaLinks ?? []).map((row) => row.tarefa_id));
+  const obsSubIds = [
+    ...new Set(
+      (myObsLinks ?? [])
+        .map((row) => row.subtarefa_id)
+        .filter((id) => !excludeSubIds.has(id)),
+    ),
+  ];
+
+  if (obsSubIds.length === 0) return [];
 
   let query = supabase
     .from("subtarefas")
@@ -983,10 +1062,10 @@ async function listSubtarefasVisualizando(
       )
     `,
     )
+    .in("id", obsSubIds)
     .eq("concluida", false)
     .eq("tarefa.concluida", false)
     .is("tarefa.deleted_at", null)
-    .neq("tarefa.visibilidade", "somente_para_mim")
     .order("created_at", { ascending: false });
 
   if (filters.atribuido_ids && filters.atribuido_ids.length > 0) {
@@ -1004,10 +1083,13 @@ async function listSubtarefasVisualizando(
 
   return rows.filter((row) => {
     if (excludeSubIds.has(row.id)) return false;
-    if (excludeTarefaIds.has(row.tarefa_id)) return false;
     if (row.criado_por === usuarioId) return false;
     if (row.responsaveis?.some((r) => r.usuario_id === usuarioId)) return false;
-    return true;
+    return usuarioNoEscopoSubtarefa(usuarioId, {
+      criado_por: row.criado_por,
+      responsaveis: row.responsaveis,
+      observadores: row.observadores,
+    });
   });
 }
 
@@ -1230,9 +1312,7 @@ async function insertSubtarefaCopia(params: {
   }
 
   const observadorIds = (source.observadores ?? []).map((r) => r.usuario_id).filter(Boolean);
-  if (source.visibilidade === "pessoas_especificas" && observadorIds.length > 0) {
-    await syncSubtarefaObservadores(newId, observadorIds);
-  }
+  await syncSubtarefaObservadores(newId, observadorIds);
 
   return newId;
 }
@@ -1468,6 +1548,7 @@ export async function updateSubtarefaMeta(
   meta: {
     data_inicio?: string | null;
     atribuido_ids?: string[];
+    observador_ids?: string[];
     visibilidade?: SubtarefaWithAuthors["visibilidade"];
   },
 ): Promise<SubtarefaWithAuthors> {
@@ -1478,6 +1559,14 @@ export async function updateSubtarefaMeta(
     .single();
   if (anteriorError) throw anteriorError;
 
+  const escopoPai = await getTarefaEscopoIdsFromDb(anterior.tarefa_id);
+  if (meta.atribuido_ids !== undefined) {
+    assertIdsNoEscopo(meta.atribuido_ids, escopoPai);
+  }
+  if (meta.observador_ids !== undefined) {
+    assertIdsNoEscopo(meta.observador_ids, escopoPai);
+  }
+
   const patch: {
     data_inicio?: string | null;
     visibilidade?: SubtarefaWithAuthors["visibilidade"];
@@ -1487,8 +1576,8 @@ export async function updateSubtarefaMeta(
   if (meta.data_inicio !== undefined) {
     patch.data_inicio = meta.data_inicio;
   }
-  if (meta.visibilidade !== undefined) {
-    patch.visibilidade = meta.visibilidade;
+  if (meta.visibilidade !== undefined || meta.observador_ids !== undefined) {
+    patch.visibilidade = VISIBILIDADE_PESSOAS;
   }
 
   if (Object.keys(patch).length > 0) {
@@ -1499,6 +1588,9 @@ export async function updateSubtarefaMeta(
 
   if (meta.atribuido_ids !== undefined) {
     await syncSubtarefaResponsaveis(id, meta.atribuido_ids);
+  }
+  if (meta.observador_ids !== undefined) {
+    await syncSubtarefaObservadores(id, meta.observador_ids);
   }
 
   const row = await getSubtarefaRow(id);
@@ -1548,6 +1640,12 @@ export async function updateSubtarefa(
     .single();
   if (anteriorError) throw anteriorError;
 
+  const escopoPai = await getTarefaEscopoIdsFromDb(anterior.tarefa_id);
+  const atribuidoIds = [...new Set(payload.atribuido_ids)];
+  const observadorIds = [...new Set(payload.observador_ids)];
+  assertIdsNoEscopo(atribuidoIds, escopoPai);
+  assertIdsNoEscopo(observadorIds, escopoPai);
+
   const patch = {
     titulo: payload.titulo.trim(),
     descricao: payload.descricao || null,
@@ -1555,7 +1653,7 @@ export async function updateSubtarefa(
     setor_id: payload.setor_id,
     prioridade: payload.prioridade,
     data_inicio: payload.data_inicio,
-    visibilidade: payload.visibilidade,
+    visibilidade: VISIBILIDADE_PESSOAS,
     lembretes: payload.lembretes as unknown as Json,
     // Recorrência existe só na tarefa principal — subtarefa nunca guarda regra própria
     recorrencia: null,
@@ -1565,12 +1663,8 @@ export async function updateSubtarefa(
   const { error } = await supabase.from("subtarefas").update(patch).eq("id", id);
   if (error) throw error;
 
-  await syncSubtarefaResponsaveis(id, payload.atribuido_ids);
-  if (payload.visibilidade === "pessoas_especificas") {
-    await syncSubtarefaObservadores(id, payload.observador_ids);
-  } else {
-    await syncSubtarefaObservadores(id, []);
-  }
+  await syncSubtarefaResponsaveis(id, atribuidoIds);
+  await syncSubtarefaObservadores(id, observadorIds);
 
   if (toLocalDateKey(anterior.data_inicio) !== toLocalDateKey(payload.data_inicio)) {
     const [ator, stakeholders, { data: tarefa }] = await Promise.all([
@@ -1623,6 +1717,9 @@ export async function createSubtarefaComentario(
     if (parent.parent_id) throw new Error("Apenas um nível de resposta é permitido.");
   }
 
+  const mencionaveis = await listSubtarefaMencionaveis(subtarefaId);
+  await assertMentionsPermitidas(conteudo, mencionaveis);
+
   const { data, error } = await supabase
     .from("subtarefa_comentarios")
     .insert({
@@ -1637,10 +1734,9 @@ export async function createSubtarefaComentario(
   if (error) throw error;
   const comentario = data as SubtarefaComentario;
 
-  const [{ data: subtarefa }, ator, mencionaveis] = await Promise.all([
+  const [{ data: subtarefa }, ator] = await Promise.all([
     supabase.from("subtarefas").select("titulo, tarefa_id").eq("id", subtarefaId).single(),
     getCurrentActor(),
-    listSubtarefaMencionaveis(subtarefaId),
   ]);
 
   const mentionedIds = (await resolveMentionIds(conteudo, mencionaveis)).filter(
@@ -1685,6 +1781,16 @@ export async function updateSubtarefaComentario(
   const trimmed = conteudo.trim();
   if (!trimmed) throw new Error("Comentário não pode ficar vazio.");
 
+  const { data: existing, error: existingError } = await supabase
+    .from("subtarefa_comentarios")
+    .select("subtarefa_id")
+    .eq("id", id)
+    .single();
+  if (existingError) throw existingError;
+
+  const mencionaveis = await listSubtarefaMencionaveis(existing.subtarefa_id);
+  await assertMentionsPermitidas(trimmed, mencionaveis);
+
   const { data, error } = await supabase
     .from("subtarefa_comentarios")
     .update({
@@ -1721,6 +1827,9 @@ export async function createTarefaComentario(
     if (parent.parent_id) throw new Error("Apenas um nível de resposta é permitido.");
   }
 
+  const mencionaveis = await listTarefaMencionaveis(tarefaId);
+  await assertMentionsPermitidas(conteudo, mencionaveis);
+
   const { data, error } = await supabase
     .from("tarefa_comentarios")
     .insert({
@@ -1735,10 +1844,9 @@ export async function createTarefaComentario(
   if (error) throw error;
   const comentario = data as TarefaComentario;
 
-  const [{ data: tarefa }, ator, mencionaveis] = await Promise.all([
+  const [{ data: tarefa }, ator] = await Promise.all([
     supabase.from("tarefas").select("criado_por, titulo").eq("id", tarefaId).single(),
     getCurrentActor(),
-    listTarefaMencionaveis(tarefaId),
   ]);
 
   const atorNome = ator?.nome ?? "Alguém";
@@ -1816,6 +1924,16 @@ export async function updateTarefaComentario(
 
   const trimmed = conteudo.trim();
   if (!trimmed) throw new Error("Comentário não pode ficar vazio.");
+
+  const { data: existing, error: existingError } = await supabase
+    .from("tarefa_comentarios")
+    .select("tarefa_id")
+    .eq("id", id)
+    .single();
+  if (existingError) throw existingError;
+
+  const mencionaveis = await listTarefaMencionaveis(existing.tarefa_id);
+  await assertMentionsPermitidas(trimmed, mencionaveis);
 
   const { data, error } = await supabase
     .from("tarefa_comentarios")

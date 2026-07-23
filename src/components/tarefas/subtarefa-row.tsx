@@ -16,13 +16,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -32,14 +25,10 @@ import { cn } from "@/lib/utils";
 import type {
   ProfileWithSetor,
   SubtarefaWithAuthors,
-  TarefaVisibilidade,
   TarefaWithRelations,
 } from "@/types";
-import {
-  TAREFA_PRIORIDADE_BAND_CLASS,
-  TAREFA_VISIBILIDADE_LABELS,
-  TAREFA_VISIBILIDADE_OPTIONS,
-} from "@/utils/tarefas";
+import { VISIBILIDADE_PESSOAS } from "@/utils/escopo-tarefa";
+import { TAREFA_PRIORIDADE_BAND_CLASS } from "@/utils/tarefas";
 
 /** Acima de Dialog/Sheet (z-50) e do drawer de subtarefa (z-[70]). */
 const META_OVERLAY_Z = "z-[100]";
@@ -146,6 +135,7 @@ export function SubtarefaRow({
   onUpdateMeta: (meta: {
     data_inicio?: string | null;
     atribuido_ids?: string[];
+    observador_ids?: string[];
     visibilidade?: SubtarefaWithAuthors["visibilidade"];
   }) => Promise<void>;
   dragHandle?: ReactNode;
@@ -170,6 +160,19 @@ export function SubtarefaRow({
     [subtarefa.responsaveis],
   );
 
+  const observadorIds = useMemo(
+    () => (subtarefa.observadores ?? []).map((o) => o.usuario_id),
+    [subtarefa.observadores],
+  );
+
+  const visualizadores = useMemo(
+    () =>
+      (subtarefa.observadores ?? [])
+        .map((o) => o.usuario)
+        .filter((u): u is NonNullable<typeof u> => !!u),
+    [subtarefa.observadores],
+  );
+
   const dataInicio = subtarefa.data_inicio
     ? new Date(subtarefa.data_inicio)
     : null;
@@ -178,6 +181,7 @@ export function SubtarefaRow({
     meta: {
       data_inicio?: string | null;
       atribuido_ids?: string[];
+      observador_ids?: string[];
       visibilidade?: SubtarefaWithAuthors["visibilidade"];
     },
   ) => {
@@ -297,53 +301,64 @@ export function SubtarefaRow({
                 onChange={(ids) => void runMeta({ atribuido_ids: ids })}
                 disabled={!canEdit || saving}
                 placeholder="Nenhum responsável"
-                emptyLabel="Nenhuma pessoa disponível nesta atividade"
+                emptyLabel="Nenhuma pessoa no escopo da tarefa"
                 showSelectAll
               />
             </PopoverContent>
           </Popover>
 
-          {/* Visibilidade */}
+          {/* Visibilidade — seletor de pessoas (escopo da tarefa pai) */}
           <Popover>
             <PopoverTrigger asChild>
               <span>
                 <MetaIconButton
                   label={
-                    subtarefa.visibilidade
-                      ? `Visibilidade: ${TAREFA_VISIBILIDADE_LABELS[subtarefa.visibilidade]}`
-                      : "Visibilidade"
+                    visualizadores.length
+                      ? `Visibilidade: ${visualizadores.map((v) => v.nome_completo).join(", ")}`
+                      : observadorIds.length
+                        ? `Visibilidade: ${observadorIds.length}`
+                        : "Visibilidade"
                   }
-                  active={!!subtarefa.visibilidade}
+                  active={observadorIds.length > 0}
                   disabled={!canEdit || saving}
                 >
-                  <Eye className="h-3.5 w-3.5" />
+                  {visualizadores.length > 0 ? (
+                    <span className="flex -space-x-1.5">
+                      {visualizadores.slice(0, 2).map((pessoa) => (
+                        <ProfileAvatar
+                          key={pessoa.id}
+                          name={pessoa.nome_completo}
+                          avatarUrl={pessoa.avatar_url}
+                          className="h-4 w-4 ring-1 ring-background"
+                        />
+                      ))}
+                    </span>
+                  ) : (
+                    <Eye className="h-3.5 w-3.5" />
+                  )}
                 </MetaIconButton>
               </span>
             </PopoverTrigger>
-            <PopoverContent className={cn("w-64 space-y-2 p-3", META_OVERLAY_Z)} align="end">
+            <PopoverContent className={cn("w-80 space-y-2 p-3", META_OVERLAY_Z)} align="end">
               <p className="text-xs font-medium text-muted-foreground">Visibilidade</p>
-              <Select
-                value={subtarefa.visibilidade ?? "none"}
-                onValueChange={(value) =>
+              <p className="text-[11px] leading-snug text-muted-foreground">
+                Criador e responsáveis sempre têm acesso. Somente pessoas do escopo da tarefa.
+              </p>
+              <PessoasMultiSelect
+                pessoas={pessoasDisponiveis}
+                value={observadorIds}
+                onChange={(ids) =>
                   void runMeta({
-                    visibilidade:
-                      value === "none" ? null : (value as TarefaVisibilidade),
+                    observador_ids: ids,
+                    visibilidade: VISIBILIDADE_PESSOAS,
                   })
                 }
                 disabled={!canEdit || saving}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Herdar da tarefa" />
-                </SelectTrigger>
-                <SelectContent className={META_OVERLAY_Z}>
-                  <SelectItem value="none">Herdar da tarefa</SelectItem>
-                  {TAREFA_VISIBILIDADE_OPTIONS.map((value) => (
-                    <SelectItem key={value} value={value}>
-                      {TAREFA_VISIBILIDADE_LABELS[value]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                placeholder="Selecione pessoas"
+                emptyLabel="Nenhuma pessoa no escopo da tarefa"
+                searchPlaceholder="Buscar por nome..."
+                showSelectAll
+              />
             </PopoverContent>
           </Popover>
 

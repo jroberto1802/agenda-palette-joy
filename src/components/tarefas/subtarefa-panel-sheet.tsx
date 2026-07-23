@@ -2,7 +2,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, MessageSquare, Paperclip } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
-import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { z } from "zod";
 import { CommentsThread } from "@/components/common/comments-thread";
@@ -44,14 +43,18 @@ import {
   useUpdateSubtarefaComentario,
 } from "@/hooks/use-tarefas";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
-import { listProjetoMembros } from "@/services/projetos";
 import type {
   SubtarefaDetail,
   SubtarefaFormData,
-  TarefaVisibilidade,
   TarefaWithRelations,
 } from "@/types";
 import { isAdmin, isGerente } from "@/utils/permissions";
+import {
+  filterPessoasPorEscopo,
+  getSubtarefaEscopoIds,
+  getTarefaEscopoIds,
+  VISIBILIDADE_PESSOAS,
+} from "@/utils/escopo-tarefa";
 import {
   TAREFA_PRIORIDADE_COLORS,
   canCommentOrAttachTarefa,
@@ -63,52 +66,28 @@ import {
   parseLembretes,
 } from "@/utils/tarefas";
 
-const subtarefaPanelSchema = z
-  .object({
-    titulo: z.string().min(2, "Título deve ter pelo menos 2 caracteres"),
-    descricao: z.string(),
-    projeto_id: z.string().nullable(),
-    setor_id: z.string().nullable(),
-    atribuido_ids: z.array(z.string()),
-    prioridade: z.enum(["P1", "P2", "P3", "P4"]),
-    data_inicio: z.date().nullable(),
-    visibilidade: z.enum([
-      "todos_empresa",
-      "todos_setor",
-      "todos_projeto",
-      "somente_para_mim",
-      "pessoas_especificas",
-    ]),
-    observador_ids: z.array(z.string()),
-    lembretes: z.array(z.enum(["no_prazo", "1h_antes", "1d_antes", "1sem_antes"])),
-    recorrencia_tipo: z.enum(["nenhuma", "diaria", "semanal", "mensal"]),
-    recorrencia_dias_semana: z.array(z.number()),
-    recorrencia_dia_mes: z.number().min(1).max(28),
-    recorrencia_data_fim: z.date().nullable(),
-  })
-  .superRefine((data, ctx) => {
-    if (data.visibilidade === "todos_setor" && !data.setor_id) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Setor é obrigatório para visibilidade "Todos do setor".',
-        path: ["setor_id"],
-      });
-    }
-    if (data.visibilidade === "todos_projeto" && !data.projeto_id) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Projeto é obrigatório para visibilidade "Todos do projeto".',
-        path: ["projeto_id"],
-      });
-    }
-    if (data.visibilidade === "pessoas_especificas" && data.observador_ids.length === 0) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Selecione ao menos uma pessoa.",
-        path: ["observador_ids"],
-      });
-    }
-  });
+const subtarefaPanelSchema = z.object({
+  titulo: z.string().min(2, "Título deve ter pelo menos 2 caracteres"),
+  descricao: z.string(),
+  projeto_id: z.string().nullable(),
+  setor_id: z.string().nullable(),
+  atribuido_ids: z.array(z.string()),
+  prioridade: z.enum(["P1", "P2", "P3", "P4"]),
+  data_inicio: z.date().nullable(),
+  visibilidade: z.enum([
+    "todos_empresa",
+    "todos_setor",
+    "todos_projeto",
+    "somente_para_mim",
+    "pessoas_especificas",
+  ]),
+  observador_ids: z.array(z.string()),
+  lembretes: z.array(z.enum(["no_prazo", "1h_antes", "1d_antes", "1sem_antes"])),
+  recorrencia_tipo: z.enum(["nenhuma", "diaria", "semanal", "mensal"]),
+  recorrencia_dias_semana: z.array(z.number()),
+  recorrencia_dia_mes: z.number().min(1).max(28),
+  recorrencia_data_fim: z.date().nullable(),
+});
 
 type SubtarefaPanelSchema = z.infer<typeof subtarefaPanelSchema>;
 type EditableField = "titulo" | "descricao";
@@ -121,12 +100,14 @@ function toFormValues(
   > | null,
 ): SubtarefaPanelSchema {
   const atribuidoIds = subtarefa?.responsaveis?.map((r) => r.usuario_id) ?? [];
-  const inheritedVisibilidade =
-    (subtarefa?.visibilidade as TarefaVisibilidade | null | undefined) ??
-    (parentTarefa?.visibilidade as TarefaVisibilidade | undefined) ??
-    "somente_para_mim";
   const ownObservadores = subtarefa?.observadores?.map((o) => o.usuario_id) ?? [];
-  const parentObservadores = parentTarefa?.observadores?.map((o) => o.usuario_id) ?? [];
+  const visibilidadeJaConfigurada = subtarefa?.visibilidade === VISIBILIDADE_PESSOAS;
+  // Enquanto não configurada: Visibilidade inicia igual aos Responsáveis.
+  const observadorIds = visibilidadeJaConfigurada
+    ? ownObservadores
+    : ownObservadores.length > 0
+      ? ownObservadores
+      : atribuidoIds;
 
   return {
     titulo: subtarefa?.titulo ?? "",
@@ -137,13 +118,8 @@ function toFormValues(
     atribuido_ids: atribuidoIds,
     prioridade: subtarefa?.prioridade ?? "P4",
     data_inicio: subtarefa?.data_inicio ? new Date(subtarefa.data_inicio) : null,
-    visibilidade: inheritedVisibilidade,
-    observador_ids:
-      ownObservadores.length > 0
-        ? ownObservadores
-        : inheritedVisibilidade === "pessoas_especificas" && !subtarefa?.visibilidade
-          ? parentObservadores
-          : ownObservadores,
+    visibilidade: VISIBILIDADE_PESSOAS,
+    observador_ids: observadorIds,
     lembretes: parseLembretes(subtarefa?.lembretes),
     // Campos mantidos no schema (toolbar com hideRecorrencia) — sempre nenhuma
     recorrencia_tipo: "nenhuma",
@@ -167,7 +143,7 @@ function toPayload(
     data_inicio: values.data_inicio ? values.data_inicio.toISOString() : null,
     // Subtarefas não possuem recorrência — só a tarefa principal
     recorrencia: null,
-    visibilidade: values.visibilidade,
+    visibilidade: VISIBILIDADE_PESSOAS,
     observador_ids: values.observador_ids,
     lembretes: values.lembretes,
   };
@@ -206,6 +182,8 @@ export function SubtarefaPanelSheet({
   );
   const [editingField, setEditingField] = useState<EditableField | null>(null);
   const savingRef = useRef(false);
+  /** Visibilidade acompanha Responsáveis até edição manual (primeira configuração). */
+  const visibilidadeManualRef = useRef(false);
 
   const form = useForm<SubtarefaPanelSchema>({
     resolver: zodResolver(subtarefaPanelSchema),
@@ -265,26 +243,41 @@ export function SubtarefaPanelSheet({
   const selectedProjeto = projetos?.find((p) => p.id === projetoId);
   const selectedSetor = setores?.find((s) => s.id === setorId);
 
-  const { data: projetoMembros } = useQuery({
-    queryKey: ["projeto-membros", projetoId],
-    queryFn: () => listProjetoMembros(projetoId!),
-    enabled: !!projetoId,
-  });
+  const escopoPaiIds = useMemo(
+    () =>
+      getTarefaEscopoIds({
+        criado_por: parentTarefa?.criado_por,
+        atribuido_a: parentTarefa?.atribuido_a,
+        responsaveis: parentTarefa?.responsaveis,
+        observadores: parentTarefa?.observadores,
+      }),
+    [parentTarefa],
+  );
 
-  const pessoasParaResponsavel = useMemo(() => {
-    if (!projetoId) return pessoasAtivas;
-    const memberIds = new Set((projetoMembros ?? []).map((m) => m.id));
-    const selected = new Set(atribuidoIds ?? []);
-    return pessoasAtivas.filter((p) => memberIds.has(p.id) || selected.has(p.id));
-  }, [projetoId, projetoMembros, pessoasAtivas, atribuidoIds]);
+  const pessoasDoEscopoPai = useMemo(
+    () => filterPessoasPorEscopo(pessoasAtivas, escopoPaiIds),
+    [pessoasAtivas, escopoPaiIds],
+  );
+
+  const pessoasParaResponsavel = pessoasDoEscopoPai;
+  const pessoasParaVisibilidade = pessoasDoEscopoPai;
 
   useEffect(() => {
     if (!open) {
       setEditingField(null);
       return;
     }
+    // Já configurada como lista de pessoas → não sincroniza mais com responsáveis.
+    visibilidadeManualRef.current = subtarefa?.visibilidade === VISIBILIDADE_PESSOAS;
     form.reset(toFormValues(subtarefa ?? null, parentTarefa));
   }, [open, subtarefa, parentTarefa, form]);
+
+  // Enquanto Visibilidade não for editada manualmente, acompanha Responsáveis.
+  useEffect(() => {
+    if (!open || visibilidadeManualRef.current) return;
+    form.setValue("observador_ids", atribuidoIds ?? [], { shouldDirty: false });
+    form.setValue("visibilidade", VISIBILIDADE_PESSOAS, { shouldDirty: false });
+  }, [open, atribuidoIds, form]);
 
   useEffect(() => {
     if (!open) return;
@@ -345,30 +338,18 @@ export function SubtarefaPanelSheet({
   }, [observadorIds, pessoasAtivas]);
 
   const pessoasMencionaveis = useMemo(() => {
-    const ids = new Set<string>([...(atribuidoIds ?? []), ...(observadorIds ?? [])]);
-    if (subtarefa?.criado_por) ids.add(subtarefa.criado_por);
-    if (parentTarefa?.criado_por) ids.add(parentTarefa.criado_por);
-    if (projetoId) {
-      for (const m of projetoMembros ?? []) ids.add(m.id);
-    } else if (setorId) {
-      for (const p of pessoasAtivas) {
-        if (p.setor_id === setorId) ids.add(p.id);
-      }
-    }
-    for (const c of comentarios) {
-      if (c.usuario_id) ids.add(c.usuario_id);
-    }
-    return pessoasAtivas.filter((p) => ids.has(p.id));
+    const escopoIds = getSubtarefaEscopoIds({
+      criado_por: subtarefa?.criado_por ?? profile?.id,
+      atribuido_ids: atribuidoIds,
+      observadores: (observadorIds ?? []).map((usuario_id) => ({ usuario_id })),
+    });
+    return filterPessoasPorEscopo(pessoasAtivas, escopoIds);
   }, [
     atribuidoIds,
     observadorIds,
     subtarefa?.criado_por,
-    parentTarefa?.criado_por,
-    projetoId,
-    projetoMembros,
-    setorId,
+    profile?.id,
     pessoasAtivas,
-    comentarios,
   ]);
 
   const persistChanges = async (): Promise<boolean> => {
@@ -496,13 +477,13 @@ export function SubtarefaPanelSheet({
                       projetos={projetos ?? []}
                       setores={setoresPermitidos}
                       pessoasParaResponsavel={pessoasParaResponsavel}
-                      pessoasAtivas={pessoasAtivas}
+                      pessoasParaVisibilidade={pessoasParaVisibilidade}
                       requireResponsavel={false}
-                      emptyResponsavelLabel={
-                        projetoId
-                          ? "Defina a equipe do projeto antes de atribuir responsáveis"
-                          : "Nenhuma pessoa disponível"
-                      }
+                      onVisibilidadeManualChange={() => {
+                        visibilidadeManualRef.current = true;
+                      }}
+                      emptyResponsavelLabel="Nenhuma pessoa no escopo da tarefa"
+                      emptyVisibilidadeLabel="Nenhuma pessoa no escopo da tarefa"
                     />
 
                     <TarefaPeopleStrip
