@@ -82,8 +82,8 @@ function CommentReacoes({
           className={cn(
             "h-6 w-6",
             reactedByMe
-              ? "text-emerald-600 hover:text-emerald-700"
-              : "text-muted-foreground opacity-0 group-hover:opacity-100",
+              ? "text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
+              : "text-muted-foreground hover:text-foreground",
           )}
           aria-label={reactedByMe ? "Remover reação" : "Reagir com check"}
           aria-pressed={reactedByMe}
@@ -91,7 +91,12 @@ function CommentReacoes({
           onClick={() => void onToggle()}
         >
           <CircleCheck
-            className={cn("h-3.5 w-3.5", reactedByMe && "fill-emerald-600 text-emerald-600")}
+            className={cn(
+              "h-3.5 w-3.5",
+              reactedByMe
+                ? "fill-emerald-600 text-emerald-600"
+                : "fill-none text-muted-foreground",
+            )}
           />
         </Button>
       )}
