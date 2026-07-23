@@ -7,11 +7,10 @@ import {
   isAfter,
   isBefore,
   isSameDay,
-  parseISO,
   startOfDay,
 } from "date-fns";
 import type { RecorrenciaConfig, RecorrenciaTipo, RecorrenciaUnidade } from "@/types";
-import { toLocalDateKey } from "@/utils/agenda-datas";
+import { parseDayLocal, toLocalDateKey } from "@/utils/agenda-datas";
 
 export type { RecorrenciaConfig, RecorrenciaTipo, RecorrenciaUnidade };
 
@@ -86,16 +85,15 @@ export function pertenceASerie(
 
 function withinEnd(date: Date, config: RecorrenciaConfig): boolean {
   if (!config.data_fim) return true;
-  return !isAfter(startOfDay(date), startOfDay(parseISO(config.data_fim)));
+  return !isAfter(startOfDay(date), parseDayLocal(config.data_fim));
 }
 
-/** Próxima data estritamente após `dataAtual` (ISO ou null). */
+/** Próxima data estritamente após `dataAtual` (ISO, YYYY-MM-DD ou null). */
 export function calcularProximaData(
   dataAtual: string | null,
   config: RecorrenciaConfig,
 ): Date | null {
-  const base = dataAtual ? parseISO(dataAtual) : new Date();
-  const from = startOfDay(base);
+  const from = dataAtual ? parseDayLocal(dataAtual) : startOfDay(new Date());
 
   switch (config.tipo) {
     case "diaria":
@@ -123,7 +121,7 @@ export function calcularProximaData(
         const sorted = [...config.datas_livres].sort();
         const fromKey = toLocalDateKey(from)!;
         const nextKey = sorted.find((d) => d > fromKey);
-        return nextKey ? startOfDay(parseISO(nextKey)) : null;
+        return nextKey ? parseDayLocal(nextKey) : null;
       }
       const n = config.intervalo && config.intervalo > 0 ? config.intervalo : 1;
       if (config.unidade === "semanas") return addWeeks(from, n);
@@ -149,7 +147,7 @@ export function calcularProximaOcorrenciaPrevista(
   aPartirDe: Date = new Date(),
 ): Date | null {
   const limite = startOfDay(aPartirDe);
-  let cursor = ancora ? startOfDay(parseISO(ancora)) : limite;
+  let cursor = ancora ? parseDayLocal(ancora) : limite;
 
   if (!isBefore(cursor, limite) && withinEnd(cursor, config)) {
     return cursor;
@@ -157,7 +155,7 @@ export function calcularProximaOcorrenciaPrevista(
 
   let guard = 0;
   while (guard < 5000) {
-    const next = calcularProximaData(cursor.toISOString(), config);
+    const next = calcularProximaData(toLocalDateKey(cursor), config);
     if (!next || !deveGerarProximaOcorrencia(config, next)) return null;
     cursor = startOfDay(next);
     if (!isBefore(cursor, limite)) return cursor;
@@ -184,7 +182,7 @@ export function expandirDatasOcorrencia(
 
   if (config.tipo === "personalizada" && config.datas_livres?.length) {
     for (const key of [...config.datas_livres].sort()) {
-      const d = startOfDay(parseISO(key));
+      const d = parseDayLocal(key);
       if (isBefore(d, rangeStart) || isAfter(d, rangeEnd)) continue;
       if (!withinEnd(d, config)) continue;
       results.push(d);
@@ -193,11 +191,11 @@ export function expandirDatasOcorrencia(
     return results;
   }
 
-  let cursor = ancora ? startOfDay(parseISO(ancora)) : rangeStart;
+  let cursor = ancora ? parseDayLocal(ancora) : rangeStart;
 
   let guard = 0;
   while (isBefore(cursor, rangeStart) && guard < 5000) {
-    const next = calcularProximaData(cursor.toISOString(), config);
+    const next = calcularProximaData(toLocalDateKey(cursor), config);
     if (!next || !deveGerarProximaOcorrencia(config, next)) return results;
     cursor = startOfDay(next);
     guard++;
@@ -212,7 +210,7 @@ export function expandirDatasOcorrencia(
   }
 
   while (results.length < max) {
-    const next = calcularProximaData(cursor.toISOString(), config);
+    const next = calcularProximaData(toLocalDateKey(cursor), config);
     if (!next || !deveGerarProximaOcorrencia(config, next)) break;
     cursor = startOfDay(next);
     if (isAfter(cursor, rangeEnd)) break;
@@ -224,7 +222,9 @@ export function expandirDatasOcorrencia(
 
 export function formatRecorrencia(config: RecorrenciaConfig | null): string {
   if (!config || config.tipo === "nenhuma") return "Nenhuma";
-  const fim = config.data_fim ? ` até ${format(parseISO(config.data_fim), "dd/MM/yyyy")}` : "";
+  const fim = config.data_fim
+    ? ` até ${format(parseDayLocal(config.data_fim), "dd/MM/yyyy")}`
+    : "";
 
   switch (config.tipo) {
     case "diaria":
@@ -273,13 +273,8 @@ export function getAncoraSerie(
   config?: RecorrenciaConfig | null,
 ): string | null {
   const parsed = config ?? parseRecorrencia(modelo.recorrencia);
-  if (parsed?.data_ancora) return parsed.data_ancora;
+  if (parsed?.data_ancora) return toLocalDateKey(parsed.data_ancora) ?? parsed.data_ancora;
   return toLocalDateKey(modelo.data_inicio) ?? modelo.data_inicio ?? null;
-}
-
-function parseDayLocal(isoOrKey: string): Date {
-  if (isoOrKey.includes("T")) return startOfDay(new Date(isoOrKey));
-  return startOfDay(new Date(`${isoOrKey}T12:00:00`));
 }
 
 /**
@@ -298,21 +293,20 @@ export function offsetDiasSubtarefaNoCiclo(
 
   const subDay = parseDayLocal(subtarefaDataInicio);
   const ancoraKey = ancora ? toLocalDateKey(ancora) ?? ancora : null;
-  const ancoraIso = ancoraKey ? `${ancoraKey}T12:00:00` : null;
 
   let parentDay: Date;
-  if (ancoraIso) {
+  if (ancoraKey) {
     const ocorrencias = expandirDatasOcorrencia(
-      ancoraIso,
+      ancoraKey,
       config,
-      parseDayLocal(ancoraIso),
+      parseDayLocal(ancoraKey),
       subDay,
       { max: 600 },
     );
     parentDay =
       ocorrencias.length > 0
         ? ocorrencias[ocorrencias.length - 1]!
-        : parseDayLocal(ancoraIso);
+        : parseDayLocal(ancoraKey);
   } else {
     parentDay = subDay;
   }
@@ -329,5 +323,5 @@ export function offsetDiasSubtarefaNoCiclo(
 export function sameCalendarDay(a: string | null | undefined, b: Date): boolean {
   const key = toLocalDateKey(a);
   if (!key) return false;
-  return isSameDay(parseISO(key), b);
+  return isSameDay(parseDayLocal(key), b);
 }

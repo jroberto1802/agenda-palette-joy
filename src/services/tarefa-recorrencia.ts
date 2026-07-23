@@ -10,7 +10,12 @@ import {
 import { addDays, endOfDay, startOfDay } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import type { RecorrenciaConfig, TarefaFormData, TarefaWithRelations } from "@/types";
-import { toLocalDateKey } from "@/utils/agenda-datas";
+import {
+  applyTimeFromIso,
+  localDateAtNoon,
+  parseDayLocal,
+  toLocalDateKey,
+} from "@/utils/agenda-datas";
 
 const TAREFA_SELECT = `
   *,
@@ -87,14 +92,15 @@ async function cloneSubtarefasDoModelo(
   if (error) throw error;
   if (!subtarefas?.length) return;
 
-  const ocorrenciaDay = startOfDay(new Date(ocorrenciaDataInicio));
+  const ocorrenciaDay = parseDayLocal(ocorrenciaDataInicio);
 
   const rows = subtarefas.map((s) => {
     let dataInicio: string | null = null;
     if (s.data_inicio && config) {
       const offset = offsetDiasSubtarefaNoCiclo(s.data_inicio, ancoraIsoOrKey, config);
       if (offset !== null) {
-        dataInicio = addDays(ocorrenciaDay, offset).toISOString();
+        const subDay = addDays(ocorrenciaDay, offset);
+        dataInicio = applyTimeFromIso(subDay, s.data_inicio).toISOString();
       }
     }
 
@@ -194,9 +200,12 @@ export async function atualizarProximaDataModelo(modeloId: string): Promise<void
 
   const ancora = getAncoraSerie(modelo, config);
   const proxima = calcularProximaOcorrenciaPrevista(ancora, config, new Date());
-  const proximaIso = proxima ? proxima.toISOString() : null;
+  // Preserva horário explícito do modelo (se houver); senão meio-dia local
+  const proximaIso = proxima
+    ? applyTimeFromIso(proxima, modelo.data_inicio).toISOString()
+    : null;
 
-  // Garante data_ancora na regra
+  // Garante data_ancora na regra (sempre YYYY-MM-DD local)
   const ancoraKey = toLocalDateKey(ancora) ?? ancora;
   const nextConfig: RecorrenciaConfig = {
     ...config,
@@ -263,14 +272,8 @@ export async function materializarOcorrenciasDevidas(): Promise<number> {
     }
 
     const ancora = getAncoraSerie(modelo, config);
-    const de = ancora ? startOfDay(new Date(ancora.includes("T") ? ancora : ancora + "T12:00:00")) : addDays(hoje, -365);
-    const datas = expandirDatasOcorrencia(
-      ancora?.includes("T") ? ancora : ancora ? `${ancora}T12:00:00` : null,
-      config,
-      de,
-      hojeFim,
-      { max: 400 },
-    );
+    const de = ancora ? parseDayLocal(ancora) : addDays(hoje, -365);
+    const datas = expandirDatasOcorrencia(ancora, config, de, hojeFim, { max: 400 });
 
     const { data: existentes } = await supabase
       .from("tarefas")
@@ -285,12 +288,17 @@ export async function materializarOcorrenciasDevidas(): Promise<number> {
         .filter((d): d is string => !!d),
     );
 
+    // Horário de referência: última ocorrência existente ou o próprio modelo
+    const timeSource =
+      (existentes ?? []).find((e) => e.data_inicio)?.data_inicio ?? modelo.data_inicio;
+
     for (const data of datas) {
       const key = toLocalDateKey(data)!;
       if (diasExistentes.has(key)) continue;
       if (data.getTime() > hojeFim.getTime()) continue;
 
-      await materializarOcorrencia(modelo, data.toISOString());
+      const dataComHora = applyTimeFromIso(localDateAtNoon(data), timeSource);
+      await materializarOcorrencia(modelo, dataComHora.toISOString());
       diasExistentes.add(key);
       criadas++;
     }
@@ -379,7 +387,6 @@ export async function listPrevisoesOcorrencia(
 
     const ancora = getAncoraSerie(modelo, config);
     const ancoraKey = ancora ? toLocalDateKey(ancora) ?? ancora : null;
-    const ancoraIso = ancoraKey ? `${ancoraKey}T12:00:00` : null;
 
     // Templates do modelo: só offsets fixos (+0, +1…), sem expandir recorrência neles
     const { data: templatesRaw } = await supabase
@@ -401,7 +408,7 @@ export async function listPrevisoesOcorrencia(
 
     // 1) Datas da TAREFA PRINCIPAL (única coisa que usa o motor de recorrência)
     const expandDe = addDays(de, -maxOffset);
-    const datasPai = expandirDatasOcorrencia(ancoraIso, config, expandDe, ate, {
+    const datasPai = expandirDatasOcorrencia(ancoraKey, config, expandDe, ate, {
       max: 60,
     });
 
@@ -411,12 +418,13 @@ export async function listPrevisoesOcorrencia(
       if (diasExistentes.has(paiKey)) continue;
 
       const paiDay = startOfDay(dataPai);
+      const paiComHora = applyTimeFromIso(localDateAtNoon(paiDay), modelo.data_inicio);
 
       if (paiDay.getTime() >= de.getTime() && paiDay.getTime() <= ate.getTime()) {
         previsoesTarefa.push({
           kind: "tarefa",
           serie_raiz_id: modelo.id,
-          data_inicio: dataPai.toISOString(),
+          data_inicio: paiComHora.toISOString(),
           titulo: modelo.titulo,
           prioridade: modelo.prioridade,
           setor: modelo.setor,
@@ -437,7 +445,7 @@ export async function listPrevisoesOcorrencia(
           kind: "subtarefa",
           serie_raiz_id: modelo.id,
           modelo_subtarefa_id: template.id,
-          data_inicio: dataSub.toISOString(),
+          data_inicio: applyTimeFromIso(dataSub, template.data_inicio).toISOString(),
           titulo: template.titulo,
           tarefa_titulo: modelo.titulo,
           prioridade: template.prioridade,

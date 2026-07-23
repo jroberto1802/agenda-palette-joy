@@ -1,19 +1,20 @@
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import {
   Bell,
   Building2,
   CalendarDays,
   Eye,
   FolderKanban,
-  RefreshCw,
   UserRound,
 } from "lucide-react";
 import type { ReactNode } from "react";
+import { useMemo } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { PessoasMultiSelect } from "@/components/common/pessoas-multi-select";
+import {
+  DataHoraRecorrenciaBody,
+  formatDataHoraLabel,
+} from "@/components/tarefas/data-hora-recorrencia-body";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   FormControl,
@@ -36,7 +37,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { RecorrenciaPopover } from "@/components/tarefas/recorrencia-popover";
 import { cn } from "@/lib/utils";
 import type {
   ProfileWithSetor,
@@ -55,8 +55,7 @@ import {
   TAREFA_VISIBILIDADE_LABELS,
   TAREFA_VISIBILIDADE_OPTIONS,
 } from "@/utils/tarefas";
-import { formatRecorrencia, parseRecorrencia } from "@/utils/recorrencia";
-import { useState } from "react";
+import { parseRecorrencia } from "@/utils/recorrencia";
 
 /** Acima de Dialog/Sheet (z-50) e do drawer de subtarefa (z-[70]). */
 const META_OVERLAY_Z = "z-[100]";
@@ -110,39 +109,6 @@ function MetaIconButton({
   );
 }
 
-function DatePopoverBody({
-  value,
-  onChange,
-}: {
-  value: Date | null;
-  onChange: (date: Date | null) => void;
-}) {
-  return (
-    <>
-      <Calendar
-        mode="single"
-        selected={value ?? undefined}
-        onSelect={(date) => onChange(date ?? null)}
-        locale={ptBR}
-        initialFocus
-      />
-      {value && (
-        <div className="border-t p-2">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="w-full"
-            onClick={() => onChange(null)}
-          >
-            Remover data
-          </Button>
-        </div>
-      )}
-    </>
-  );
-}
-
 export function TarefaMetaToolbar({
   form,
   canEdit,
@@ -173,7 +139,6 @@ export function TarefaMetaToolbar({
   requireResponsavel?: boolean;
   hideRecorrencia?: boolean;
 }) {
-  const [recorrenciaOpen, setRecorrenciaOpen] = useState(false);
   const projetoId = form.watch("projeto_id");
   const setorId = form.watch("setor_id");
   const atribuidoIds = form.watch("atribuido_ids") ?? [];
@@ -190,20 +155,51 @@ export function TarefaMetaToolbar({
   const recorrenciaDatasLivres =
     (form.watch("recorrencia_datas_livres") as string[] | undefined) ?? [];
 
-  const recorrenciaAtual: RecorrenciaConfig | null =
-    recorrenciaTipo === "nenhuma"
-      ? null
-      : {
-          tipo: recorrenciaTipo,
-          dias_semana: recorrenciaDias,
-          dia_mes: recorrenciaDiaMes,
-          intervalo: recorrenciaIntervalo,
-          unidade: recorrenciaUnidade,
-          datas_livres: recorrenciaDatasLivres,
-        };
+  const recorrenciaAtual: RecorrenciaConfig | null = useMemo(
+    () =>
+      recorrenciaTipo === "nenhuma"
+        ? null
+        : {
+            tipo: recorrenciaTipo,
+            dias_semana: recorrenciaDias,
+            dia_mes: recorrenciaDiaMes,
+            intervalo: recorrenciaIntervalo,
+            unidade: recorrenciaUnidade,
+            datas_livres: recorrenciaDatasLivres,
+          },
+    [
+      recorrenciaTipo,
+      recorrenciaDias,
+      recorrenciaDiaMes,
+      recorrenciaIntervalo,
+      recorrenciaUnidade,
+      recorrenciaDatasLivres,
+    ],
+  );
 
   const projetoNome = projetos.find((p) => p.id === projetoId)?.nome;
   const setorNome = setores.find((s) => s.id === setorId)?.nome;
+
+  const applyRecorrencia = (config: RecorrenciaConfig | null) => {
+    form.setValue("recorrencia_tipo", config?.tipo ?? "nenhuma", {
+      shouldDirty: true,
+    });
+    form.setValue("recorrencia_dias_semana", config?.dias_semana ?? [], {
+      shouldDirty: true,
+    });
+    form.setValue("recorrencia_dia_mes", config?.dia_mes ?? 1, {
+      shouldDirty: true,
+    });
+    form.setValue("recorrencia_intervalo", config?.intervalo ?? 1, {
+      shouldDirty: true,
+    });
+    form.setValue("recorrencia_unidade", config?.unidade ?? "dias", {
+      shouldDirty: true,
+    });
+    form.setValue("recorrencia_datas_livres", config?.datas_livres ?? [], {
+      shouldDirty: true,
+    });
+  };
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -428,7 +424,7 @@ export function TarefaMetaToolbar({
           )}
         />
 
-        {/* Data */}
+        {/* Data + Hora + Recorrência (popup único) */}
         <FormField
           control={form.control}
           name="data_inicio"
@@ -438,12 +434,8 @@ export function TarefaMetaToolbar({
                 <PopoverTrigger asChild>
                   <span>
                     <MetaIconButton
-                      label={
-                        dataInicio
-                          ? `Data: ${format(dataInicio, "dd/MM/yyyy", { locale: ptBR })}`
-                          : "Data"
-                      }
-                      active={!!dataInicio}
+                      label={formatDataHoraLabel(dataInicio)}
+                      active={!!dataInicio || !!parseRecorrencia(recorrenciaAtual)}
                       disabled={!canEdit}
                     >
                       <CalendarDays className="h-4 w-4" />
@@ -451,7 +443,14 @@ export function TarefaMetaToolbar({
                   </span>
                 </PopoverTrigger>
                 <PopoverContent className={cn("w-auto p-0", META_OVERLAY_Z)} align="start">
-                  <DatePopoverBody value={field.value} onChange={field.onChange} />
+                  <DataHoraRecorrenciaBody
+                    value={field.value}
+                    onChange={field.onChange}
+                    canEdit={canEdit}
+                    showRecorrencia={!hideRecorrencia}
+                    recorrencia={recorrenciaAtual}
+                    onRecorrenciaChange={hideRecorrencia ? undefined : applyRecorrencia}
+                  />
                 </PopoverContent>
               </Popover>
               <FormMessage />
@@ -570,52 +569,6 @@ export function TarefaMetaToolbar({
             </FormItem>
           )}
         />
-
-        {/* Recorrência — apenas tarefas */}
-        {!hideRecorrencia && (
-          <RecorrenciaPopover
-            value={parseRecorrencia(recorrenciaAtual)}
-            canEdit={canEdit}
-            open={recorrenciaOpen}
-            onOpenChange={setRecorrenciaOpen}
-            confirmAlteracao={!!parseRecorrencia(recorrenciaAtual)}
-            onConfirm={(config) => {
-              form.setValue("recorrencia_tipo", config?.tipo ?? "nenhuma", {
-                shouldDirty: true,
-              });
-              form.setValue("recorrencia_dias_semana", config?.dias_semana ?? [], {
-                shouldDirty: true,
-              });
-              form.setValue("recorrencia_dia_mes", config?.dia_mes ?? 1, {
-                shouldDirty: true,
-              });
-              form.setValue("recorrencia_intervalo", config?.intervalo ?? 1, {
-                shouldDirty: true,
-              });
-              form.setValue("recorrencia_unidade", config?.unidade ?? "dias", {
-                shouldDirty: true,
-              });
-              form.setValue("recorrencia_datas_livres", config?.datas_livres ?? [], {
-                shouldDirty: true,
-              });
-            }}
-            trigger={
-              <span>
-                <MetaIconButton
-                  label={
-                    parseRecorrencia(recorrenciaAtual)
-                      ? formatRecorrencia(parseRecorrencia(recorrenciaAtual))
-                      : "Recorrência"
-                  }
-                  active={!!parseRecorrencia(recorrenciaAtual)}
-                  disabled={!canEdit}
-                >
-                  <RefreshCw className="h-4 w-4" />
-                </MetaIconButton>
-              </span>
-            }
-          />
-        )}
       </div>
     </TooltipProvider>
   );

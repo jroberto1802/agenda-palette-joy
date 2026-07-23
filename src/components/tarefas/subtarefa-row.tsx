@@ -6,11 +6,14 @@ import { ConfirmDeleteDialog } from "@/components/common/confirm-delete-dialog";
 import { PessoasMultiSelect } from "@/components/common/pessoas-multi-select";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
 import { ConclusaoBolinha } from "@/components/tarefas/conclusao-bolinha";
+import {
+  DataHoraRecorrenciaBody,
+  formatDataHoraLabel,
+} from "@/components/tarefas/data-hora-recorrencia-body";
 import { DescricaoPreview } from "@/components/tarefas/descricao-preview";
 import { TarefaActionsMenu } from "@/components/tarefas/tarefa-actions-menu";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
@@ -223,16 +226,12 @@ export function SubtarefaRow({
           className="flex shrink-0 items-center gap-0.5"
           onClick={(event) => event.stopPropagation()}
         >
-          {/* Data */}
+          {/* Data + Hora */}
           <Popover>
             <PopoverTrigger asChild>
               <span>
                 <MetaIconButton
-                  label={
-                    dataInicio
-                      ? `Data: ${format(dataInicio, "dd/MM/yyyy", { locale: ptBR })}`
-                      : "Data"
-                  }
+                  label={formatDataHoraLabel(dataInicio)}
                   active={!!dataInicio}
                   disabled={!canEdit || saving}
                 >
@@ -247,30 +246,16 @@ export function SubtarefaRow({
               </span>
             </PopoverTrigger>
             <PopoverContent className={cn("w-auto p-0", META_OVERLAY_Z)} align="end">
-              <Calendar
-                mode="single"
-                selected={dataInicio ?? undefined}
-                onSelect={(date) =>
+              <DataHoraRecorrenciaBody
+                value={dataInicio}
+                canEdit={canEdit && !saving}
+                showRecorrencia={false}
+                onChange={(date) =>
                   void runMeta({
                     data_inicio: date ? date.toISOString() : null,
                   })
                 }
-                locale={ptBR}
-                initialFocus
               />
-              {dataInicio && (
-                <div className="border-t p-2">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => void runMeta({ data_inicio: null })}
-                  >
-                    Remover data
-                  </Button>
-                </div>
-              )}
             </PopoverContent>
           </Popover>
 

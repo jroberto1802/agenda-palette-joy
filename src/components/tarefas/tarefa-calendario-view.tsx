@@ -24,7 +24,7 @@ import {
   type PrevisaoSubtarefa,
 } from "@/services/tarefa-recorrencia";
 import type { SubtarefaAgendaItem, TarefaWithRelations } from "@/types";
-import { toLocalDateKey } from "@/utils/agenda-datas";
+import { toLocalDateKey, hasExplicitTime } from "@/utils/agenda-datas";
 import { isSerieModelo } from "@/utils/recorrencia";
 import { TAREFA_PRIORIDADE_COLORS, formatResponsaveisLabel } from "@/utils/tarefas";
 import { cn } from "@/lib/utils";
@@ -262,7 +262,7 @@ function TimelineItem({
           Responsável: {formatResponsaveisLabel(tarefa)}
         </p>
       )}
-      {tarefa.data_inicio && (
+      {tarefa.data_inicio && hasExplicitTime(new Date(tarefa.data_inicio)) && (
         <p className="text-xs text-muted-foreground">
           {format(parseISO(tarefa.data_inicio), "HH:mm", { locale: ptBR })}
         </p>
