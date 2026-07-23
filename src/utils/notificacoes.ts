@@ -145,13 +145,15 @@ export function extractMentionedUserIds(
   conteudo: string,
   pessoas: { id: string; nome_completo: string }[],
 ): string[] {
-  if (!conteudo.includes("@") || pessoas.length === 0) return [];
+  // Conteúdo pode ser HTML rico — menções continuam como @Nome no texto
+  const plain = conteudo.replace(/<[^>]+>/g, " ");
+  if (!plain.includes("@") || pessoas.length === 0) return [];
 
   const sorted = [...pessoas].sort(
     (a, b) => b.nome_completo.length - a.nome_completo.length,
   );
   const mentioned = new Set<string>();
-  const lower = conteudo.toLowerCase();
+  const lower = plain.toLowerCase();
 
   for (const pessoa of sorted) {
     const nome = pessoa.nome_completo.trim();

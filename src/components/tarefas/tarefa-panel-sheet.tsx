@@ -48,7 +48,7 @@ import {
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
+import { RichTextEditor } from "@/components/common/rich-text-editor";
 import { usePessoas } from "@/hooks/use-pessoas";
 import { useProjetos } from "@/hooks/use-projetos";
 import { useProfile } from "@/hooks/use-profile";
@@ -922,13 +922,14 @@ export function TarefaPanelSheet({
                           >
                             {(editable) => (
                               <FormControl>
-                                <Textarea
+                                <RichTextEditor
+                                  value={field.value ?? ""}
+                                  onChange={field.onChange}
+                                  onBlur={field.onBlur}
                                   placeholder="Adicione uma descrição... (duplo clique para editar)"
-                                  rows={4}
-                                  className="rounded-xl border bg-card shadow-sm"
                                   readOnly={!editable}
                                   disabled={!canEdit}
-                                  {...field}
+                                  minHeightClassName="[&_.ProseMirror]:min-h-[6rem]"
                                 />
                               </FormControl>
                             )}

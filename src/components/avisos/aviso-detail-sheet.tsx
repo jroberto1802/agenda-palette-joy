@@ -4,6 +4,7 @@ import { CheckCircle2, Circle, MessageSquare, Paperclip, Pencil, Pin, Trash2 } f
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { CommentsThread } from "@/components/common/comments-thread";
+import { RichTextDisplay } from "@/components/common/rich-text-display";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
 import { AvisoDestinatarioDisplay } from "@/components/avisos/aviso-destinatario";
 import { Badge } from "@/components/ui/badge";
@@ -227,7 +228,10 @@ export function AvisoDetailSheet({
             <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
               <ScrollArea className="min-h-0 flex-1">
                 <div className="space-y-4 p-6">
-                  <p className="whitespace-pre-wrap text-sm leading-relaxed">{aviso.conteudo}</p>
+                  <RichTextDisplay
+                    content={aviso.conteudo}
+                    className="text-sm leading-relaxed text-foreground"
+                  />
                 </div>
               </ScrollArea>
 

@@ -13,6 +13,7 @@ import {
   AVISO_PRIORIDADE_LABELS,
   formatAvisoExpiracao,
 } from "@/utils/avisos";
+import { stripHtml } from "@/utils/rich-text";
 
 export function AvisoCard({
   aviso,
@@ -23,8 +24,8 @@ export function AvisoCard({
   lido: boolean;
   onOpen: () => void;
 }) {
-  const preview =
-    aviso.conteudo.length > 80 ? `${aviso.conteudo.slice(0, 80)}...` : aviso.conteudo;
+  const plain = stripHtml(aviso.conteudo);
+  const preview = plain.length > 80 ? `${plain.slice(0, 80)}...` : plain;
 
   return (
     <Card

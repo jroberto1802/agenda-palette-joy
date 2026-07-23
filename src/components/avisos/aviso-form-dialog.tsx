@@ -29,7 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
+import { RichTextEditor } from "@/components/common/rich-text-editor";
 import type {
   AvisoAlcance,
   AvisoFormData,
@@ -38,6 +38,7 @@ import type {
   ProfileWithSetor,
   SetorWithGerente,
 } from "@/types";
+import { stripHtml } from "@/utils/rich-text";
 import { AVISO_ALCANCE_LABELS, AVISO_PRIORIDADE_LABELS } from "@/utils/avisos";
 
 function defaultExpirationValue(): string {
@@ -55,7 +56,9 @@ function toDatetimeLocalValue(iso: string): string {
 
 const avisoBaseSchema = z.object({
   titulo: z.string().min(2, "Título obrigatório"),
-  conteudo: z.string().min(5, "Conteúdo deve ter pelo menos 5 caracteres"),
+  conteudo: z
+    .string()
+    .refine((v) => stripHtml(v).length >= 5, "Conteúdo deve ter pelo menos 5 caracteres"),
   alcance: z.enum(["todos", "por_setor", "pessoa_especifica"]),
   prioridade: z.enum(["urgente", "importante", "informativo", "geral"]),
   data_expiracao: z.string().min(1, "Data de expiração obrigatória"),
@@ -215,7 +218,13 @@ export function AvisoFormDialog({
                 <FormItem>
                   <FormLabel>Conteúdo</FormLabel>
                   <FormControl>
-                    <Textarea rows={5} placeholder="Escreva o aviso..." {...field} />
+                    <RichTextEditor
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      placeholder="Escreva o aviso..."
+                      minHeightClassName="[&_.ProseMirror]:min-h-[8rem]"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

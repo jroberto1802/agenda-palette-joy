@@ -1,3 +1,5 @@
+import { stripHtml } from "@/utils/rich-text";
+
 export function DescricaoPreview({
   descricao,
   className,
@@ -5,7 +7,7 @@ export function DescricaoPreview({
   descricao?: string | null;
   className?: string;
 }) {
-  const text = descricao?.replace(/\s+/g, " ").trim();
+  const text = stripHtml(descricao).replace(/\s+/g, " ").trim();
   if (!text) return null;
 
   return (

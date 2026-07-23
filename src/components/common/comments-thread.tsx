@@ -20,6 +20,7 @@ import {
   getComentarioEditadoLabel,
 } from "@/utils/comentarios";
 import { formatDateTime } from "@/utils/formatters";
+import { stripHtml } from "@/utils/rich-text";
 
 export type ThreadComentario = {
   id: string;
@@ -44,7 +45,7 @@ export type ThreadComentario = {
 };
 
 function commentPreview(conteudo: string) {
-  const trimmed = conteudo.trim().replace(/\s+/g, " ");
+  const trimmed = stripHtml(conteudo).replace(/\s+/g, " ").trim();
   if (trimmed.length <= 80) return trimmed;
   return `${trimmed.slice(0, 80)}…`;
 }
