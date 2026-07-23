@@ -1,4 +1,4 @@
-import { Check, CircleCheck, Pencil, Reply, Trash2, X } from "lucide-react";
+import { Check, Pencil, Reply, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   CommentBody,
@@ -63,6 +63,7 @@ function CommentReacoes({
   onToggle?: () => Promise<void>;
 }) {
   const count = reacoes.length;
+  // true = esta pessoa já reagiu → ícone verde; false = ainda não → ícone cinza
   const reactedByMe = !!currentUserId && reacoes.some((r) => r.usuario_id === currentUserId);
   const sorted = useMemo(
     () =>
@@ -80,23 +81,27 @@ function CommentReacoes({
           variant="ghost"
           size="icon"
           className={cn(
-            "h-6 w-6",
+            "h-6 w-6 shrink-0",
             reactedByMe
-              ? "text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
-              : "text-muted-foreground hover:text-foreground",
+              ? "text-green-600 hover:bg-green-50 hover:text-green-700"
+              : "text-zinc-400 hover:bg-muted hover:text-zinc-500",
           )}
-          aria-label={reactedByMe ? "Remover reação" : "Reagir com check"}
+          aria-label={reactedByMe ? "Remover reação" : "Reagir"}
           aria-pressed={reactedByMe}
           disabled={reacting}
           onClick={() => void onToggle()}
         >
-          <CircleCheck
+          {/*
+            Lógica do ícone de Reagir:
+            - padrão (não reagiu): check cinza
+            - ativado (reagiu): check verde
+          */}
+          <Check
             className={cn(
-              "h-3.5 w-3.5",
-              reactedByMe
-                ? "fill-emerald-600 text-emerald-600"
-                : "fill-none text-muted-foreground",
+              "h-3.5 w-3.5 stroke-[2.5]",
+              reactedByMe ? "text-green-600" : "text-zinc-400",
             )}
+            aria-hidden
           />
         </Button>
       )}
@@ -109,12 +114,12 @@ function CommentReacoes({
               className={cn(
                 "inline-flex h-6 items-center gap-1 rounded-full border px-1.5 text-xs transition-colors",
                 reactedByMe
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                  ? "border-green-200 bg-green-50 text-green-700 hover:bg-green-100"
                   : "border-border bg-muted/40 text-muted-foreground hover:bg-muted",
               )}
               aria-label={`${count} reação${count === 1 ? "" : "ões"}`}
             >
-              <CircleCheck className="h-3 w-3 fill-emerald-600 text-emerald-600" />
+              <Check className="h-3 w-3 text-green-600" aria-hidden />
               <span>{count}</span>
             </button>
           </PopoverTrigger>
