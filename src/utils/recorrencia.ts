@@ -3,6 +3,7 @@ import {
   addMonths,
   addWeeks,
   addYears,
+  endOfDay,
   format,
   isAfter,
   isBefore,
@@ -81,6 +82,19 @@ export function pertenceASerie(
   tarefa: { serie_raiz_id?: string | null },
 ): boolean {
   return !!tarefa.serie_raiz_id;
+}
+
+/** Janela máxima de previsão futura exibida em "Em breve" e no Calendário. */
+export const PREVISAO_LIMITE_ANOS = 1;
+
+/**
+ * Último instante com previsão de ocorrência futura (hoje + 1 ano).
+ *
+ * Limite de exibição/cálculo apenas: a série continua ativa indefinidamente,
+ * e a previsão reaparece quando a data entra na janela.
+ */
+export function getLimitePrevisaoFutura(hoje: Date = new Date()): Date {
+  return endOfDay(addYears(startOfDay(hoje), PREVISAO_LIMITE_ANOS));
 }
 
 function withinEnd(date: Date, config: RecorrenciaConfig): boolean {

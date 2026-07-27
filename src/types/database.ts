@@ -534,6 +534,7 @@ export type Database = {
           descricao: string | null;
           id: string;
           lembretes: Json;
+          origem_subtarefa_id: string | null;
           posicao: number;
           prioridade: "P1" | "P2" | "P3" | "P4";
           projeto_id: string | null;
@@ -559,6 +560,7 @@ export type Database = {
           descricao?: string | null;
           id?: string;
           lembretes?: Json;
+          origem_subtarefa_id?: string | null;
           posicao?: number;
           prioridade?: "P1" | "P2" | "P3" | "P4";
           projeto_id?: string | null;
@@ -584,6 +586,7 @@ export type Database = {
           descricao?: string | null;
           id?: string;
           lembretes?: Json;
+          origem_subtarefa_id?: string | null;
           posicao?: number;
           prioridade?: "P1" | "P2" | "P3" | "P4";
           projeto_id?: string | null;
@@ -1339,6 +1342,14 @@ export type Database = {
       fold_search_text: {
         Args: { t: string };
         Returns: string;
+      };
+      materializar_ocorrencias_recorrencia: {
+        Args: { p_dias_retroativos?: number };
+        Returns: number;
+      };
+      recorrencia_atualizar_proxima_data: {
+        Args: { p_modelo_id: string };
+        Returns: void;
       };
     };
     Enums: Record<string, never>;

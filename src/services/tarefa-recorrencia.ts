@@ -1,7 +1,7 @@
 import {
-  calcularProximaOcorrenciaPrevista,
   expandirDatasOcorrencia,
   getAncoraSerie,
+  getLimitePrevisaoFutura,
   isSerieModelo,
   offsetDiasSubtarefaNoCiclo,
   parseRecorrencia,
@@ -10,12 +10,7 @@ import {
 import { addDays, endOfDay, startOfDay } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import type { RecorrenciaConfig, TarefaFormData, TarefaWithRelations } from "@/types";
-import {
-  applyTimeFromIso,
-  localDateAtNoon,
-  parseDayLocal,
-  toLocalDateKey,
-} from "@/utils/agenda-datas";
+import { applyTimeFromIso, localDateAtNoon, toLocalDateKey } from "@/utils/agenda-datas";
 
 const TAREFA_SELECT = `
   *,
@@ -33,28 +28,6 @@ const TAREFA_SELECT = `
   )
 `;
 
-async function syncResponsaveis(tarefaId: string, usuarioIds: string[]) {
-  await supabase.from("tarefa_responsaveis").delete().eq("tarefa_id", tarefaId);
-  if (usuarioIds.length === 0) return;
-  const { error } = await supabase.from("tarefa_responsaveis").insert(
-    usuarioIds.map((usuario_id) => ({ tarefa_id: tarefaId, usuario_id })),
-  );
-  if (error) throw error;
-}
-
-async function syncObservadores(tarefaId: string, usuarioIds: string[]) {
-  await supabase.from("tarefa_observadores").delete().eq("tarefa_id", tarefaId);
-  if (usuarioIds.length === 0) return;
-  const { error } = await supabase.from("tarefa_observadores").insert(
-    usuarioIds.map((usuario_id) => ({ tarefa_id: tarefaId, usuario_id })),
-  );
-  if (error) throw error;
-}
-
-function primaryAtribuido(ids: string[]): string | null {
-  return ids[0] ?? null;
-}
-
 /** Prefixo ISO para comparar dia civil (YYYY-MM-DD). */
 function dayPrefix(iso: string | null | undefined): string | null {
   return toLocalDateKey(iso);
@@ -70,243 +43,35 @@ type ModeloSubtarefaTemplate = {
 };
 
 /**
- * Após criar a ocorrência da tarefa, gera UM conjunto de subtarefas filhas.
- * Data = data da ocorrência + offset (sem recorrência própria).
+ * Aponta o modelo da série para a próxima data devida que ainda não tem ocorrência.
+ *
+ * Roda no servidor (`security definer`): a ocorrência pode ser concluída por
+ * alguém sem permissão de escrita no modelo, e o modelo precisa avançar mesmo assim.
  */
-async function cloneSubtarefasDoModelo(
-  modeloId: string,
-  ocorrenciaId: string,
-  ancoraIsoOrKey: string | null,
-  ocorrenciaDataInicio: string,
-  config: RecorrenciaConfig | null,
-): Promise<void> {
-  const { data: subtarefas, error } = await supabase
-    .from("subtarefas")
-    .select(
-      "titulo, descricao, prioridade, data_inicio, projeto_id, setor_id, visibilidade, lembretes, posicao",
-    )
-    .eq("tarefa_id", modeloId)
-    .order("posicao", { ascending: true })
-    .order("created_at", { ascending: true });
-
-  if (error) throw error;
-  if (!subtarefas?.length) return;
-
-  const ocorrenciaDay = parseDayLocal(ocorrenciaDataInicio);
-
-  const rows = subtarefas.map((s) => {
-    let dataInicio: string | null = null;
-    if (s.data_inicio && config) {
-      const offset = offsetDiasSubtarefaNoCiclo(s.data_inicio, ancoraIsoOrKey, config);
-      if (offset !== null) {
-        const subDay = addDays(ocorrenciaDay, offset);
-        dataInicio = applyTimeFromIso(subDay, s.data_inicio).toISOString();
-      }
-    }
-
-    return {
-      id: crypto.randomUUID(),
-      tarefa_id: ocorrenciaId,
-      titulo: s.titulo,
-      descricao: s.descricao,
-      prioridade: s.prioridade,
-      data_inicio: dataInicio,
-      projeto_id: s.projeto_id,
-      setor_id: s.setor_id,
-      visibilidade: s.visibilidade,
-      lembretes: s.lembretes,
-      // Subtarefas nunca têm recorrência própria
-      recorrencia: null,
-      posicao: s.posicao,
-      concluida: false,
-      concluido_por: null,
-    };
-  });
-
-  const { error: insertError } = await supabase.from("subtarefas").insert(rows);
-  if (insertError) throw insertError;
-}
-
-async function materializarOcorrencia(
-  modelo: TarefaWithRelations,
-  dataInicioIso: string,
-): Promise<TarefaWithRelations | null> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const responsavelIds =
-    modelo.responsaveis?.map((r) => r.usuario_id).filter(Boolean) ??
-    (modelo.atribuido_a ? [modelo.atribuido_a] : []);
-
-  const observadorIds =
-    modelo.observadores?.map((o) => o.usuario_id).filter(Boolean) ?? [];
-
-  const novaId = crypto.randomUUID();
-  const serieRaizId = modelo.serie_raiz_id === modelo.id ? modelo.id : (modelo.serie_raiz_id ?? modelo.id);
-  const config = parseRecorrencia(modelo.recorrencia);
-  const ancora = getAncoraSerie(modelo, config);
-
-  const { data, error } = await supabase
-    .from("tarefas")
-    .insert({
-      id: novaId,
-      titulo: modelo.titulo,
-      descricao: modelo.descricao,
-      projeto_id: modelo.projeto_id,
-      setor_id: modelo.setor_id,
-      atribuido_a: primaryAtribuido(responsavelIds),
-      prioridade: modelo.prioridade,
-      concluida: false,
-      data_inicio: dataInicioIso,
-      tags: modelo.tags,
-      recorrencia: null,
-      serie_raiz_id: serieRaizId,
-      visibilidade: modelo.visibilidade,
-      lembretes: modelo.lembretes,
-      criado_por: user.id,
-    })
-    .select(TAREFA_SELECT)
-    .single();
-
-  if (error) throw error;
-
-  if (responsavelIds.length > 0) await syncResponsaveis(novaId, responsavelIds);
-  if (observadorIds.length > 0) await syncObservadores(novaId, observadorIds);
-
-  await cloneSubtarefasDoModelo(
-    serieRaizId,
-    novaId,
-    ancora,
-    dataInicioIso,
-    config,
-  ).catch(() => undefined);
-
-  return data as TarefaWithRelations;
-}
-
-/** Atualiza `data_inicio` do modelo para a próxima ocorrência prevista. */
 export async function atualizarProximaDataModelo(modeloId: string): Promise<void> {
-  const { data: modelo, error } = await supabase
-    .from("tarefas")
-    .select("id, data_inicio, recorrencia, serie_raiz_id")
-    .eq("id", modeloId)
-    .single();
-  if (error || !modelo) return;
-
-  const config = parseRecorrencia(modelo.recorrencia);
-  if (!config || !isSerieModelo(modelo)) return;
-
-  const ancora = getAncoraSerie(modelo, config);
-  const proxima = calcularProximaOcorrenciaPrevista(ancora, config, new Date());
-  // Preserva horário explícito do modelo (se houver); senão meio-dia local
-  const proximaIso = proxima
-    ? applyTimeFromIso(proxima, modelo.data_inicio).toISOString()
-    : null;
-
-  // Garante data_ancora na regra (sempre YYYY-MM-DD local)
-  const ancoraKey = toLocalDateKey(ancora) ?? ancora;
-  const nextConfig: RecorrenciaConfig = {
-    ...config,
-    data_ancora: config.data_ancora ?? ancoraKey,
-  };
-
-  await supabase
-    .from("tarefas")
-    .update({
-      data_inicio: proximaIso,
-      recorrencia: serializeRecorrencia(nextConfig),
-      concluida: false,
-      data_conclusao: null,
-    })
-    .eq("id", modeloId);
+  const { error } = await supabase.rpc("recorrencia_atualizar_proxima_data", {
+    p_modelo_id: modeloId,
+  });
+  if (error) throw error;
 }
 
 /**
- * Reabre modelos concluídos (modelo é permanente) e materializa ocorrências devidas.
- * O modelo NÃO conta como ocorrência — só linhas filhas (`serie_raiz_id !== id`).
+ * Materializa as ocorrências devidas (data <= hoje, America/Sao_Paulo) de todas
+ * as séries ativas, com o conjunto de subtarefas de cada uma (offset em dias).
+ *
+ * A geração é do servidor: job diário às 00:05 (America/Sao_Paulo) e esta RPC
+ * como catch-up quando o app abre. Rodar no servidor é o que garante:
+ * - independência de alguém estar logado;
+ * - autoria (`criado_por`) preservada do modelo, não de quem abriu o app;
+ * - séries invisíveis para o usuário atual também sendo geradas;
+ * - ausência de duplicidade (lock + checagem na mesma transação).
+ *
+ * @returns quantidade de ocorrências criadas nesta execução.
  */
 export async function materializarOcorrenciasDevidas(): Promise<number> {
-  const hoje = startOfDay(new Date());
-  const hojeFim = endOfDay(hoje);
-
-  const { data: candidatas, error } = await supabase
-    .from("tarefas")
-    .select(TAREFA_SELECT)
-    .is("deleted_at", null)
-    .not("recorrencia", "is", null)
-    .not("serie_raiz_id", "is", null);
-
+  const { data, error } = await supabase.rpc("materializar_ocorrencias_recorrencia", {});
   if (error) throw error;
-
-  const modelosSerie = ((candidatas ?? []) as TarefaWithRelations[]).filter((t) =>
-    isSerieModelo(t),
-  );
-
-  let criadas = 0;
-
-  for (const modelo of modelosSerie) {
-    if (modelo.concluida) {
-      await supabase
-        .from("tarefas")
-        .update({ concluida: false, data_conclusao: null })
-        .eq("id", modelo.id);
-    }
-
-    const config = parseRecorrencia(modelo.recorrencia);
-    if (!config) continue;
-
-    // Persist âncora se ainda não existir
-    if (!config.data_ancora && modelo.data_inicio) {
-      const ancoraKey = toLocalDateKey(modelo.data_inicio);
-      if (ancoraKey) {
-        await supabase
-          .from("tarefas")
-          .update({
-            recorrencia: serializeRecorrencia({ ...config, data_ancora: ancoraKey }),
-          })
-          .eq("id", modelo.id);
-        config.data_ancora = ancoraKey;
-      }
-    }
-
-    const ancora = getAncoraSerie(modelo, config);
-    const de = ancora ? parseDayLocal(ancora) : addDays(hoje, -365);
-    const datas = expandirDatasOcorrencia(ancora, config, de, hojeFim, { max: 400 });
-
-    const { data: existentes } = await supabase
-      .from("tarefas")
-      .select("id, data_inicio, serie_raiz_id")
-      .eq("serie_raiz_id", modelo.id)
-      .is("deleted_at", null)
-      .neq("id", modelo.id); // só ocorrências, nunca o modelo
-
-    const diasExistentes = new Set(
-      (existentes ?? [])
-        .map((e) => dayPrefix(e.data_inicio))
-        .filter((d): d is string => !!d),
-    );
-
-    // Horário de referência: última ocorrência existente ou o próprio modelo
-    const timeSource =
-      (existentes ?? []).find((e) => e.data_inicio)?.data_inicio ?? modelo.data_inicio;
-
-    for (const data of datas) {
-      const key = toLocalDateKey(data)!;
-      if (diasExistentes.has(key)) continue;
-      if (data.getTime() > hojeFim.getTime()) continue;
-
-      const dataComHora = applyTimeFromIso(localDateAtNoon(data), timeSource);
-      await materializarOcorrencia(modelo, dataComHora.toISOString());
-      diasExistentes.add(key);
-      criadas++;
-    }
-
-    await atualizarProximaDataModelo(modelo.id);
-  }
-
-  return criadas;
+  return typeof data === "number" ? data : 0;
 }
 
 export type PrevisaoOcorrencia = {
@@ -346,14 +111,23 @@ export type PrevisoesAgenda = {
  * Recorrência: SOMENTE a tarefa principal.
  * Subtarefas: após cada ocorrência da tarefa, exatamente UM conjunto
  * (data = ocorrência + offset). Sem recorrência própria.
+ *
+ * A janela é limitada a 1 ano à frente de hoje. Além disso nada é previsto,
+ * mesmo com a série ativa — é limite de exibição, não de vigência da série.
  */
 export async function listPrevisoesOcorrencia(
   deIsoDate: string,
   ateIsoDate: string,
 ): Promise<PrevisoesAgenda> {
   const de = startOfDay(new Date(deIsoDate + "T12:00:00"));
-  const ate = endOfDay(new Date(ateIsoDate + "T12:00:00"));
+  const ateSolicitado = endOfDay(new Date(ateIsoDate + "T12:00:00"));
   const hojeFim = endOfDay(new Date());
+  const limitePrevisao = getLimitePrevisaoFutura();
+
+  if (de.getTime() > limitePrevisao.getTime()) return { tarefas: [], subtarefas: [] };
+
+  const ate =
+    ateSolicitado.getTime() > limitePrevisao.getTime() ? limitePrevisao : ateSolicitado;
 
   const { data: candidatas, error } = await supabase
     .from("tarefas")
