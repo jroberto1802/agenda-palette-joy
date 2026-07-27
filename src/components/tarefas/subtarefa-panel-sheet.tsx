@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, MessageSquare, Paperclip } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { RichTextEditor } from "@/components/common/rich-text-editor";
+import { DescricaoField } from "@/components/tarefas/descricao-field";
 import { usePessoas } from "@/hooks/use-pessoas";
 import { useProjetos } from "@/hooks/use-projetos";
 import { useProfile } from "@/hooks/use-profile";
@@ -262,7 +262,7 @@ export function SubtarefaPanelSheet({
   const pessoasParaResponsavel = pessoasDoEscopoPai;
   const pessoasParaVisibilidade = pessoasDoEscopoPai;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) {
       setEditingField(null);
       return;
@@ -555,14 +555,16 @@ export function SubtarefaPanelSheet({
                           >
                             {(editable) => (
                               <FormControl>
-                                <RichTextEditor
+                                <DescricaoField
                                   value={field.value ?? ""}
                                   onChange={field.onChange}
                                   onBlur={field.onBlur}
-                                  placeholder="Adicione uma descrição... (duplo clique para editar)"
-                                  readOnly={!editable}
+                                  editable={editable}
                                   disabled={!canEdit}
+                                  editorKey={subtarefaId ?? "subtarefa"}
+                                  placeholder="Adicione uma descrição... (duplo clique para editar)"
                                   minHeightClassName="[&_.ProseMirror]:min-h-[12rem]"
+                                  readMinHeightClassName="min-h-[12rem]"
                                 />
                               </FormControl>
                             )}

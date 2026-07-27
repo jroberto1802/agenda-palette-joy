@@ -92,7 +92,7 @@ export function CommentBody({
       className={cn(
         "text-sm text-muted-foreground",
         "[&_p]:my-0.5 [&_p]:leading-snug [&_mark]:rounded-sm [&_mark]:px-0.5 [&_u]:underline",
-        "[&_strong]:font-semibold [&_em]:italic",
+        "[&_mark]:!text-neutral-900 [&_strong]:font-semibold [&_em]:italic",
         className,
       )}
       dangerouslySetInnerHTML={{ __html: html }}
@@ -288,8 +288,10 @@ export function CommentMentionInput({
         className={cn(
           "rounded-md border bg-transparent shadow-sm focus-within:ring-1 focus-within:ring-ring",
           "[&_.ProseMirror]:px-3 [&_.ProseMirror]:py-2 [&_.ProseMirror]:outline-none [&_.ProseMirror]:text-sm",
+          "[&_.ProseMirror]:text-foreground",
           "[&_.ProseMirror_p]:my-1 [&_.ProseMirror_p]:leading-relaxed",
           "[&_.ProseMirror_mark]:rounded-sm [&_.ProseMirror_mark]:px-0.5",
+          "[&_.ProseMirror_mark]:!text-neutral-900",
           "[&_.ProseMirror_u]:underline",
           "[&_p.is-editor-empty:first-child::before]:pointer-events-none",
           "[&_p.is-editor-empty:first-child::before]:float-left",

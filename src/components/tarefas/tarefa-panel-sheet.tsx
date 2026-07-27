@@ -15,7 +15,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ChevronRight, GripVertical, MessageSquare, Paperclip, Plus, Save } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -53,7 +53,7 @@ import {
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { RichTextEditor } from "@/components/common/rich-text-editor";
+import { DescricaoField } from "@/components/tarefas/descricao-field";
 import { usePessoas } from "@/hooks/use-pessoas";
 import { useProjetos } from "@/hooks/use-projetos";
 import { useProfile } from "@/hooks/use-profile";
@@ -492,7 +492,7 @@ export function TarefaPanelSheet({
     ? defaultDataInicio.getTime()
     : null;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) return;
     visibilidadeManualRef.current = !isCreate;
     const recorrenciaOverride =
@@ -923,14 +923,16 @@ export function TarefaPanelSheet({
                           >
                             {(editable) => (
                               <FormControl>
-                                <RichTextEditor
+                                <DescricaoField
                                   value={field.value ?? ""}
                                   onChange={field.onChange}
                                   onBlur={field.onBlur}
-                                  placeholder="Adicione uma descrição... (duplo clique para editar)"
-                                  readOnly={!editable}
+                                  editable={editable}
                                   disabled={!canEdit}
+                                  editorKey={tarefaId ?? "nova-tarefa"}
+                                  placeholder="Adicione uma descrição... (duplo clique para editar)"
                                   minHeightClassName="[&_.ProseMirror]:min-h-[6rem]"
+                                  readMinHeightClassName="min-h-[6rem]"
                                 />
                               </FormControl>
                             )}

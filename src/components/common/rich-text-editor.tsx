@@ -8,9 +8,25 @@ import { useEffect, useRef } from "react";
 import { FormatToolbar } from "@/components/common/format-toolbar";
 import { cn } from "@/lib/utils";
 import {
+  HIGHLIGHT_TEXT_COLOR,
   normalizeRichTextOutput,
   toEditorHtml,
 } from "@/utils/rich-text";
+
+/** Classes compartilhadas do surface TipTap (contraste explícito claro/escuro). */
+export const RICH_TEXT_EDITOR_SURFACE =
+  "[&_.ProseMirror]:px-3 [&_.ProseMirror]:py-2 [&_.ProseMirror]:outline-none [&_.ProseMirror]:text-sm " +
+  "[&_.ProseMirror]:text-card-foreground " +
+  "[&_.ProseMirror_p]:my-1 [&_.ProseMirror_p]:leading-relaxed " +
+  "[&_.ProseMirror_mark]:rounded-sm [&_.ProseMirror_mark]:px-0.5 " +
+  // Marca-texto pastel: texto sempre escuro (legível no tema escuro)
+  "[&_.ProseMirror_mark]:!text-neutral-900 " +
+  "[&_.ProseMirror_u]:underline " +
+  "[&_p.is-editor-empty:first-child::before]:pointer-events-none " +
+  "[&_p.is-editor-empty:first-child::before]:float-left " +
+  "[&_p.is-editor-empty:first-child::before]:h-0 " +
+  "[&_p.is-editor-empty:first-child::before]:text-muted-foreground " +
+  "[&_p.is-editor-empty:first-child::before]:content-[attr(data-placeholder)]";
 
 export function RichTextEditor({
   value,
@@ -53,7 +69,13 @@ export function RichTextEditor({
         listItem: false,
       }),
       Underline,
-      Highlight.configure({ multicolor: true }),
+      Highlight.configure({
+        multicolor: true,
+        HTMLAttributes: {
+          // Garante contraste mesmo se o HTML salvo vier sem color
+          style: `color: ${HIGHLIGHT_TEXT_COLOR}`,
+        },
+      }),
       Placeholder.configure({
         placeholder: placeholder ?? "",
       }),
@@ -83,7 +105,7 @@ export function RichTextEditor({
       return;
     }
     lastEmitted.current = incoming;
-    editor.commands.setContent(toEditorHtml(incoming), { emitUpdate: false });
+    editor.commands.setContent(toEditorHtml(incoming || value), { emitUpdate: false });
   }, [editor, value]);
 
   useEffect(() => {
@@ -94,20 +116,12 @@ export function RichTextEditor({
 
   const surface = cn(
     variant === "card"
-      ? "rounded-xl border bg-card shadow-sm"
-      : "rounded-md border bg-transparent shadow-sm",
+      ? "rounded-xl border bg-card text-card-foreground shadow-sm"
+      : "rounded-md border bg-transparent text-foreground shadow-sm",
     "focus-within:ring-1 focus-within:ring-ring",
-    "[&_.ProseMirror]:px-3 [&_.ProseMirror]:py-2 [&_.ProseMirror]:outline-none [&_.ProseMirror]:text-sm",
-    "[&_.ProseMirror_p]:my-1 [&_.ProseMirror_p]:leading-relaxed",
-    "[&_.ProseMirror_mark]:rounded-sm [&_.ProseMirror_mark]:px-0.5",
-    "[&_.ProseMirror_u]:underline",
-    "[&_p.is-editor-empty:first-child::before]:pointer-events-none",
-    "[&_p.is-editor-empty:first-child::before]:float-left",
-    "[&_p.is-editor-empty:first-child::before]:h-0",
-    "[&_p.is-editor-empty:first-child::before]:text-muted-foreground",
-    "[&_p.is-editor-empty:first-child::before]:content-[attr(data-placeholder)]",
+    RICH_TEXT_EDITOR_SURFACE,
     minHeightClassName,
-    !editable && "cursor-default opacity-90",
+    !editable && "cursor-default",
   );
 
   if (!editor) {

@@ -11,6 +11,9 @@ export const HIGHLIGHT_COLORS = [
 
 export type HighlightColorId = (typeof HIGHLIGHT_COLORS)[number]["id"];
 
+/** Texto escuro sobre marca-texto pastel — legível em tema claro e escuro. */
+export const HIGHLIGHT_TEXT_COLOR = "#171717";
+
 const ALLOWED_TAGS = [
   "p",
   "br",
@@ -75,16 +78,55 @@ export function normalizeRichTextOutput(html: string): string {
   if (!html) return "";
   const text = stripHtml(html);
   if (!text) return "";
-  return html;
+  // TipTap Highlight usa `color: inherit` — normaliza para texto escuro legível no dark mode
+  return normalizeHighlightContrast(html);
+}
+
+/**
+ * Garante contraste do marca-texto: fundos pastéis claros com texto escuro.
+ * Evita bloco ilegível no tema escuro (texto claro herdado sobre highlight).
+ */
+export function normalizeHighlightContrast(html: string): string {
+  if (!html || !html.includes("<mark")) return html;
+
+  return html.replace(/<mark\b([^>]*)>/gi, (_full, rawAttrs: string) => {
+    let attrs = rawAttrs ?? "";
+    const dataColor = attrs.match(/\bdata-color\s*=\s*("([^"]*)"|'([^']*)')/i);
+    const bgFromData = dataColor?.[2] ?? dataColor?.[3];
+
+    if (/\bstyle\s*=\s*/i.test(attrs)) {
+      attrs = attrs.replace(
+        /\bstyle\s*=\s*("([^"]*)"|'([^']*)')/i,
+        (_s, _q, doubleVal?: string, singleVal?: string) => {
+          const current = doubleVal ?? singleVal ?? "";
+          const withoutColor = current
+            .replace(/(?:^|;)\s*color\s*:[^;]*/gi, "")
+            .replace(/;;+/g, ";")
+            .replace(/^;|;$/g, "")
+            .trim();
+          const bgMatch = withoutColor.match(/background-color\s*:\s*([^;]+)/i);
+          const bg = (bgMatch?.[1] ?? bgFromData ?? "#fef08a").trim();
+          const next = `background-color: ${bg}; color: ${HIGHLIGHT_TEXT_COLOR}`;
+          return `style="${next}"`;
+        },
+      );
+    } else {
+      const bg = (bgFromData ?? "#fef08a").trim();
+      attrs = `${attrs} style="background-color: ${bg}; color: ${HIGHLIGHT_TEXT_COLOR}"`;
+    }
+
+    return `<mark${attrs}>`;
+  });
 }
 
 /** Sanitiza HTML para exibição segura. */
 export function sanitizeRichHtml(html: string): string {
   if (!html) return "";
-  return DOMPurify.sanitize(html, {
+  const clean = DOMPurify.sanitize(html, {
     ALLOWED_TAGS,
     ALLOWED_ATTR,
   });
+  return normalizeHighlightContrast(clean);
 }
 
 /** Conteúdo para o editor: HTML sanitizado ou conversão de texto legado. */

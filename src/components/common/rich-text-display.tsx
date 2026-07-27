@@ -9,7 +9,7 @@ import {
 
 const DISPLAY_PROSE =
   "[&_p]:my-1 [&_p]:leading-relaxed [&_mark]:rounded-sm [&_mark]:px-0.5 [&_u]:underline " +
-  "[&_strong]:font-semibold [&_em]:italic";
+  "[&_strong]:font-semibold [&_em]:italic [&_mark]:!text-neutral-900";
 
 /** Renderiza texto plano legado ou HTML rico sanitizado. */
 export function RichTextDisplay({
@@ -34,7 +34,7 @@ export function RichTextDisplay({
 
   return (
     <Comp
-      className={cn("text-sm text-muted-foreground", DISPLAY_PROSE, className)}
+      className={cn("text-sm text-foreground", DISPLAY_PROSE, className)}
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );
