@@ -7,6 +7,10 @@ import {
   notifyTarefaAnexo,
 } from "@/services/notificacao-events";
 import type { SubtarefaAnexo, TarefaAnexo } from "@/types";
+import {
+  assertAnexoTamanhoPermitido,
+  normalizeAnexoUploadError,
+} from "@/utils/anexos";
 
 const BUCKET = "tarefa-anexos";
 
@@ -38,46 +42,52 @@ export async function listAnexos(tarefaId: string): Promise<TarefaAnexo[]> {
 }
 
 export async function uploadAnexo(tarefaId: string, file: File): Promise<TarefaAnexo> {
-  const storagePath = buildStoragePath(tarefaId, file.name);
+  try {
+    assertAnexoTamanhoPermitido(file);
 
-  const { error: uploadError } = await supabase.storage.from(BUCKET).upload(storagePath, file, {
-    cacheControl: "3600",
-    upsert: false,
-    contentType: file.type || undefined,
-  });
-  if (uploadError) throw uploadError;
+    const storagePath = buildStoragePath(tarefaId, file.name);
 
-  const { data, error } = await supabase
-    .from("tarefa_anexos")
-    .insert({
-      tarefa_id: tarefaId,
-      storage_path: storagePath,
-      nome: file.name,
-      tipo: file.type || null,
-      tamanho: file.size,
-    })
-    .select()
-    .single();
+    const { error: uploadError } = await supabase.storage.from(BUCKET).upload(storagePath, file, {
+      cacheControl: "3600",
+      upsert: false,
+      contentType: file.type || undefined,
+    });
+    if (uploadError) throw uploadError;
 
-  if (error) {
-    await supabase.storage.from(BUCKET).remove([storagePath]);
-    throw error;
+    const { data, error } = await supabase
+      .from("tarefa_anexos")
+      .insert({
+        tarefa_id: tarefaId,
+        storage_path: storagePath,
+        nome: file.name,
+        tipo: file.type || null,
+        tamanho: file.size,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      await supabase.storage.from(BUCKET).remove([storagePath]);
+      throw error;
+    }
+
+    const [{ data: tarefa }, ator, stakeholders] = await Promise.all([
+      supabase.from("tarefas").select("titulo").eq("id", tarefaId).single(),
+      getCurrentActor(),
+      getTarefaStakeholderIds(tarefaId),
+    ]);
+
+    await notifyTarefaAnexo({
+      usuarioIds: stakeholders.filter((id) => id !== ator?.id),
+      tarefaId,
+      titulo: tarefa?.titulo ?? "tarefa",
+      atorNome: ator?.nome ?? "Alguém",
+    }).catch(() => undefined);
+
+    return data;
+  } catch (error) {
+    throw normalizeAnexoUploadError(error);
   }
-
-  const [{ data: tarefa }, ator, stakeholders] = await Promise.all([
-    supabase.from("tarefas").select("titulo").eq("id", tarefaId).single(),
-    getCurrentActor(),
-    getTarefaStakeholderIds(tarefaId),
-  ]);
-
-  await notifyTarefaAnexo({
-    usuarioIds: stakeholders.filter((id) => id !== ator?.id),
-    tarefaId,
-    titulo: tarefa?.titulo ?? "tarefa",
-    atorNome: ator?.nome ?? "Alguém",
-  }).catch(() => undefined);
-
-  return data;
 }
 
 export async function deleteAnexo(anexo: TarefaAnexo): Promise<void> {
@@ -107,59 +117,65 @@ export async function uploadSubtarefaAnexo(
   subtarefaId: string,
   file: File,
 ): Promise<SubtarefaAnexo> {
-  const { data: subtarefa, error: subtarefaError } = await supabase
-    .from("subtarefas")
-    .select("tarefa_id, titulo")
-    .eq("id", subtarefaId)
-    .single();
-  if (subtarefaError) throw subtarefaError;
+  try {
+    assertAnexoTamanhoPermitido(file);
 
-  // Pasta raiz = tarefa_id para reutilizar as policies do bucket tarefa-anexos
-  const storagePath = buildStoragePath(
-    `${subtarefa.tarefa_id}/sub/${subtarefaId}`,
-    file.name,
-  );
+    const { data: subtarefa, error: subtarefaError } = await supabase
+      .from("subtarefas")
+      .select("tarefa_id, titulo")
+      .eq("id", subtarefaId)
+      .single();
+    if (subtarefaError) throw subtarefaError;
 
-  const { error: uploadError } = await supabase.storage.from(BUCKET).upload(storagePath, file, {
-    cacheControl: "3600",
-    upsert: false,
-    contentType: file.type || undefined,
-  });
-  if (uploadError) throw uploadError;
+    // Pasta raiz = tarefa_id para reutilizar as policies do bucket tarefa-anexos
+    const storagePath = buildStoragePath(
+      `${subtarefa.tarefa_id}/sub/${subtarefaId}`,
+      file.name,
+    );
 
-  const { data, error } = await supabase
-    .from("subtarefa_anexos")
-    .insert({
-      subtarefa_id: subtarefaId,
-      storage_path: storagePath,
-      nome: file.name,
-      tipo: file.type || null,
-      tamanho: file.size,
-    })
-    .select()
-    .single();
+    const { error: uploadError } = await supabase.storage.from(BUCKET).upload(storagePath, file, {
+      cacheControl: "3600",
+      upsert: false,
+      contentType: file.type || undefined,
+    });
+    if (uploadError) throw uploadError;
 
-  if (error) {
-    await supabase.storage.from(BUCKET).remove([storagePath]);
-    throw error;
+    const { data, error } = await supabase
+      .from("subtarefa_anexos")
+      .insert({
+        subtarefa_id: subtarefaId,
+        storage_path: storagePath,
+        nome: file.name,
+        tipo: file.type || null,
+        tamanho: file.size,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      await supabase.storage.from(BUCKET).remove([storagePath]);
+      throw error;
+    }
+
+    const [{ data: tarefa }, ator, responsaveis] = await Promise.all([
+      supabase.from("tarefas").select("titulo").eq("id", subtarefa.tarefa_id).single(),
+      getCurrentActor(),
+      getSubtarefaResponsavelIds(subtarefaId),
+    ]);
+
+    await notifySubtarefaAnexo({
+      usuarioIds: responsaveis.filter((id) => id !== ator?.id),
+      tarefaId: subtarefa.tarefa_id,
+      subtarefaId,
+      tarefaTitulo: tarefa?.titulo ?? "tarefa",
+      subtarefaTitulo: subtarefa.titulo ?? "subtarefa",
+      atorNome: ator?.nome ?? "Alguém",
+    }).catch(() => undefined);
+
+    return data;
+  } catch (error) {
+    throw normalizeAnexoUploadError(error);
   }
-
-  const [{ data: tarefa }, ator, responsaveis] = await Promise.all([
-    supabase.from("tarefas").select("titulo").eq("id", subtarefa.tarefa_id).single(),
-    getCurrentActor(),
-    getSubtarefaResponsavelIds(subtarefaId),
-  ]);
-
-  await notifySubtarefaAnexo({
-    usuarioIds: responsaveis.filter((id) => id !== ator?.id),
-    tarefaId: subtarefa.tarefa_id,
-    subtarefaId,
-    tarefaTitulo: tarefa?.titulo ?? "tarefa",
-    subtarefaTitulo: subtarefa.titulo ?? "subtarefa",
-    atorNome: ator?.nome ?? "Alguém",
-  }).catch(() => undefined);
-
-  return data;
 }
 
 export async function deleteSubtarefaAnexo(anexo: SubtarefaAnexo): Promise<void> {

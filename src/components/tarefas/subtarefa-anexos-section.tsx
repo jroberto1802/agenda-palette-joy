@@ -11,6 +11,7 @@ import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
 import { cn } from "@/lib/utils";
 import { downloadAnexoFile } from "@/services/anexos";
 import type { SubtarefaAnexo } from "@/types";
+import { ANEXO_TAMANHO_EXCEDIDO_MSG } from "@/utils/anexos";
 import { formatDateTime } from "@/utils/formatters";
 
 function formatFileSize(bytes: number | null) {
@@ -47,9 +48,12 @@ export function SubtarefaAnexosSection({
         await uploadAnexo.mutateAsync({ subtarefaId, file });
         toast.success(`"${file.name}" enviado`);
       } catch (error) {
-        toast.error("Erro ao enviar anexo", {
-          description: getSupabaseErrorMessage(error as Error),
-        });
+        const message = getSupabaseErrorMessage(error as Error);
+        if (message === ANEXO_TAMANHO_EXCEDIDO_MSG) {
+          toast.error(ANEXO_TAMANHO_EXCEDIDO_MSG);
+        } else {
+          toast.error("Erro ao enviar anexo", { description: message });
+        }
       }
     }
     if (inputRef.current) inputRef.current.value = "";

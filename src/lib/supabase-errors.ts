@@ -23,6 +23,14 @@ export function getSupabaseErrorMessage(error: PostgrestError | Error | null): s
     return message;
   }
   if (
+    message.includes("tamanho máximo permitido de 500 KB") ||
+    message.toLowerCase().includes("maximum allowed size") ||
+    message.toLowerCase().includes("payload too large") ||
+    message.toLowerCase().includes("entity too large")
+  ) {
+    return "O arquivo excede o tamanho máximo permitido de 500 KB. Compacte ou reduza o arquivo antes de enviá-lo.";
+  }
+  if (
     message.toLowerCase().includes("already been registered") ||
     message.toLowerCase().includes("already registered") ||
     message.toLowerCase().includes("user already exists") ||
