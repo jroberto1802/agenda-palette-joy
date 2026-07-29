@@ -765,68 +765,106 @@ export function TarefaPanelSheet({
           <Form {...form}>
             <form onSubmit={handleSave} className="flex min-h-0 flex-1 flex-col">
               <DialogHeader className="shrink-0 space-y-0 border-b px-6 py-4 pr-12 text-left">
-                <div className="mb-2 flex items-center gap-1 text-xs text-muted-foreground">
-                  <span>Projeto</span>
-                  <ChevronRight className="h-3 w-3" />
-                  <span>{selectedProjeto?.nome ?? "Nenhum"}</span>
-                  <ChevronRight className="h-3 w-3" />
-                  <span>Setor</span>
-                  <ChevronRight className="h-3 w-3" />
-                  <span>{selectedSetor?.nome ?? "Sem setor"}</span>
-                  <ChevronRight className="h-3 w-3" />
-                  <span className="font-medium text-foreground">
-                    {isCreate ? "Nova tarefa" : tarefa?.titulo ?? "Tarefa"}
-                  </span>
-                </div>
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="space-y-1">
-                    <DialogTitle className="text-left">
-                      {isCreate ? "Nova tarefa" : "Editar tarefa"}
-                    </DialogTitle>
-                    <DialogDescription className="text-left">
-                      {isCreate
-                        ? "Preencha o título, selecione ao menos um responsável pelos ícones e salve."
-                        : "Clique nos ícones para alterar metadados. Duplo clique na descrição para editar."}
-                    </DialogDescription>
-                  </div>
-                  {!readOnly && (
-                    <div className="flex flex-wrap gap-2">
-                      {tarefa && (
-                        <>
-                          <Badge
-                            variant="outline"
-                            className={TAREFA_PRIORIDADE_COLORS[tarefa.prioridade]}
-                          >
-                            {tarefa.prioridade}
-                          </Badge>
-                          <Badge
-                            variant="secondary"
-                            className={getTarefaConclusaoColorClass(tarefa.concluida)}
-                          >
-                            {getTarefaConclusaoLabel(tarefa.concluida)}
-                          </Badge>
-                        </>
-                      )}
-                      {canEdit && (
+                {isCreate ? (
+                  <>
+                    <div className="mb-2 flex items-center gap-1 text-xs text-muted-foreground">
+                      <span>Projeto</span>
+                      <ChevronRight className="h-3 w-3" />
+                      <span>{selectedProjeto?.nome ?? "Nenhum"}</span>
+                      <ChevronRight className="h-3 w-3" />
+                      <span>Setor</span>
+                      <ChevronRight className="h-3 w-3" />
+                      <span>{selectedSetor?.nome ?? "Sem setor"}</span>
+                      <ChevronRight className="h-3 w-3" />
+                      <span className="font-medium text-foreground">Nova tarefa</span>
+                    </div>
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="space-y-1">
+                        <DialogTitle className="text-left">Nova tarefa</DialogTitle>
+                        <DialogDescription className="text-left">
+                          Preencha o título, selecione ao menos um responsável pelos ícones e
+                          salve.
+                        </DialogDescription>
+                      </div>
+                      {!readOnly && canEdit && (
                         <Button
                           type="submit"
                           size="sm"
                           className="gap-2"
                           disabled={saving}
                           onClick={(event) => {
-                            // Garante feedback mesmo se o submit nativo falhar silenciosamente.
                             if (event.currentTarget.form) return;
                             event.preventDefault();
                             void handleSave();
                           }}
                         >
                           <Save className="h-4 w-4" />
-                          {saving ? "Salvando..." : isCreate ? "Criar tarefa" : "Salvar"}
+                          {saving ? "Salvando..." : "Criar tarefa"}
                         </Button>
                       )}
                     </div>
-                  )}
-                </div>
+                  </>
+                ) : (
+                  <>
+                    <DialogTitle className="sr-only">
+                      {tarefa?.titulo ?? "Editar tarefa"}
+                    </DialogTitle>
+                    <DialogDescription className="sr-only">
+                      Detalhes, anexos e comentários da tarefa.
+                    </DialogDescription>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex min-w-0 flex-wrap items-center gap-1 text-xs text-muted-foreground">
+                        <span>Projeto</span>
+                        <ChevronRight className="h-3 w-3 shrink-0" />
+                        <span className="truncate">{selectedProjeto?.nome ?? "Nenhum"}</span>
+                        <ChevronRight className="h-3 w-3 shrink-0" />
+                        <span>Setor</span>
+                        <ChevronRight className="h-3 w-3 shrink-0" />
+                        <span className="truncate">{selectedSetor?.nome ?? "Sem setor"}</span>
+                        <ChevronRight className="h-3 w-3 shrink-0" />
+                        <span className="truncate font-medium text-foreground">
+                          {tarefa?.titulo ?? "Tarefa"}
+                        </span>
+                      </div>
+                      {!readOnly && (
+                        <div className="flex flex-wrap gap-2">
+                          {tarefa && (
+                            <>
+                              <Badge
+                                variant="outline"
+                                className={TAREFA_PRIORIDADE_COLORS[tarefa.prioridade]}
+                              >
+                                {tarefa.prioridade}
+                              </Badge>
+                              <Badge
+                                variant="secondary"
+                                className={getTarefaConclusaoColorClass(tarefa.concluida)}
+                              >
+                                {getTarefaConclusaoLabel(tarefa.concluida)}
+                              </Badge>
+                            </>
+                          )}
+                          {canEdit && (
+                            <Button
+                              type="submit"
+                              size="sm"
+                              className="gap-2"
+                              disabled={saving}
+                              onClick={(event) => {
+                                if (event.currentTarget.form) return;
+                                event.preventDefault();
+                                void handleSave();
+                              }}
+                            >
+                              <Save className="h-4 w-4" />
+                              {saving ? "Salvando..." : "Salvar"}
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
               </DialogHeader>
 
               <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
