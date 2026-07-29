@@ -168,22 +168,12 @@ function ConfiguracoesPage() {
           {showCadastros && <TabsTrigger value="cadastros">Cadastros</TabsTrigger>}
           <TabsTrigger value="conta">Conta</TabsTrigger>
           <TabsTrigger value="seguranca">Segurança</TabsTrigger>
+          {showCadastros && <TabsTrigger value="pessoas">Pessoas</TabsTrigger>}
         </TabsList>
 
         {showCadastros && (
-          <TabsContent value="cadastros" className="space-y-8 mt-6">
-            <Tabs defaultValue="setores">
-              <TabsList>
-                <TabsTrigger value="setores">Setores</TabsTrigger>
-                <TabsTrigger value="pessoas">Pessoas</TabsTrigger>
-              </TabsList>
-              <TabsContent value="setores" className="mt-4">
-                <CadastroSetoresPanel canManage={canManageCadastros} />
-              </TabsContent>
-              <TabsContent value="pessoas" className="mt-4">
-                <CadastroPessoasPanel canManage={canManageCadastros} />
-              </TabsContent>
-            </Tabs>
+          <TabsContent value="cadastros" className="mt-6">
+            <CadastroSetoresPanel canManage={canManageCadastros} />
           </TabsContent>
         )}
 
@@ -297,6 +287,12 @@ function ConfiguracoesPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {showCadastros && (
+          <TabsContent value="pessoas" className="mt-6">
+            <CadastroPessoasPanel canManage={canManageCadastros} />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

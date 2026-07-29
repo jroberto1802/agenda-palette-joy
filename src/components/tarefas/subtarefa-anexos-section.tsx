@@ -28,12 +28,14 @@ export function SubtarefaAnexosSection({
   /** Upload liberado para visualizadores; se omitido, segue `canEdit`. */
   canUpload,
   hideTitle = false,
+  compact = false,
 }: {
   subtarefaId: string;
   anexos: SubtarefaAnexo[];
   canEdit: boolean;
   canUpload?: boolean;
   hideTitle?: boolean;
+  compact?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const uploadAnexo = useUploadSubtarefaAnexo();
@@ -71,14 +73,27 @@ export function SubtarefaAnexosSection({
 
   return (
     <section className="w-full min-w-0">
-      <div className={cn("mb-3 flex items-center justify-between", hideTitle && "mb-2")}>
+      <div
+        className={cn(
+          "flex items-center justify-between",
+          compact ? "mb-2" : "mb-3",
+          hideTitle && "mb-2",
+        )}
+      >
         {!hideTitle ? (
-          <h3 className="flex items-center gap-2 text-sm font-semibold">
-            <Paperclip className="h-4 w-4" />
+          <h3
+            className={cn(
+              "flex items-center gap-2 font-semibold",
+              compact ? "text-xs" : "text-sm",
+            )}
+          >
+            <Paperclip className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
             Anexos ({anexos.length})
           </h3>
         ) : (
-          <span className="text-xs text-muted-foreground">{anexos.length} arquivo(s)</span>
+          <span className="text-[11px] text-muted-foreground">
+            {anexos.length} arquivo(s)
+          </span>
         )}
         {allowUpload && (
           <>
@@ -93,7 +108,7 @@ export function SubtarefaAnexosSection({
               type="button"
               variant="outline"
               size="sm"
-              className="gap-2"
+              className={cn("gap-1.5", compact && "h-7 px-2 text-xs")}
               disabled={uploadAnexo.isPending}
               onClick={() => inputRef.current?.click()}
             >
@@ -105,25 +120,38 @@ export function SubtarefaAnexosSection({
       </div>
 
       {anexos.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Nenhum anexo nesta subtarefa.</p>
+        <p className={cn("text-muted-foreground", compact ? "text-xs" : "text-sm")}>
+          Nenhum anexo nesta subtarefa.
+        </p>
       ) : (
-        <div className="w-full min-w-0 space-y-2">
+        <div className={cn("w-full min-w-0", compact ? "space-y-1.5" : "space-y-2")}>
           {anexos.map((anexo) => (
             <div
               key={anexo.id}
-              className="flex w-full min-w-0 items-center gap-2 rounded-md border px-3 py-2 group"
+              className={cn(
+                "flex w-full min-w-0 items-center gap-2 rounded-md border group",
+                compact ? "px-2 py-1.5" : "px-3 py-2",
+              )}
             >
-              <FileIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <FileIcon
+                className={cn(
+                  "shrink-0 text-muted-foreground",
+                  compact ? "h-3.5 w-3.5" : "h-4 w-4",
+                )}
+              />
               <div className="min-w-0 flex-1">
                 <button
                   type="button"
-                  className="block w-full truncate text-left text-sm font-medium hover:underline"
+                  className={cn(
+                    "block w-full truncate text-left font-medium hover:underline",
+                    compact ? "text-xs" : "text-sm",
+                  )}
                   onClick={() => void handleDownload(anexo)}
                   title={`Baixar ${anexo.nome}`}
                 >
                   {anexo.nome}
                 </button>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-[10px] text-muted-foreground">
                   {formatFileSize(anexo.tamanho)} · {formatDateTime(anexo.created_at)}
                 </p>
               </div>
@@ -131,7 +159,7 @@ export function SubtarefaAnexosSection({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7 shrink-0"
+                className={cn("shrink-0", compact ? "h-6 w-6" : "h-7 w-7")}
                 onClick={() => void handleDownload(anexo)}
                 title={`Baixar ${anexo.nome}`}
               >
@@ -142,7 +170,10 @@ export function SubtarefaAnexosSection({
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7 shrink-0 text-destructive hover:text-destructive"
+                  className={cn(
+                    "shrink-0 text-destructive hover:text-destructive",
+                    compact ? "h-6 w-6" : "h-7 w-7",
+                  )}
                   onClick={() => setDeleting(anexo)}
                   title={`Excluir ${anexo.nome}`}
                 >

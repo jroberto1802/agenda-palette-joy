@@ -19,7 +19,13 @@ export type TarefaPeopleMini = {
   avatar_url?: string | null;
 };
 
-function PersonAvatar({ person }: { person: TarefaPeopleMini }) {
+function PersonAvatar({
+  person,
+  compact = false,
+}: {
+  person: TarefaPeopleMini;
+  compact?: boolean;
+}) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -27,8 +33,11 @@ function PersonAvatar({ person }: { person: TarefaPeopleMini }) {
           <ProfileAvatar
             name={person.nome_completo}
             avatarUrl={person.avatar_url}
-            className="h-6 w-6 border border-background"
-            fallbackClassName="text-[9px]"
+            className={cn(
+              "border border-background",
+              compact ? "h-5 w-5" : "h-6 w-6",
+            )}
+            fallbackClassName={compact ? "text-[8px]" : "text-[9px]"}
           />
         </span>
       </TooltipTrigger>
@@ -39,15 +48,21 @@ function PersonAvatar({ person }: { person: TarefaPeopleMini }) {
   );
 }
 
-function PersonStack({ people }: { people: TarefaPeopleMini[] }) {
+function PersonStack({
+  people,
+  compact = false,
+}: {
+  people: TarefaPeopleMini[];
+  compact?: boolean;
+}) {
   if (people.length === 0) {
     return <span className="text-[11px] text-muted-foreground">—</span>;
   }
 
   return (
-    <div className="flex -space-x-1.5">
+    <div className={cn("flex", compact ? "-space-x-1" : "-space-x-1.5")}>
       {people.map((person) => (
-        <PersonAvatar key={person.id} person={person} />
+        <PersonAvatar key={person.id} person={person} compact={compact} />
       ))}
     </div>
   );
@@ -84,6 +99,7 @@ export function TarefaPeopleStrip({
   visualizadores,
   setorNome,
   projetoNome,
+  compact = false,
   className,
 }: {
   criador?: TarefaPeopleMini | null;
@@ -93,6 +109,7 @@ export function TarefaPeopleStrip({
   visualizadores: TarefaPeopleMini[];
   setorNome?: string | null;
   projetoNome?: string | null;
+  compact?: boolean;
   className?: string;
 }) {
   const showVisualizadores = true;
@@ -103,46 +120,51 @@ export function TarefaPeopleStrip({
         })
       : null;
 
+  const labelClass = compact
+    ? "shrink-0 text-[10px] font-medium text-muted-foreground"
+    : "shrink-0 text-[11px] font-medium text-muted-foreground";
+  const mutedClass = compact ? "text-[10px] text-muted-foreground" : "text-[11px] text-muted-foreground";
+
   return (
     <TooltipProvider delayDuration={200}>
       <div
         className={cn(
-          "flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border bg-muted/20 px-3 py-2",
+          "flex flex-wrap items-center border bg-muted/20",
+          compact
+            ? "gap-x-3 gap-y-1.5 rounded-lg px-2 py-1.5"
+            : "gap-x-4 gap-y-2 rounded-xl px-3 py-2",
           className,
         )}
       >
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="shrink-0 text-[11px] font-medium text-muted-foreground">
-            Criado por
-          </span>
+        <div className={cn("flex min-w-0 items-center", compact ? "gap-1.5" : "gap-2")}>
+          <span className={labelClass}>Criado por</span>
           {criador ? (
             <div className="flex items-center gap-1.5">
-              <PersonAvatar person={criador} />
-              {createdLabel && (
-                <span className="text-[11px] text-muted-foreground">{createdLabel}</span>
-              )}
+              <PersonAvatar person={criador} compact={compact} />
+              {createdLabel && <span className={mutedClass}>{createdLabel}</span>}
             </div>
           ) : (
-            <span className="text-[11px] text-muted-foreground">—</span>
+            <span className={mutedClass}>—</span>
           )}
         </div>
 
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="shrink-0 text-[11px] font-medium text-muted-foreground">
-            Responsável
-          </span>
-          <PersonStack people={responsaveis} />
+        <div className={cn("flex min-w-0 items-center", compact ? "gap-1.5" : "gap-2")}>
+          <span className={labelClass}>Responsável</span>
+          <PersonStack people={responsaveis} compact={compact} />
         </div>
 
         {showVisualizadores && (
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="shrink-0 text-[11px] font-medium text-muted-foreground">
-              Visualizadores
-            </span>
+          <div className={cn("flex min-w-0 items-center", compact ? "gap-1.5" : "gap-2")}>
+            <span className={labelClass}>Visualizadores</span>
             {visibilidade === "pessoas_especificas" ? (
-              <PersonStack people={visualizadores} />
+              <PersonStack people={visualizadores} compact={compact} />
             ) : (
-              <span className="truncate text-[11px] font-medium text-foreground">
+              <span
+                className={cn(
+                  "truncate font-medium text-foreground",
+                  compact ? "text-[10px]" : "text-[11px]",
+                )}
+              >
                 <GroupLabel
                   visibilidade={visibilidade}
                   setorNome={setorNome}

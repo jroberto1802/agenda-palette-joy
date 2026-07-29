@@ -10,7 +10,6 @@ import { SubtarefaAnexosSection } from "@/components/tarefas/subtarefa-anexos-se
 import { TarefaMetaToolbar } from "@/components/tarefas/tarefa-meta-toolbar";
 import { TarefaPeopleStrip } from "@/components/tarefas/tarefa-people-strip";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
@@ -403,7 +402,7 @@ export function SubtarefaPanelSheet({
     <Sheet open={open} onOpenChange={(next) => void handleOpenChange(next)}>
       <SheetContent
         side="right"
-        className="flex w-full flex-col gap-0 p-0 sm:max-w-xl md:max-w-2xl lg:max-w-3xl z-[70]"
+        className="flex w-full flex-col gap-0 p-0 sm:max-w-[560px] z-[70] [&>button]:right-3 [&>button]:top-3 [&>button>svg]:h-3.5 [&>button>svg]:w-3.5"
         onInteractOutside={(event) => {
           // Mantém o drawer aberto ao usar seletor de arquivos / cliques no overlay do dialog pai
           event.preventDefault();
@@ -416,10 +415,10 @@ export function SubtarefaPanelSheet({
         }}
       >
         {isLoading || !subtarefa ? (
-          <div className="space-y-4 p-6 pt-12">
-            <Skeleton className="h-6 w-2/3" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-24 w-full" />
+          <div className="space-y-3 p-4 pt-10">
+            <Skeleton className="h-5 w-2/3" />
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-20 w-full" />
           </div>
         ) : (
           <Form {...form}>
@@ -430,34 +429,35 @@ export function SubtarefaPanelSheet({
                 void handleOpenChange(false);
               }}
             >
-              <SheetHeader className="shrink-0 space-y-2 border-b px-6 py-4 pr-12 text-left">
-                <button
-                  type="button"
-                  className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
-                  onClick={() => void handleOpenChange(false)}
-                >
-                  <ArrowLeft className="h-3.5 w-3.5" />
-                  Subtarefa de:{" "}
-                  <span className="font-medium text-foreground">{parentTitle}</span>
-                </button>
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="space-y-1">
-                    <SheetTitle className="text-left">Subtarefa</SheetTitle>
-                    <SheetDescription className="text-left">
-                      Campos, anexos e comentários exclusivos desta subtarefa. Fechar salva
-                      automaticamente.
-                    </SheetDescription>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
+              <SheetHeader className="shrink-0 space-y-0 border-b px-4 py-2.5 pr-10 text-left">
+                <SheetTitle className="sr-only">
+                  Subtarefa de {parentTitle}
+                </SheetTitle>
+                <SheetDescription className="sr-only">
+                  Detalhes, anexos e comentários da subtarefa.
+                </SheetDescription>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    className="flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+                    onClick={() => void handleOpenChange(false)}
+                  >
+                    <ArrowLeft className="h-3 w-3 shrink-0" />
+                    <span className="truncate">
+                      Subtarefa de:{" "}
+                      <span className="font-medium text-foreground">{parentTitle}</span>
+                    </span>
+                  </button>
+                  <div className="flex flex-wrap gap-1.5">
                     <Badge
                       variant="outline"
-                      className={TAREFA_PRIORIDADE_COLORS[subtarefa.prioridade]}
+                      className={`px-1.5 py-0 text-[10px] ${TAREFA_PRIORIDADE_COLORS[subtarefa.prioridade]}`}
                     >
                       {subtarefa.prioridade}
                     </Badge>
                     <Badge
                       variant="secondary"
-                      className={getTarefaConclusaoColorClass(subtarefa.concluida)}
+                      className={`px-1.5 py-0 text-[10px] ${getTarefaConclusaoColorClass(subtarefa.concluida)}`}
                     >
                       {getTarefaConclusaoLabel(subtarefa.concluida)}
                     </Badge>
@@ -467,13 +467,14 @@ export function SubtarefaPanelSheet({
 
               <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
                 <ScrollArea className="min-h-0 flex-1">
-                  <div className="space-y-4 p-6">
+                  <div className="space-y-3 p-4">
                     <TarefaMetaToolbar
                       form={form as never}
                       canEdit={canEdit}
                       canEditVisibility={canEditVisibility}
                       hideProjetoSetor
                       hideRecorrencia
+                      compact
                       projetos={projetos ?? []}
                       setores={setoresPermitidos}
                       pessoasParaResponsavel={pessoasParaResponsavel}
@@ -494,6 +495,7 @@ export function SubtarefaPanelSheet({
                       visualizadores={visualizadoresDisplay}
                       setorNome={selectedSetor?.nome}
                       projetoNome={selectedProjeto?.nome}
+                      compact
                     />
 
                     {(formErrors.visibilidade ||
@@ -502,7 +504,7 @@ export function SubtarefaPanelSheet({
                       formErrors.observador_ids) && (
                       <div
                         role="alert"
-                        className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                        className="rounded-md border border-destructive/40 bg-destructive/10 px-2.5 py-1.5 text-xs text-destructive"
                       >
                         {formErrors.observador_ids?.message ||
                           formErrors.setor_id?.message ||
@@ -528,7 +530,7 @@ export function SubtarefaPanelSheet({
                               <FormControl>
                                 <Input
                                   placeholder="Título da subtarefa"
-                                  className="rounded-xl border bg-card px-3 py-2 text-lg font-semibold shadow-sm focus-visible:ring-1"
+                                  className="h-9 rounded-lg border bg-card px-2.5 py-1.5 text-sm font-semibold shadow-sm focus-visible:ring-1"
                                   readOnly={!editable}
                                   disabled={!canEdit}
                                   {...field}
@@ -563,8 +565,8 @@ export function SubtarefaPanelSheet({
                                   disabled={!canEdit}
                                   editorKey={subtarefaId ?? "subtarefa"}
                                   placeholder="Adicione uma descrição... (duplo clique para editar)"
-                                  minHeightClassName="[&_.ProseMirror]:min-h-[12rem]"
-                                  readMinHeightClassName="min-h-[12rem]"
+                                  minHeightClassName="[&_.ProseMirror]:min-h-[8rem] text-sm"
+                                  readMinHeightClassName="min-h-[8rem] text-sm"
                                 />
                               </FormControl>
                             )}
@@ -576,22 +578,22 @@ export function SubtarefaPanelSheet({
                   </div>
                 </ScrollArea>
 
-                <aside className="flex w-full shrink-0 flex-col border-t bg-muted/20 lg:w-80 lg:border-l lg:border-t-0">
+                <aside className="flex w-full shrink-0 flex-col border-t bg-muted/20 lg:w-52 lg:border-l lg:border-t-0">
                   <Tabs
                     value={sideTab}
                     onValueChange={(value) => setSideTab(value as "comentarios" | "anexos")}
                     className="flex min-h-0 flex-1 flex-col"
                   >
-                    <TabsList className="mx-4 mt-4 grid w-auto grid-cols-2">
-                      <TabsTrigger value="anexos" className="gap-1.5">
-                        <Paperclip className="h-3.5 w-3.5" />
+                    <TabsList className="mx-3 mt-3 grid h-8 w-auto grid-cols-2">
+                      <TabsTrigger value="anexos" className="gap-1 px-2 text-[11px]">
+                        <Paperclip className="h-3 w-3" />
                         Anexos
                         {anexos.length > 0 && (
                           <span className="text-muted-foreground">({anexos.length})</span>
                         )}
                       </TabsTrigger>
-                      <TabsTrigger value="comentarios" className="gap-1.5">
-                        <MessageSquare className="h-3.5 w-3.5" />
+                      <TabsTrigger value="comentarios" className="gap-1 px-2 text-[11px]">
+                        <MessageSquare className="h-3 w-3" />
                         Comentários
                         {comentarios.length > 0 && (
                           <span className="text-muted-foreground">({comentarios.length})</span>
@@ -603,14 +605,15 @@ export function SubtarefaPanelSheet({
                       value="anexos"
                       className="mt-0 min-h-0 flex-1 data-[state=inactive]:hidden"
                     >
-                      <ScrollArea className="h-full max-h-[calc(100vh-12rem)] [&>[data-radix-scroll-area-viewport]>div]:!block">
-                        <div className="w-full space-y-3 p-4">
+                      <ScrollArea className="h-full max-h-[calc(100vh-11rem)] [&>[data-radix-scroll-area-viewport]>div]:!block">
+                        <div className="w-full space-y-2 p-3">
                           <SubtarefaAnexosSection
                             subtarefaId={subtarefa.id}
                             anexos={anexos}
                             canEdit={canEdit}
                             canUpload={canCommentOrAttach}
                             hideTitle
+                            compact
                           />
                         </div>
                       </ScrollArea>
@@ -620,8 +623,8 @@ export function SubtarefaPanelSheet({
                       value="comentarios"
                       className="mt-0 min-h-0 flex-1 data-[state=inactive]:hidden"
                     >
-                      <ScrollArea className="h-full max-h-[calc(100vh-12rem)]">
-                        <div className="p-4">
+                      <ScrollArea className="h-full max-h-[calc(100vh-11rem)]">
+                        <div className="p-3">
                           <CommentsThread
                             comentarios={comentarios}
                             pessoasMencionaveis={pessoasMencionaveis}
@@ -631,6 +634,7 @@ export function SubtarefaPanelSheet({
                             highlightId={highlightComentarioId}
                             idPrefix="subtarefa-comentario"
                             pending={createComentario.isPending}
+                            compact
                             onSubmit={async (conteudo, parentId) => {
                               try {
                                 await createComentario.mutateAsync({
@@ -692,22 +696,11 @@ export function SubtarefaPanelSheet({
                 </aside>
               </div>
 
-              {canEdit && updateSubtarefa.isPending && (
-                <div className="border-t px-6 py-2 text-xs text-muted-foreground">
-                  Salvando alterações...
-                </div>
-              )}
-
               {canEdit && (
-                <div className="flex justify-end border-t px-6 py-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => void handleOpenChange(false)}
-                  >
-                    Fechar
-                  </Button>
+                <div className="border-t px-4 py-1.5 text-[10px] text-muted-foreground">
+                  {updateSubtarefa.isPending
+                    ? "Salvando alterações..."
+                    : "Salvo automaticamente"}
                 </div>
               )}
             </form>

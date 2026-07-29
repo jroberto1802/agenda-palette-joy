@@ -163,6 +163,7 @@ export function CommentsThread({
   idPrefix,
   pending = false,
   emptyLabel = "Nenhum comentário ainda.",
+  compact = false,
   onSubmit,
   onDelete,
   onEdit,
@@ -180,6 +181,8 @@ export function CommentsThread({
   idPrefix: string;
   pending?: boolean;
   emptyLabel?: string;
+  /** Densidade reduzida (drawer compacto da subtarefa). */
+  compact?: boolean;
   onSubmit: (conteudo: string, parentId: string | null) => Promise<void>;
   onDelete?: (id: string) => Promise<void>;
   onEdit?: (id: string, conteudo: string) => Promise<void>;
@@ -282,19 +285,27 @@ export function CommentsThread({
         key={c.id}
         id={`${idPrefix}-${c.id}`}
         className={cn(
-          "group flex gap-3 rounded-lg p-2 transition-colors",
-          isReply && "ml-8 border-l-2 border-muted pl-3",
+          "group flex rounded-lg p-2 transition-colors",
+          compact ? "gap-2" : "gap-3",
+          isReply && (compact ? "ml-5 border-l-2 border-muted pl-2" : "ml-8 border-l-2 border-muted pl-3"),
           highlightId === c.id && "bg-primary/10 ring-1 ring-primary/40",
         )}
       >
         <ProfileAvatar
           name={c.usuario?.nome_completo ?? "?"}
           avatarUrl={c.usuario?.avatar_url}
-          className="h-8 w-8 shrink-0"
+          className={cn("shrink-0", compact ? "h-6 w-6" : "h-8 w-8")}
         />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0">
-            <p className="text-sm font-medium leading-tight">{c.usuario?.nome_completo}</p>
+            <p
+              className={cn(
+                "font-medium leading-tight",
+                compact ? "text-xs" : "text-sm",
+              )}
+            >
+              {c.usuario?.nome_completo}
+            </p>
             <p className="text-xs leading-tight text-muted-foreground">
               {formatDateTime(c.created_at)}
             </p>
@@ -409,10 +420,12 @@ export function CommentsThread({
   };
 
   return (
-    <div className="space-y-4">
-      <div className="space-y-3">
+    <div className={cn(compact ? "space-y-3" : "space-y-4")}>
+      <div className={cn(compact ? "space-y-2" : "space-y-3")}>
         {roots.length === 0 && (
-          <p className="text-sm text-muted-foreground">{emptyLabel}</p>
+          <p className={cn("text-muted-foreground", compact ? "text-xs" : "text-sm")}>
+            {emptyLabel}
+          </p>
         )}
         {roots.map((root) => (
           <div key={root.id} className="space-y-2">
@@ -423,7 +436,7 @@ export function CommentsThread({
       </div>
 
       {canComment && (
-        <div className="space-y-2 border-t pt-3">
+        <div className={cn("space-y-2 border-t", compact ? "pt-2" : "pt-3")}>
           {replyingTo && (
             <div className="flex items-center justify-between rounded-md bg-muted/50 px-2 py-1.5 text-xs">
               <span className="truncate text-muted-foreground">

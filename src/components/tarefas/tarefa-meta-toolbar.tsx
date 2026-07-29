@@ -73,12 +73,14 @@ function MetaIconButton({
   label,
   active,
   disabled,
+  compact = false,
   children,
   className,
 }: {
   label: string;
   active?: boolean;
   disabled?: boolean;
+  compact?: boolean;
   children: ReactNode;
   className?: string;
 }) {
@@ -91,7 +93,8 @@ function MetaIconButton({
           size="icon"
           disabled={disabled}
           className={cn(
-            "h-9 w-9 shrink-0 rounded-lg text-muted-foreground hover:text-foreground",
+            "shrink-0 rounded-lg text-muted-foreground hover:text-foreground",
+            compact ? "h-7 w-7" : "h-9 w-9",
             active && "bg-muted text-foreground",
             className,
           )}
@@ -122,6 +125,8 @@ export function TarefaMetaToolbar({
   requireResponsavel = true,
   /** Subtarefas não possuem recorrência própria. */
   hideRecorrencia = false,
+  /** Densidade reduzida (drawer compacto da subtarefa). */
+  compact = false,
   onVisibilidadeManualChange,
 }: {
   form: UseFormReturn<TarefaMetaFormValues & Record<string, unknown>>;
@@ -140,9 +145,11 @@ export function TarefaMetaToolbar({
   /** Na tarefa principal é obrigatório; subtarefa pode ficar sem responsável. */
   requireResponsavel?: boolean;
   hideRecorrencia?: boolean;
+  compact?: boolean;
   /** Chamado quando o usuário edita a Visibilidade manualmente (desliga sync com responsáveis). */
   onVisibilidadeManualChange?: () => void;
 }) {
+  const iconClass = compact ? "h-3.5 w-3.5" : "h-4 w-4";
   const projetoId = form.watch("projeto_id");
   const setorId = form.watch("setor_id");
   const atribuidoIds = form.watch("atribuido_ids") ?? [];
@@ -206,7 +213,12 @@ export function TarefaMetaToolbar({
 
   return (
     <TooltipProvider delayDuration={200}>
-      <div className="flex flex-wrap items-center gap-1 rounded-xl border bg-muted/30 p-1.5">
+      <div
+        className={cn(
+          "flex flex-wrap items-center border bg-muted/30",
+          compact ? "gap-0.5 rounded-lg p-1" : "gap-1 rounded-xl p-1.5",
+        )}
+      >
         {/* Projeto */}
         {!hideProjetoSetor && (
         <FormField
@@ -221,8 +233,9 @@ export function TarefaMetaToolbar({
                       label={projetoNome ? `Projeto: ${projetoNome}` : "Projeto"}
                       active={!!field.value}
                       disabled={!canEdit || lockProjeto}
+                      compact={compact}
                     >
-                      <FolderKanban className="h-4 w-4" />
+                      <FolderKanban className={iconClass} />
                     </MetaIconButton>
                   </span>
                 </PopoverTrigger>
@@ -276,8 +289,9 @@ export function TarefaMetaToolbar({
                       label={setorNome ? `Setor: ${setorNome}` : "Setor"}
                       active={!!field.value}
                       disabled={!canEdit}
+                      compact={compact}
                     >
-                      <Building2 className="h-4 w-4" />
+                      <Building2 className={iconClass} />
                     </MetaIconButton>
                   </span>
                 </PopoverTrigger>
@@ -329,13 +343,14 @@ export function TarefaMetaToolbar({
                       }
                       active={atribuidoIds.length > 0}
                       disabled={!canEdit}
+                      compact={compact}
                       className={
                         requireResponsavel && !atribuidoIds.length
                           ? "text-destructive"
                           : undefined
                       }
                     >
-                      <UserRound className="h-4 w-4" />
+                      <UserRound className={iconClass} />
                     </MetaIconButton>
                   </span>
                 </PopoverTrigger>
@@ -377,8 +392,9 @@ export function TarefaMetaToolbar({
                       }
                       active={(field.value?.length ?? 0) > 0}
                       disabled={!canEditVisibility}
+                      compact={compact}
                     >
-                      <Eye className="h-4 w-4" />
+                      <Eye className={iconClass} />
                     </MetaIconButton>
                   </span>
                 </PopoverTrigger>
@@ -422,8 +438,9 @@ export function TarefaMetaToolbar({
                       label={formatDataHoraLabel(dataInicio)}
                       active={!!dataInicio || !!parseRecorrencia(recorrenciaAtual)}
                       disabled={!canEdit}
+                      compact={compact}
                     >
-                      <CalendarDays className="h-4 w-4" />
+                      <CalendarDays className={iconClass} />
                     </MetaIconButton>
                   </span>
                 </PopoverTrigger>
@@ -456,10 +473,12 @@ export function TarefaMetaToolbar({
                       label={`Prioridade: ${field.value}`}
                       active
                       disabled={!canEdit}
+                      compact={compact}
                     >
                       <span
                         className={cn(
-                          "h-3.5 w-3.5 rounded-full",
+                          "rounded-full",
+                          compact ? "h-3 w-3" : "h-3.5 w-3.5",
                           TAREFA_PRIORIDADE_DOT[prioridade],
                         )}
                       />
@@ -515,8 +534,9 @@ export function TarefaMetaToolbar({
                       }
                       active={lembretes.length > 0}
                       disabled={!canEdit}
+                      compact={compact}
                     >
-                      <Bell className="h-4 w-4" />
+                      <Bell className={iconClass} />
                     </MetaIconButton>
                   </span>
                 </PopoverTrigger>
