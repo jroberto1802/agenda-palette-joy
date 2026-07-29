@@ -85,6 +85,14 @@ export type DashboardKpis = {
   totalPessoas: number;
 };
 
+/** Contagens leves para indicadores nos cards (Cards / Lista / Colunas). */
+export type TarefaCardIndicadores = {
+  subtarefas_total: number;
+  subtarefas_concluidas: number;
+  comentarios_count: number;
+  anexos_count: number;
+};
+
 export type TarefaWithRelations = Tarefa & {
   setor: Pick<Setor, "id" | "nome" | "cor"> | null;
   projeto: Pick<Projeto, "id" | "nome"> | null;
@@ -99,6 +107,8 @@ export type TarefaWithRelations = Tarefa & {
     usuario_id: string;
     usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
   }[];
+  /** Presente nas listagens; ausente em alguns retornos de mutação até o refetch. */
+  indicadores?: TarefaCardIndicadores;
 };
 
 export type RecorrenciaTipo =

@@ -65,6 +65,16 @@ const TAREFA_SELECT = `
   )
 `;
 
+/** Embeds leves para indicadores do card — aliases evitam conflito com getTarefaDetail. */
+const TAREFA_INDICADORES_SELECT = `
+  subtarefas_resumo:subtarefas(concluida),
+  comentarios_count:tarefa_comentarios(count),
+  anexos_count:tarefa_anexos(count)
+`;
+
+const TAREFA_SELECT_WITH_INDICADORES = `${TAREFA_SELECT},
+  ${TAREFA_INDICADORES_SELECT}`;
+
 const TAREFA_SELECT_LITE = `
   *,
   setor:setores(id, nome, cor),
@@ -76,6 +86,41 @@ const TAREFA_SELECT_LITE = `
     usuario:profiles!tarefa_responsaveis_usuario_id_fkey(id, nome_completo, avatar_url)
   )
 `;
+
+type CountEmbed = { count: number }[] | null | undefined;
+type SubtarefaResumoEmbed = { concluida: boolean }[] | null | undefined;
+
+function parseCountEmbed(embed: CountEmbed): number {
+  if (!embed || embed.length === 0) return 0;
+  const value = embed[0]?.count;
+  return typeof value === "number" ? value : 0;
+}
+
+function attachTarefaIndicadores(row: Record<string, unknown>): TarefaWithRelations {
+  const subtarefas = (row.subtarefas_resumo as SubtarefaResumoEmbed) ?? [];
+  const {
+    subtarefas_resumo: _sub,
+    comentarios_count: comentariosRaw,
+    anexos_count: anexosRaw,
+    ...rest
+  } = row;
+
+  return {
+    ...(rest as TarefaWithRelations),
+    indicadores: {
+      subtarefas_total: subtarefas.length,
+      subtarefas_concluidas: subtarefas.filter((s) => s.concluida).length,
+      comentarios_count: parseCountEmbed(comentariosRaw as CountEmbed),
+      anexos_count: parseCountEmbed(anexosRaw as CountEmbed),
+    },
+  };
+}
+
+function mapTarefasWithIndicadores(data: unknown[] | null): TarefaWithRelations[] {
+  return (data ?? []).map((row) =>
+    attachTarefaIndicadores(row as Record<string, unknown>),
+  );
+}
 
 function serializeLembretes(lembretes: TarefaLembreteOpcao[]): TarefaLembreteOpcao[] {
   return lembretes;
@@ -314,7 +359,10 @@ export async function listTarefas(filters: TarefaFilters = {}): Promise<TarefaWi
     data: { user },
   } = await supabase.auth.getUser();
 
-  let query = supabase.from("tarefas").select(TAREFA_SELECT).is("deleted_at", null);
+  let query = supabase
+    .from("tarefas")
+    .select(TAREFA_SELECT_WITH_INDICADORES)
+    .is("deleted_at", null);
 
   if (filters.somente_finalizadas) {
     query = query.eq("concluida", true);
@@ -428,7 +476,7 @@ export async function listTarefas(filters: TarefaFilters = {}): Promise<TarefaWi
   const { data, error } = await query;
   if (error) throw error;
 
-  let rows = (data ?? []) as TarefaWithRelations[];
+  let rows = mapTarefasWithIndicadores(data as unknown[] | null);
 
   if (filters.somente_visualizando && user) {
     rows = rows.filter((tarefa) => {
@@ -447,26 +495,26 @@ export async function listTarefas(filters: TarefaFilters = {}): Promise<TarefaWi
 export async function getTarefa(id: string): Promise<TarefaWithRelations> {
   const { data, error } = await supabase
     .from("tarefas")
-    .select(TAREFA_SELECT)
+    .select(TAREFA_SELECT_WITH_INDICADORES)
     .eq("id", id)
     .is("deleted_at", null)
     .single();
 
   if (error) throw error;
-  return data as TarefaWithRelations;
+  return attachTarefaIndicadores(data as Record<string, unknown>);
 }
 
 export async function listRecentTarefas(limit = 5): Promise<TarefaWithRelations[]> {
   const { data, error } = await supabase
     .from("tarefas")
-    .select(TAREFA_SELECT)
+    .select(TAREFA_SELECT_WITH_INDICADORES)
     .is("deleted_at", null)
     .eq("concluida", false)
     .order("data_inicio", { ascending: true, nullsFirst: false })
     .limit(limit);
 
   if (error) throw error;
-  return (data ?? []) as TarefaWithRelations[];
+  return mapTarefasWithIndicadores(data as unknown[] | null);
 }
 
 export async function listTarefasCalendario(
@@ -475,7 +523,7 @@ export async function listTarefasCalendario(
 ): Promise<TarefaWithRelations[]> {
   const { data, error } = await supabase
     .from("tarefas")
-    .select(TAREFA_SELECT)
+    .select(TAREFA_SELECT_WITH_INDICADORES)
     .is("deleted_at", null)
     .eq("concluida", false)
     .not("data_inicio", "is", null)
@@ -484,7 +532,7 @@ export async function listTarefasCalendario(
     .order("data_inicio", { ascending: true });
 
   if (error) throw error;
-  return (data ?? []) as TarefaWithRelations[];
+  return mapTarefasWithIndicadores(data as unknown[] | null);
 }
 
 export async function createTarefa(payload: TarefaFormData): Promise<TarefaWithRelations> {

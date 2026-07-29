@@ -1,15 +1,17 @@
-import { CalendarIcon } from "lucide-react";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
 import { ConclusaoBolinha } from "@/components/tarefas/conclusao-bolinha";
 import { DescricaoPreview } from "@/components/tarefas/descricao-preview";
 import { SerieModeloBadge } from "@/components/tarefas/serie-modelo-badge";
 import { MinhaAgendaBadge } from "@/components/tarefas/subtarefa-row";
 import { TarefaActionsMenu } from "@/components/tarefas/tarefa-actions-menu";
+import {
+  TarefaCardDataInicio,
+  TarefaCardIndicadores,
+} from "@/components/tarefas/tarefa-card-indicadores";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TAREFA_CARD_FIXED_CLASS } from "@/lib/layout";
 import type { TarefaWithRelations } from "@/types";
-import { formatDate, getVencimentoVariant } from "@/utils/formatters";
 import { isSerieModelo } from "@/utils/recorrencia";
 import {
   TAREFA_PRIORIDADE_BAND_CLASS,
@@ -45,7 +47,6 @@ export function TarefaCard({
 }) {
   const podeAlternarConcluida =
     (canToggleConcluida ?? canEdit) && !isSerieModelo(tarefa);
-  const vencimentoVariant = getVencimentoVariant(tarefa.data_inicio, tarefa.concluida);
   const responsaveis = getTarefaResponsaveis(tarefa);
   const ehModelo = isSerieModelo(tarefa);
 
@@ -166,21 +167,16 @@ export function TarefaCard({
             </span>
           )}
           {tarefa.data_inicio ? (
-            <span
-              className={cn(
-                "ml-auto flex shrink-0 items-center gap-1",
-                vencimentoVariant === "destructive" && "font-medium text-destructive",
-                vencimentoVariant === "warning" &&
-                  "font-medium text-amber-600 dark:text-amber-400",
-              )}
-            >
-              <CalendarIcon className="h-3 w-3 shrink-0" />
-              {formatDate(tarefa.data_inicio)}
-            </span>
+            <TarefaCardDataInicio
+              dataInicio={tarefa.data_inicio}
+              concluida={tarefa.concluida}
+              className="ml-auto"
+            />
           ) : null}
         </div>
 
-        <div className="flex h-4 min-w-0 shrink-0 items-center gap-1 overflow-hidden">
+        <div className="flex h-4 min-w-0 shrink-0 items-center gap-1.5 overflow-hidden">
+          <TarefaCardIndicadores tarefa={tarefa} />
           {tarefa.tags.length > 0
             ? tarefa.tags.map((tag) => (
                 <Badge

@@ -19,7 +19,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { CalendarIcon, GripVertical, MoreHorizontal, Pencil, Plus, Trash2, User } from "lucide-react";
+import { GripVertical, MoreHorizontal, Pencil, Plus, Trash2, User } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ConfirmDeleteDialog } from "@/components/common/confirm-delete-dialog";
@@ -27,6 +27,10 @@ import { ConclusaoBolinha } from "@/components/tarefas/conclusao-bolinha";
 import { DescricaoPreview } from "@/components/tarefas/descricao-preview";
 import { MinhaAgendaBadge } from "@/components/tarefas/subtarefa-row";
 import { TarefaActionsMenu } from "@/components/tarefas/tarefa-actions-menu";
+import {
+  TarefaCardDataInicio,
+  TarefaCardIndicadores,
+} from "@/components/tarefas/tarefa-card-indicadores";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -59,7 +63,6 @@ import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
 import { cn } from "@/lib/utils";
 import type { TarefaBoardColuna } from "@/services/tarefa-board";
 import type { TarefaWithRelations } from "@/types";
-import { formatDate, getVencimentoVariant } from "@/utils/formatters";
 import {
   TAREFA_PRIORIDADE_BAND_CLASS,
   TAREFA_PRIORIDADE_COLORS,
@@ -137,8 +140,6 @@ function ColunaCardContent({
   canToggleConcluida?: boolean;
   actions?: React.ReactNode;
 }) {
-  const vencimentoVariant = getVencimentoVariant(tarefa.data_inicio, tarefa.concluida);
-
   return (
     <div
       className={cn(
@@ -189,19 +190,11 @@ function ColunaCardContent({
             {formatResponsaveisLabel(tarefa)}
           </span>
         )}
-        {tarefa.data_inicio && (
-          <span
-            className={cn(
-              "flex items-center gap-1",
-              vencimentoVariant === "destructive" && "font-medium text-destructive",
-              vencimentoVariant === "warning" &&
-                "font-medium text-amber-600 dark:text-amber-400",
-            )}
-          >
-            <CalendarIcon className="h-3 w-3" />
-            {formatDate(tarefa.data_inicio)}
-          </span>
-        )}
+        <TarefaCardDataInicio
+          dataInicio={tarefa.data_inicio}
+          concluida={tarefa.concluida}
+        />
+        <TarefaCardIndicadores tarefa={tarefa} />
       </div>
     </div>
   );

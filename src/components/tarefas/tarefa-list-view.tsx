@@ -15,7 +15,6 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import {
   AlertTriangle,
-  CalendarIcon,
   ChevronRight,
   GripVertical,
 } from "lucide-react";
@@ -26,11 +25,14 @@ import { DescricaoPreview } from "@/components/tarefas/descricao-preview";
 import { SerieModeloBadge } from "@/components/tarefas/serie-modelo-badge";
 import { MinhaAgendaBadge } from "@/components/tarefas/subtarefa-row";
 import { TarefaActionsMenu } from "@/components/tarefas/tarefa-actions-menu";
+import {
+  TarefaCardDataInicio,
+  TarefaCardIndicadores,
+} from "@/components/tarefas/tarefa-card-indicadores";
 import { Badge } from "@/components/ui/badge";
 import { useReorderTarefasLista, useSyncTarefaBoardItens, useTarefaBoardItens } from "@/hooks/use-tarefa-board";
 import { cn } from "@/lib/utils";
 import type { TarefaWithRelations } from "@/types";
-import { formatDate, getVencimentoVariant } from "@/utils/formatters";
 import { isSerieModelo } from "@/utils/recorrencia";
 import {
   TAREFA_PRIORIDADE_BAND_CLASS,
@@ -59,7 +61,6 @@ export function TarefaListRowContent({
   isDragging?: boolean;
   showAtrasadaBadge?: boolean;
 }) {
-  const vencimentoVariant = getVencimentoVariant(tarefa.data_inicio, tarefa.concluida);
   const ehModelo = isSerieModelo(tarefa);
 
   return (
@@ -114,19 +115,13 @@ export function TarefaListRowContent({
               <span className="truncate">{formatResponsaveisLabel(tarefa)}</span>
             </span>
           )}
-          {tarefa.data_inicio && !ehModelo && (
-            <span
-              className={cn(
-                "inline-flex items-center gap-1",
-                vencimentoVariant === "destructive" && "font-medium text-destructive",
-                vencimentoVariant === "warning" &&
-                  "font-medium text-amber-600 dark:text-amber-400",
-              )}
-            >
-              <CalendarIcon className="h-3 w-3" />
-              {formatDate(tarefa.data_inicio)}
-            </span>
-          )}
+          <TarefaCardDataInicio
+            dataInicio={tarefa.data_inicio}
+            concluida={tarefa.concluida}
+            hideWhenModelo
+            isModelo={ehModelo}
+          />
+          <TarefaCardIndicadores tarefa={tarefa} />
         </div>
       </button>
       {actions}
