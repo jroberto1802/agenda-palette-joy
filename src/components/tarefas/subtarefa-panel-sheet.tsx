@@ -41,7 +41,9 @@ import {
   useUpdateSubtarefa,
   useUpdateSubtarefaComentario,
 } from "@/hooks/use-tarefas";
+import { SUBTAREFA_PANEL_CONTENT_CLASS } from "@/lib/layout";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
+import { cn } from "@/lib/utils";
 import type {
   SubtarefaDetail,
   SubtarefaFormData,
@@ -402,7 +404,7 @@ export function SubtarefaPanelSheet({
     <Sheet open={open} onOpenChange={(next) => void handleOpenChange(next)}>
       <SheetContent
         side="right"
-        className="flex w-full flex-col gap-0 p-0 sm:max-w-[560px] z-[70] [&>button]:right-3 [&>button]:top-3 [&>button>svg]:h-3.5 [&>button>svg]:w-3.5"
+        className={cn(SUBTAREFA_PANEL_CONTENT_CLASS)}
         onInteractOutside={(event) => {
           const target = event.target as HTMLElement | null;
           // Permite interação com popovers/selects portais (Responsável, Visibilidade, etc.).
@@ -489,147 +491,147 @@ export function SubtarefaPanelSheet({
                 </div>
               </SheetHeader>
 
-              <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-                <ScrollArea className="min-h-0 flex-1">
-                  <div className="space-y-3 p-4">
-                    <TarefaMetaToolbar
-                      form={form as never}
-                      canEdit={canEdit}
-                      canEditVisibility={canEditVisibility}
-                      hideProjetoSetor
-                      hideRecorrencia
-                      compact
-                      projetos={projetos ?? []}
-                      setores={setoresPermitidos}
-                      pessoasParaResponsavel={pessoasParaResponsavel}
-                      pessoasParaVisibilidade={pessoasParaVisibilidade}
-                      requireResponsavel={false}
-                      onVisibilidadeManualChange={() => {
-                        visibilidadeManualRef.current = true;
-                      }}
-                      emptyResponsavelLabel="Nenhuma pessoa no escopo da tarefa"
-                      emptyVisibilidadeLabel="Nenhuma pessoa no escopo da tarefa"
-                    />
+              <ScrollArea className="min-h-0 flex-1">
+                <div className="space-y-3 p-4">
+                  <TarefaMetaToolbar
+                    form={form as never}
+                    canEdit={canEdit}
+                    canEditVisibility={canEditVisibility}
+                    hideProjetoSetor
+                    hideRecorrencia
+                    compact
+                    projetos={projetos ?? []}
+                    setores={setoresPermitidos}
+                    pessoasParaResponsavel={pessoasParaResponsavel}
+                    pessoasParaVisibilidade={pessoasParaVisibilidade}
+                    requireResponsavel={false}
+                    onVisibilidadeManualChange={() => {
+                      visibilidadeManualRef.current = true;
+                    }}
+                    emptyResponsavelLabel="Nenhuma pessoa no escopo da tarefa"
+                    emptyVisibilidadeLabel="Nenhuma pessoa no escopo da tarefa"
+                  />
 
-                    <TarefaPeopleStrip
-                      criador={criadorDisplay}
-                      createdAt={subtarefa?.created_at ?? null}
-                      responsaveis={responsaveisDisplay}
-                      visibilidade={visibilidade}
-                      visualizadores={visualizadoresDisplay}
-                      setorNome={selectedSetor?.nome}
-                      projetoNome={selectedProjeto?.nome}
-                      compact
-                    />
+                  <TarefaPeopleStrip
+                    criador={criadorDisplay}
+                    createdAt={subtarefa?.created_at ?? null}
+                    responsaveis={responsaveisDisplay}
+                    visibilidade={visibilidade}
+                    visualizadores={visualizadoresDisplay}
+                    setorNome={selectedSetor?.nome}
+                    projetoNome={selectedProjeto?.nome}
+                    compact
+                  />
 
-                    {(formErrors.visibilidade ||
-                      formErrors.setor_id ||
-                      formErrors.projeto_id ||
-                      formErrors.observador_ids) && (
-                      <div
-                        role="alert"
-                        className="rounded-md border border-destructive/40 bg-destructive/10 px-2.5 py-1.5 text-xs text-destructive"
-                      >
-                        {formErrors.observador_ids?.message ||
-                          formErrors.setor_id?.message ||
-                          formErrors.projeto_id?.message ||
-                          formErrors.visibilidade?.message ||
-                          "Verifique os campos obrigatórios dos metadados."}
-                      </div>
-                    )}
-
-                    <FormField
-                      control={form.control}
-                      name="titulo"
-                      render={({ field }) => (
-                        <FormItem>
-                          <EditableOnDoubleClick
-                            locked={!canEdit}
-                            forceEditable={false}
-                            editing={editingField === "titulo"}
-                            onStartEdit={() => setEditingField("titulo")}
-                            onEndEdit={() => setEditingField(null)}
-                          >
-                            {(editable) => (
-                              <FormControl>
-                                <Input
-                                  placeholder="Título da subtarefa"
-                                  className="h-9 rounded-lg border bg-card px-2.5 py-1.5 text-sm font-semibold shadow-sm focus-visible:ring-1"
-                                  readOnly={!editable}
-                                  disabled={!canEdit}
-                                  {...field}
-                                />
-                              </FormControl>
-                            )}
-                          </EditableOnDoubleClick>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="descricao"
-                      render={({ field }) => (
-                        <FormItem>
-                          <EditableOnDoubleClick
-                            locked={!canEdit}
-                            forceEditable={false}
-                            editing={editingField === "descricao"}
-                            onStartEdit={() => setEditingField("descricao")}
-                            onEndEdit={() => setEditingField(null)}
-                          >
-                            {(editable) => (
-                              <FormControl>
-                                <DescricaoField
-                                  value={field.value ?? ""}
-                                  onChange={field.onChange}
-                                  onBlur={field.onBlur}
-                                  editable={editable}
-                                  disabled={!canEdit}
-                                  editorKey={subtarefaId ?? "subtarefa"}
-                                  placeholder="Adicione uma descrição... (duplo clique para editar)"
-                                  minHeightClassName="[&_.ProseMirror]:min-h-[8rem] text-sm"
-                                  readMinHeightClassName="min-h-[8rem] text-sm"
-                                />
-                              </FormControl>
-                            )}
-                          </EditableOnDoubleClick>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                </ScrollArea>
-
-                <aside className="flex w-full shrink-0 flex-col border-t bg-muted/20 lg:w-52 lg:border-l lg:border-t-0">
-                  <Tabs
-                    value={sideTab}
-                    onValueChange={(value) => setSideTab(value as "comentarios" | "anexos")}
-                    className="flex min-h-0 flex-1 flex-col"
-                  >
-                    <TabsList className="mx-3 mt-3 grid h-8 w-auto grid-cols-2">
-                      <TabsTrigger value="anexos" className="gap-1 px-2 text-[11px]">
-                        <Paperclip className="h-3 w-3" />
-                        Anexos
-                        {anexos.length > 0 && (
-                          <span className="text-muted-foreground">({anexos.length})</span>
-                        )}
-                      </TabsTrigger>
-                      <TabsTrigger value="comentarios" className="gap-1 px-2 text-[11px]">
-                        <MessageSquare className="h-3 w-3" />
-                        Comentários
-                        {comentarios.length > 0 && (
-                          <span className="text-muted-foreground">({comentarios.length})</span>
-                        )}
-                      </TabsTrigger>
-                    </TabsList>
-
-                    <TabsContent
-                      value="anexos"
-                      className="mt-0 min-h-0 flex-1 data-[state=inactive]:hidden"
+                  {(formErrors.visibilidade ||
+                    formErrors.setor_id ||
+                    formErrors.projeto_id ||
+                    formErrors.observador_ids) && (
+                    <div
+                      role="alert"
+                      className="rounded-md border border-destructive/40 bg-destructive/10 px-2.5 py-1.5 text-xs text-destructive"
                     >
-                      <ScrollArea className="h-full max-h-[calc(100vh-11rem)] [&>[data-radix-scroll-area-viewport]>div]:!block">
+                      {formErrors.observador_ids?.message ||
+                        formErrors.setor_id?.message ||
+                        formErrors.projeto_id?.message ||
+                        formErrors.visibilidade?.message ||
+                        "Verifique os campos obrigatórios dos metadados."}
+                    </div>
+                  )}
+
+                  <FormField
+                    control={form.control}
+                    name="titulo"
+                    render={({ field }) => (
+                      <FormItem>
+                        <EditableOnDoubleClick
+                          locked={!canEdit}
+                          forceEditable={false}
+                          editing={editingField === "titulo"}
+                          onStartEdit={() => setEditingField("titulo")}
+                          onEndEdit={() => setEditingField(null)}
+                        >
+                          {(editable) => (
+                            <FormControl>
+                              <Input
+                                placeholder="Título da subtarefa"
+                                className="h-9 rounded-lg border bg-card px-2.5 py-1.5 text-sm font-semibold shadow-sm focus-visible:ring-1"
+                                readOnly={!editable}
+                                disabled={!canEdit}
+                                {...field}
+                              />
+                            </FormControl>
+                          )}
+                        </EditableOnDoubleClick>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="descricao"
+                    render={({ field }) => (
+                      <FormItem>
+                        <EditableOnDoubleClick
+                          locked={!canEdit}
+                          forceEditable={false}
+                          editing={editingField === "descricao"}
+                          onStartEdit={() => setEditingField("descricao")}
+                          onEndEdit={() => setEditingField(null)}
+                        >
+                          {(editable) => (
+                            <FormControl>
+                              <DescricaoField
+                                value={field.value ?? ""}
+                                onChange={field.onChange}
+                                onBlur={field.onBlur}
+                                editable={editable}
+                                disabled={!canEdit}
+                                editorKey={subtarefaId ?? "subtarefa"}
+                                placeholder="Adicione uma descrição... (duplo clique para editar)"
+                                minHeightClassName="[&_.ProseMirror]:min-h-[8rem] text-sm"
+                                readMinHeightClassName="min-h-[8rem] text-sm"
+                              />
+                            </FormControl>
+                          )}
+                        </EditableOnDoubleClick>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="rounded-lg border bg-muted/20">
+                    <Tabs
+                      value={sideTab}
+                      onValueChange={(value) =>
+                        setSideTab(value as "comentarios" | "anexos")
+                      }
+                      className="flex flex-col"
+                    >
+                      <TabsList className="mx-3 mt-3 grid h-8 w-auto grid-cols-2 self-stretch">
+                        <TabsTrigger value="anexos" className="gap-1 px-2 text-[11px]">
+                          <Paperclip className="h-3 w-3" />
+                          Anexos
+                          {anexos.length > 0 && (
+                            <span className="text-muted-foreground">({anexos.length})</span>
+                          )}
+                        </TabsTrigger>
+                        <TabsTrigger value="comentarios" className="gap-1 px-2 text-[11px]">
+                          <MessageSquare className="h-3 w-3" />
+                          Comentários
+                          {comentarios.length > 0 && (
+                            <span className="text-muted-foreground">
+                              ({comentarios.length})
+                            </span>
+                          )}
+                        </TabsTrigger>
+                      </TabsList>
+
+                      <TabsContent
+                        value="anexos"
+                        className="mt-0 data-[state=inactive]:hidden"
+                      >
                         <div className="w-full space-y-2 p-3">
                           <SubtarefaAnexosSection
                             subtarefaId={subtarefa.id}
@@ -640,14 +642,12 @@ export function SubtarefaPanelSheet({
                             compact
                           />
                         </div>
-                      </ScrollArea>
-                    </TabsContent>
+                      </TabsContent>
 
-                    <TabsContent
-                      value="comentarios"
-                      className="mt-0 min-h-0 flex-1 data-[state=inactive]:hidden"
-                    >
-                      <ScrollArea className="h-full max-h-[calc(100vh-11rem)]">
+                      <TabsContent
+                        value="comentarios"
+                        className="mt-0 data-[state=inactive]:hidden"
+                      >
                         <div className="p-3">
                           <CommentsThread
                             comentarios={comentarios}
@@ -714,11 +714,11 @@ export function SubtarefaPanelSheet({
                             }}
                           />
                         </div>
-                      </ScrollArea>
-                    </TabsContent>
-                  </Tabs>
-                </aside>
-              </div>
+                      </TabsContent>
+                    </Tabs>
+                  </div>
+                </div>
+              </ScrollArea>
 
               {canEdit && (
                 <div className="border-t px-4 py-1.5 text-[10px] text-muted-foreground">
