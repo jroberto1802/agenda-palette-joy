@@ -190,6 +190,10 @@ export type TarefaFilters = {
    * excluindo aqueles em que o usuário logado é responsável ou criador.
    */
   somente_visualizando?: boolean;
+  /** Menu Recorrentes: apenas modelos de série (`serie_raiz_id = id`). */
+  somente_modelos?: boolean;
+  /** Se true, não remove modelos da listagem (padrão: exclui modelos). */
+  incluir_modelos?: boolean;
 };
 
 export type Subtarefa = Tables<"subtarefas">;
@@ -239,6 +243,10 @@ export type SubtarefaMetaUpdate = {
   atribuido_ids?: string[];
   observador_ids?: string[];
   visibilidade?: Subtarefa["visibilidade"];
+  /** Dia fixo 1–31 (mensal-like no modelo). */
+  dia_no_mes?: number | null;
+  /** Offset em dias a partir da ocorrência pai (diária/semanal/intervalo). */
+  offset_dias?: number | null;
 };
 
 export type SubtarefaFormData = {

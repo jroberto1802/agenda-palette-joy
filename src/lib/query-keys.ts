@@ -33,6 +33,14 @@ export const tarefaKeys = {
   kpis: () => [...tarefaKeys.all, "kpis"] as const,
   recent: () => [...tarefaKeys.all, "recent"] as const,
   calendario: (mes: string) => [...tarefaKeys.all, "calendario", mes] as const,
+  seriesModelos: () => [...tarefaKeys.all, "series-modelos"] as const,
+};
+
+export const recorrenciaPastaKeys = {
+  all: ["recorrencia-pastas"] as const,
+  list: () => [...recorrenciaPastaKeys.all, "list"] as const,
+  detail: (id: string) => [...recorrenciaPastaKeys.all, "detail", id] as const,
+  membros: (id: string) => [...recorrenciaPastaKeys.all, "membros", id] as const,
 };
 
 export const anexoKeys = {

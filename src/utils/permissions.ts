@@ -178,6 +178,65 @@ export function canManageProjetoMembros(
   return false;
 }
 
+type RecorrenciaPastaEscopo = {
+  criado_por: string | null;
+  membros?: Array<{ usuario_id?: string; usuario?: { id: string } | null } | null> | null;
+};
+
+export function isRecorrenciaPastaParticipante(
+  profile: Profile | null | undefined,
+  pasta: RecorrenciaPastaEscopo | null | undefined,
+): boolean {
+  if (!profile || !pasta) return false;
+  if (pasta.criado_por === profile.id) return true;
+  return (pasta.membros ?? []).some((m) => {
+    if (!m) return false;
+    return m.usuario_id === profile.id || m.usuario?.id === profile.id;
+  });
+}
+
+export function canSeeRecorrenciaPasta(
+  profile: Profile | null | undefined,
+  pasta: RecorrenciaPastaEscopo | null | undefined,
+): boolean {
+  if (!profile || !pasta) return false;
+  if (isAdmin(profile)) return true;
+  return isRecorrenciaPastaParticipante(profile, pasta);
+}
+
+export function canCreateRecorrenciaPasta(profile: Profile | null | undefined): boolean {
+  return !!profile;
+}
+
+export function canManageRecorrenciaPasta(
+  profile: Profile | null | undefined,
+  pasta: RecorrenciaPastaEscopo | null | undefined,
+): boolean {
+  if (!profile || !pasta) return false;
+  if (isAdmin(profile)) return true;
+  if (pasta.criado_por === profile.id) return true;
+  if (isGerente(profile)) return isRecorrenciaPastaParticipante(profile, pasta);
+  return false;
+}
+
+export function canDeleteRecorrenciaPasta(
+  profile: Profile | null | undefined,
+  pasta: RecorrenciaPastaEscopo | null | undefined,
+): boolean {
+  return canManageRecorrenciaPasta(profile, pasta);
+}
+
+export function canManageRecorrenciaPastaMembros(
+  profile: Profile | null | undefined,
+  pasta: RecorrenciaPastaEscopo | null | undefined,
+): boolean {
+  if (!profile || !pasta) return false;
+  if (isAdmin(profile)) return true;
+  if (pasta.criado_por === profile.id) return true;
+  if (isGerente(profile)) return isRecorrenciaPastaParticipante(profile, pasta);
+  return false;
+}
+
 export const PAPEL_LABELS: Record<Papel, string> = {
   admin: "Administrador",
   gerente: "Gestor",

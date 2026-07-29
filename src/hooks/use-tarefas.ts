@@ -15,6 +15,7 @@ import {
   getSubtarefaDetail,
   getTarefaDetail,
   listRecentTarefas,
+  listSeriesModelos,
   listSubtarefasAgenda,
   listTarefas,
   listTarefasCalendario,
@@ -78,6 +79,14 @@ export function useTarefas(
   return useQuery({
     queryKey: tarefaKeys.list(filterKey),
     queryFn: () => listTarefas(filters),
+    enabled: options?.enabled ?? true,
+  });
+}
+
+export function useSeriesModelos(options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: tarefaKeys.seriesModelos(),
+    queryFn: () => listSeriesModelos(),
     enabled: options?.enabled ?? true,
   });
 }

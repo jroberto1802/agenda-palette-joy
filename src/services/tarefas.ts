@@ -489,7 +489,21 @@ export async function listTarefas(filters: TarefaFilters = {}): Promise<TarefaWi
     });
   }
 
+  if (filters.somente_modelos) {
+    rows = rows.filter((t) => isSerieModelo(t));
+  } else if (!filters.incluir_modelos) {
+    rows = rows.filter((t) => !isSerieModelo(t));
+  }
+
   return rows;
+}
+
+/** Modelos de série para o menu Recorrentes. */
+export async function listSeriesModelos(): Promise<TarefaWithRelations[]> {
+  return listTarefas({
+    somente_modelos: true,
+    excluir_finalizadas: false,
+  });
 }
 
 export async function getTarefa(id: string): Promise<TarefaWithRelations> {
@@ -514,7 +528,7 @@ export async function listRecentTarefas(limit = 5): Promise<TarefaWithRelations[
     .limit(limit);
 
   if (error) throw error;
-  return mapTarefasWithIndicadores(data as unknown[] | null);
+  return mapTarefasWithIndicadores(data as unknown[] | null).filter((t) => !isSerieModelo(t));
 }
 
 export async function listTarefasCalendario(
@@ -532,7 +546,7 @@ export async function listTarefasCalendario(
     .order("data_inicio", { ascending: true });
 
   if (error) throw error;
-  return mapTarefasWithIndicadores(data as unknown[] | null);
+  return mapTarefasWithIndicadores(data as unknown[] | null).filter((t) => !isSerieModelo(t));
 }
 
 export async function createTarefa(payload: TarefaFormData): Promise<TarefaWithRelations> {
@@ -1598,6 +1612,8 @@ export async function updateSubtarefaMeta(
     atribuido_ids?: string[];
     observador_ids?: string[];
     visibilidade?: SubtarefaWithAuthors["visibilidade"];
+    dia_no_mes?: number | null;
+    offset_dias?: number | null;
   },
 ): Promise<SubtarefaWithAuthors> {
   const { data: anterior, error: anteriorError } = await supabase
@@ -1618,11 +1634,26 @@ export async function updateSubtarefaMeta(
   const patch: {
     data_inicio?: string | null;
     visibilidade?: SubtarefaWithAuthors["visibilidade"];
+    dia_no_mes?: number | null;
+    offset_dias?: number | null;
     updated_at?: string;
   } = {};
 
   if (meta.data_inicio !== undefined) {
     patch.data_inicio = meta.data_inicio;
+  }
+  if (meta.dia_no_mes !== undefined) {
+    patch.dia_no_mes = meta.dia_no_mes;
+    if (meta.dia_no_mes != null) {
+      patch.offset_dias = null;
+      patch.data_inicio = null;
+    }
+  }
+  if (meta.offset_dias !== undefined) {
+    patch.offset_dias = meta.offset_dias;
+    if (meta.offset_dias != null) {
+      patch.dia_no_mes = null;
+    }
   }
   if (meta.visibilidade !== undefined || meta.observador_ids !== undefined) {
     patch.visibilidade = VISIBILIDADE_PESSOAS;

@@ -3,11 +3,11 @@ import {
   getAncoraSerie,
   getLimitePrevisaoFutura,
   isSerieModelo,
-  offsetDiasSubtarefaNoCiclo,
+  dataSubtarefaNaOcorrencia,
   parseRecorrencia,
   serializeRecorrencia,
 } from "@/utils/recorrencia";
-import { addDays, endOfDay, startOfDay } from "date-fns";
+import { endOfDay, startOfDay } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import type { RecorrenciaConfig, TarefaFormData, TarefaWithRelations } from "@/types";
 import { applyTimeFromIso, localDateAtNoon, toLocalDateKey } from "@/utils/agenda-datas";
@@ -40,6 +40,8 @@ type ModeloSubtarefaTemplate = {
   data_inicio: string | null;
   setor_id: string | null;
   projeto_id: string | null;
+  dia_no_mes?: number | null;
+  offset_dias?: number | null;
 };
 
 /**
@@ -162,27 +164,16 @@ export async function listPrevisoesOcorrencia(
     const ancora = getAncoraSerie(modelo, config);
     const ancoraKey = ancora ? toLocalDateKey(ancora) ?? ancora : null;
 
-    // Templates do modelo: só offsets fixos (+0, +1…), sem expandir recorrência neles
+    // Templates do modelo: Dia fixo, offset explícito ou legado
     const { data: templatesRaw } = await supabase
       .from("subtarefas")
-      .select("id, titulo, prioridade, data_inicio, setor_id, projeto_id")
+      .select("id, titulo, prioridade, data_inicio, setor_id, projeto_id, dia_no_mes, offset_dias")
       .eq("tarefa_id", modelo.id);
 
     const templates = (templatesRaw ?? []) as ModeloSubtarefaTemplate[];
-    const templatesComOffset: Array<{ template: ModeloSubtarefaTemplate; offset: number }> = [];
-    for (const t of templates) {
-      const offset = offsetDiasSubtarefaNoCiclo(t.data_inicio, ancora, config);
-      if (offset === null) continue;
-      templatesComOffset.push({ template: t, offset });
-    }
-
-    const maxOffset = templatesComOffset.length
-      ? Math.max(...templatesComOffset.map((t) => t.offset))
-      : 0;
 
     // 1) Datas da TAREFA PRINCIPAL (única coisa que usa o motor de recorrência)
-    const expandDe = addDays(de, -maxOffset);
-    const datasPai = expandirDatasOcorrencia(ancoraKey, config, expandDe, ate, {
+    const datasPai = expandirDatasOcorrencia(ancoraKey, config, de, ate, {
       max: 60,
     });
 
@@ -207,9 +198,10 @@ export async function listPrevisoesOcorrencia(
         });
       }
 
-      // 2) UM conjunto de subtarefas para ESTA ocorrência (sem recorrência)
-      for (const { template, offset } of templatesComOffset) {
-        const dataSub = addDays(paiDay, offset);
+      // 2) UM conjunto de subtarefas para ESTA ocorrência
+      for (const template of templates) {
+        const dataSub = dataSubtarefaNaOcorrencia(paiDay, config, template, ancora);
+        if (!dataSub) continue;
         if (dataSub.getTime() <= hojeFim.getTime()) continue;
         if (dataSub.getTime() < de.getTime() || dataSub.getTime() > ate.getTime()) {
           continue;

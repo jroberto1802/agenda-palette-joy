@@ -10,6 +10,7 @@ import {
   Megaphone,
   Moon,
   Plus,
+  RefreshCw,
   Search,
   Settings,
   Shield,
@@ -56,7 +57,7 @@ type NavItem = {
 
 /**
  * Ordem do menu:
- * Dashboard → Avisos → Nova tarefa → Buscar → Agenda → Projetos → Calendário →
+ * Dashboard → Avisos → Nova tarefa → Buscar → Agenda → Recorrentes → Projetos → Calendário →
  * Equipe → Finalizados → Relatórios → Configurações → Admin
  * ("Nova tarefa" e "Buscar" são ações injetadas antes de Agenda.)
  */
@@ -64,6 +65,7 @@ const BASE_NAV: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/avisos", label: "Avisos", icon: Megaphone },
   { to: "/tarefas", label: "Agenda", icon: ClipboardList },
+  { to: "/recorrentes", label: "Recorrentes", icon: RefreshCw },
   { to: "/projetos", label: "Projetos", icon: FolderKanban },
   { to: "/calendario", label: "Calendário", icon: CalendarDays },
   { to: "/equipe", label: "Equipe", icon: Users },

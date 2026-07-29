@@ -21,7 +21,6 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { CommentsThread } from "@/components/common/comments-thread";
 import { EditableOnDoubleClick } from "@/components/common/editable-on-double-click";
-import { ConfirmSerieEditDialog } from "@/components/tarefas/confirm-serie-edit-dialog";
 import { SubtarefaPanelSheet } from "@/components/tarefas/subtarefa-panel-sheet";
 import { SubtarefaRow } from "@/components/tarefas/subtarefa-row";
 import { MoverSubtarefaDialog } from "@/components/tarefas/mover-subtarefa-dialog";
@@ -75,9 +74,7 @@ import {
   useUpdateSubtarefaMeta,
   useUpdateTarefa,
   useUpdateTarefaComentario,
-  useUpdateTarefaComEscopoSerie,
 } from "@/hooks/use-tarefas";
-import { getModeloRecorrencia, type EscopoEdicaoSerie } from "@/services/tarefa-recorrencia";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
 import type {
   ProfileWithSetor,
@@ -90,7 +87,13 @@ import type {
   TarefaVisibilidade,
   TarefaWithRelations,
 } from "@/types";
-import { isSerieOcorrencia, parseRecorrencia } from "@/utils/recorrencia";
+import { isSerieModelo, isSerieOcorrencia, parseRecorrencia, calcularProximaOcorrenciaPrevista } from "@/utils/recorrencia";
+import {
+  applyTimeToDate,
+  getTimeInputValue,
+  hasExplicitTime,
+  localDateAtNoon,
+} from "@/utils/agenda-datas";
 import { isAdmin, isGerente } from "@/utils/permissions";
 import {
   TAREFA_PRIORIDADE_COLORS,
@@ -167,6 +170,8 @@ function SortableSubtarefaRow({
   onMove,
   onDelete,
   onUpdateMeta,
+  modeloSerieMode = false,
+  modeloRecorrencia = null,
 }: {
   subtarefa: SubtarefaWithAuthors;
   canEdit: boolean;
@@ -176,12 +181,9 @@ function SortableSubtarefaRow({
   onDuplicate: () => void;
   onMove: () => void;
   onDelete: () => Promise<void>;
-  onUpdateMeta: (meta: {
-    data_inicio?: string | null;
-    atribuido_ids?: string[];
-    observador_ids?: string[];
-    visibilidade?: SubtarefaWithAuthors["visibilidade"];
-  }) => Promise<void>;
+  onUpdateMeta: Parameters<typeof SubtarefaRow>[0]["onUpdateMeta"];
+  modeloSerieMode?: boolean;
+  modeloRecorrencia?: RecorrenciaConfig | null;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: subtarefa.id,
@@ -204,6 +206,8 @@ function SortableSubtarefaRow({
         onDelete={onDelete}
         onUpdateMeta={onUpdateMeta}
         isDragging={isDragging}
+        modeloSerieMode={modeloSerieMode}
+        modeloRecorrencia={modeloRecorrencia}
         dragHandle={
           canEdit ? (
             <button
@@ -323,6 +327,8 @@ export function TarefaPanelSheet({
   initialAba,
   highlightComentarioId = null,
   initialSubtarefaId = null,
+  /** Fluxo dedicado do menu Recorrentes (modelo de série). */
+  serieModeloMode = false,
 }: {
   tarefaId: string | null;
   open: boolean;
@@ -338,6 +344,7 @@ export function TarefaPanelSheet({
   initialAba?: "comentarios" | "anexos";
   highlightComentarioId?: string | null;
   initialSubtarefaId?: string | null;
+  serieModeloMode?: boolean;
 }) {
   const isCreate = !tarefaId;
   const { data: profile } = useProfile();
@@ -348,7 +355,6 @@ export function TarefaPanelSheet({
 
   const createTarefa = useCreateTarefa();
   const updateTarefa = useUpdateTarefa();
-  const updateTarefaEscopo = useUpdateTarefaComEscopoSerie();
   const createSubtarefa = useCreateSubtarefa();
   const toggleSubtarefa = useToggleSubtarefa();
   const updateSubtarefaMeta = useUpdateSubtarefaMeta();
@@ -370,13 +376,9 @@ export function TarefaPanelSheet({
   /** Na criação, Visibilidade acompanha Responsáveis até edição manual. */
   const visibilidadeManualRef = useRef(false);
   const [editingField, setEditingField] = useState<EditableTarefaField | null>(null);
-  const [pendingSeriePayload, setPendingSeriePayload] = useState<TarefaFormData | null>(null);
 
-  const { data: modeloRecorrencia } = useQuery({
-    queryKey: ["serie-modelo-recorrencia", tarefa?.serie_raiz_id],
-    queryFn: () => getModeloRecorrencia(tarefa!.serie_raiz_id!),
-    enabled: !!tarefa && isSerieOcorrencia(tarefa) && !!tarefa.serie_raiz_id,
-  });
+  const ehModeloSerie =
+    serieModeloMode || (!!tarefa && isSerieModelo(tarefa));
 
   useEffect(() => {
     if (!open) {
@@ -495,8 +497,9 @@ export function TarefaPanelSheet({
   useLayoutEffect(() => {
     if (!open) return;
     visibilidadeManualRef.current = !isCreate;
+    // Ocorrências não carregam a regra do modelo no formulário.
     const recorrenciaOverride =
-      tarefa && isSerieOcorrencia(tarefa) ? (modeloRecorrencia ?? null) : undefined;
+      tarefa && isSerieOcorrencia(tarefa) ? null : undefined;
     form.reset(
       toFormValues(
         tarefa ?? null,
@@ -515,7 +518,6 @@ export function TarefaPanelSheet({
     defaultProjetoId,
     defaultDataInicioKey,
     defaultAtribuidoIdsKey,
-    modeloRecorrencia,
     form,
     isCreate,
   ]);
@@ -635,46 +637,54 @@ export function TarefaPanelSheet({
 
   const pessoasEscopoTarefa = pessoasMencionaveis;
 
-  const applySave = async (payload: TarefaFormData, escopo?: EscopoEdicaoSerie) => {
+  const applySave = async (payload: TarefaFormData) => {
     if (isCreate) {
       const created = await createTarefa.mutateAsync(payload);
-      toast.success("Tarefa criada");
+      toast.success(ehModeloSerie ? "Série criada" : "Tarefa criada");
       onSaved?.(created.id);
       return;
     }
     if (!tarefaId) return;
-
-    if (escopo && tarefa && isSerieOcorrencia(tarefa)) {
-      await updateTarefaEscopo.mutateAsync({ id: tarefaId, data: payload, escopo });
-    } else {
-      await updateTarefa.mutateAsync({ id: tarefaId, data: payload });
-    }
-    toast.success("Tarefa atualizada");
+    await updateTarefa.mutateAsync({ id: tarefaId, data: payload });
+    toast.success(ehModeloSerie ? "Série atualizada" : "Tarefa atualizada");
     setEditingField(null);
   };
 
   const handleSave = form.handleSubmit(
     async (values) => {
       try {
-        const existingRec =
-          tarefa && isSerieOcorrencia(tarefa)
-            ? (modeloRecorrencia ?? null)
-            : parseRecorrencia(tarefa?.recorrencia);
+        if (ehModeloSerie) {
+          const rec = toRecorrenciaPayload(values, parseRecorrencia(tarefa?.recorrencia));
+          if (!rec || rec.tipo === "nenhuma") {
+            toast.error("Defina a recorrência da série", {
+              description: "A regra de recorrência é obrigatória no menu Recorrentes.",
+            });
+            return;
+          }
+        }
+        const existingRec = ehModeloSerie
+          ? parseRecorrencia(tarefa?.recorrencia)
+          : null;
         const payload = toPayload(values, existingRec);
-        // Escopo só para ocorrência; modelo da série salva direto
-        if (
-          !isCreate &&
-          tarefaId &&
-          tarefa &&
-          isSerieOcorrencia(tarefa) &&
-          form.formState.isDirty
-        ) {
-          setPendingSeriePayload(payload);
-          return;
+        // Fora de Recorrentes / ocorrência: nunca grava regra de recorrência.
+        if (!ehModeloSerie) {
+          payload.recorrencia = null;
+        } else if (payload.recorrencia) {
+          // Modelo sem calendário: garante âncora/data a partir da regra + hora.
+          if (!payload.data_inicio) {
+            const first =
+              calcularProximaOcorrenciaPrevista(null, payload.recorrencia) ??
+              localDateAtNoon(new Date());
+            const timed =
+              values.data_inicio && hasExplicitTime(values.data_inicio)
+                ? applyTimeToDate(first, getTimeInputValue(values.data_inicio))
+                : localDateAtNoon(first);
+            payload.data_inicio = timed.toISOString();
+          }
         }
         await applySave(payload);
       } catch (error) {
-        toast.error("Erro ao salvar tarefa", {
+        toast.error(ehModeloSerie ? "Erro ao salvar série" : "Erro ao salvar tarefa", {
           description: getSupabaseErrorMessage(error as Error),
         });
       }
@@ -688,28 +698,24 @@ export function TarefaPanelSheet({
         )
         .filter(Boolean);
 
-      toast.error(isCreate ? "Não foi possível criar a tarefa" : "Não foi possível salvar a tarefa", {
-        description:
-          messages[0] ??
-          "Preencha os campos obrigatórios (título e responsável) e tente novamente.",
-      });
+      toast.error(
+        isCreate
+          ? ehModeloSerie
+            ? "Não foi possível criar a série"
+            : "Não foi possível criar a tarefa"
+          : ehModeloSerie
+            ? "Não foi possível salvar a série"
+            : "Não foi possível salvar a tarefa",
+        {
+          description:
+            messages[0] ??
+            "Preencha os campos obrigatórios (título e responsável) e tente novamente.",
+        },
+      );
 
       if (errors.titulo) setEditingField("titulo");
     },
   );
-
-  const handleConfirmSerieEdit = async (escopo: EscopoEdicaoSerie) => {
-    if (!pendingSeriePayload) return;
-    try {
-      await applySave(pendingSeriePayload, escopo);
-      setPendingSeriePayload(null);
-    } catch (error) {
-      toast.error("Erro ao salvar tarefa", {
-        description: getSupabaseErrorMessage(error as Error),
-      });
-      throw error;
-    }
-  };
 
   const handleAddSubtarefa = async () => {
     if (!tarefaId || !novaSubtarefa.trim()) return;
@@ -723,8 +729,7 @@ export function TarefaPanelSheet({
     }
   };
 
-  const saving =
-    createTarefa.isPending || updateTarefa.isPending || updateTarefaEscopo.isPending;
+  const saving = createTarefa.isPending || updateTarefa.isPending;
   const showInteractions = !isCreate && !!tarefaId;
   const {
     formState: { errors: formErrors },
@@ -879,6 +884,8 @@ export function TarefaPanelSheet({
                       setores={setoresPermitidos}
                       pessoasParaResponsavel={pessoasParaResponsavel}
                       pessoasParaVisibilidade={pessoasAtivas}
+                      hideRecorrencia={!ehModeloSerie}
+                      dateMode={ehModeloSerie ? "recorrencia" : "calendario"}
                       onVisibilidadeManualChange={() => {
                         visibilidadeManualRef.current = true;
                       }}
@@ -1032,6 +1039,19 @@ export function TarefaPanelSheet({
                                     subtarefa={sub}
                                     canEdit={canEdit}
                                     pessoasDisponiveis={pessoasEscopoTarefa}
+                                    modeloSerieMode={ehModeloSerie}
+                                    modeloRecorrencia={parseRecorrencia(
+                                      form.watch("recorrencia_tipo") === "nenhuma"
+                                        ? null
+                                        : {
+                                            tipo: form.watch("recorrencia_tipo") as never,
+                                            dias_semana: form.watch("recorrencia_dias_semana"),
+                                            dia_mes: form.watch("recorrencia_dia_mes"),
+                                            intervalo: form.watch("recorrencia_intervalo"),
+                                            unidade: form.watch("recorrencia_unidade"),
+                                            datas_livres: form.watch("recorrencia_datas_livres"),
+                                          },
+                                    )}
                                     onOpen={() => setSubtarefaDrawerId(sub.id)}
                                     onToggle={async (concluida) => {
                                       applySubtarefaConclusaoOrder(sub.id, concluida);
@@ -1233,15 +1253,6 @@ export function TarefaPanelSheet({
       onOpenChange={(open) => {
         if (!open) setMovingSubtarefa(null);
       }}
-    />
-
-    <ConfirmSerieEditDialog
-      open={!!pendingSeriePayload}
-      onOpenChange={(next) => {
-        if (!next) setPendingSeriePayload(null);
-      }}
-      loading={updateTarefaEscopo.isPending}
-      onConfirm={handleConfirmSerieEdit}
     />
     </>
   );

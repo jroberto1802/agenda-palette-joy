@@ -4,6 +4,7 @@ import {
   CalendarDays,
   Eye,
   FolderKanban,
+  RefreshCw,
   UserRound,
 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -13,6 +14,8 @@ import { PessoasMultiSelect } from "@/components/common/pessoas-multi-select";
 import {
   DataHoraRecorrenciaBody,
   formatDataHoraLabel,
+  formatRecorrenciaHoraLabel,
+  type DataHoraDateMode,
 } from "@/components/tarefas/data-hora-recorrencia-body";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -123,10 +126,12 @@ export function TarefaMetaToolbar({
   emptyResponsavelLabel,
   emptyVisibilidadeLabel = "Nenhuma pessoa disponível",
   requireResponsavel = true,
-  /** Subtarefas não possuem recorrência própria. */
-  hideRecorrencia = false,
+  /** Subtarefas e tarefas comuns: sem recorrência no popup Data. */
+  hideRecorrencia = true,
   /** Densidade reduzida (drawer compacto da subtarefa). */
   compact = false,
+  /** calendario = Data+Hora; recorrencia = frequência+Hora (só modelo em Recorrentes). */
+  dateMode = "calendario" as DataHoraDateMode,
   onVisibilidadeManualChange,
 }: {
   form: UseFormReturn<TarefaMetaFormValues & Record<string, unknown>>;
@@ -146,6 +151,7 @@ export function TarefaMetaToolbar({
   requireResponsavel?: boolean;
   hideRecorrencia?: boolean;
   compact?: boolean;
+  dateMode?: DataHoraDateMode;
   /** Chamado quando o usuário edita a Visibilidade manualmente (desliga sync com responsáveis). */
   onVisibilidadeManualChange?: () => void;
 }) {
@@ -427,7 +433,7 @@ export function TarefaMetaToolbar({
           )}
         />
 
-        {/* Data + Hora + Recorrência (popup único) */}
+        {/* Data + Hora (+ Recorrência só no modo recorrencia) */}
         <FormField
           control={form.control}
           name="data_inicio"
@@ -437,12 +443,24 @@ export function TarefaMetaToolbar({
                 <PopoverTrigger asChild>
                   <span>
                     <MetaIconButton
-                      label={formatDataHoraLabel(dataInicio)}
-                      active={!!dataInicio || !!parseRecorrencia(recorrenciaAtual)}
+                      label={
+                        dateMode === "recorrencia"
+                          ? formatRecorrenciaHoraLabel(recorrenciaAtual, dataInicio)
+                          : formatDataHoraLabel(dataInicio)
+                      }
+                      active={
+                        dateMode === "recorrencia"
+                          ? !!parseRecorrencia(recorrenciaAtual) || !!dataInicio
+                          : !!dataInicio
+                      }
                       disabled={!canEdit}
                       compact={compact}
                     >
-                      <CalendarDays className={iconClass} />
+                      {dateMode === "recorrencia" ? (
+                        <RefreshCw className={iconClass} />
+                      ) : (
+                        <CalendarDays className={iconClass} />
+                      )}
                     </MetaIconButton>
                   </span>
                 </PopoverTrigger>
@@ -451,9 +469,13 @@ export function TarefaMetaToolbar({
                     value={field.value}
                     onChange={field.onChange}
                     canEdit={canEdit}
-                    showRecorrencia={!hideRecorrencia}
+                    dateMode={
+                      hideRecorrencia || dateMode === "calendario" ? "calendario" : "recorrencia"
+                    }
                     recorrencia={recorrenciaAtual}
-                    onRecorrenciaChange={hideRecorrencia ? undefined : applyRecorrencia}
+                    onRecorrenciaChange={
+                      hideRecorrencia || dateMode === "calendario" ? undefined : applyRecorrencia
+                    }
                   />
                 </PopoverContent>
               </Popover>

@@ -19,43 +19,56 @@ import { formatRecorrencia, parseRecorrencia } from "@/utils/recorrencia";
 
 type Panel = "calendario" | "hora" | "repetir";
 
+/** calendario = Data+Hora (sem Repetir). recorrencia = frequência+Hora (sem calendário). */
+export type DataHoraDateMode = "calendario" | "recorrencia";
+
 export function DataHoraRecorrenciaBody({
   value,
   onChange,
   canEdit,
   recorrencia,
   onRecorrenciaChange,
-  showRecorrencia = true,
+  dateMode = "calendario",
 }: {
   value: Date | null;
   onChange: (date: Date | null) => void;
   canEdit: boolean;
   recorrencia?: RecorrenciaConfig | null;
   onRecorrenciaChange?: (config: RecorrenciaConfig | null) => void | Promise<void>;
-  /** Subtarefas: calendário + hora, sem repetir. */
-  showRecorrencia?: boolean;
+  dateMode?: DataHoraDateMode;
 }) {
-  const [panel, setPanel] = useState<Panel>("calendario");
+  const isRecorrenciaMode = dateMode === "recorrencia";
+  const [panel, setPanel] = useState<Panel>(isRecorrenciaMode ? "repetir" : "calendario");
   const [draftTime, setDraftTime] = useState("");
 
   useEffect(() => {
     setDraftTime(getTimeInputValue(value));
   }, [value]);
 
+  useEffect(() => {
+    setPanel(isRecorrenciaMode ? "repetir" : "calendario");
+  }, [isRecorrenciaMode]);
+
   const recorrenciaParsed = parseRecorrencia(recorrencia ?? null);
   const timeLabel = hasExplicitTime(value) ? getTimeInputValue(value) : null;
+
+  const backFromHora = () => setPanel(isRecorrenciaMode ? "repetir" : "calendario");
 
   if (panel === "hora") {
     return (
       <div className="w-[280px] space-y-3 p-3">
         <p className="text-sm font-medium">Horário</p>
-        <p className="text-xs text-muted-foreground">Opcional — a data pode ficar sem horário.</p>
+        <p className="text-xs text-muted-foreground">
+          {isRecorrenciaMode
+            ? "Hora padrão das ocorrências futuras."
+            : "Opcional — a data pode ficar sem horário."}
+        </p>
         <div className="space-y-1.5">
           <Label className="text-xs">Hora</Label>
           <Input
             type="time"
             value={draftTime}
-            disabled={!canEdit || !value}
+            disabled={!canEdit || (!value && !isRecorrenciaMode)}
             onChange={(e) => setDraftTime(e.target.value)}
           />
         </div>
@@ -66,26 +79,30 @@ export function DataHoraRecorrenciaBody({
             size="sm"
             disabled={!canEdit || !value || !hasExplicitTime(value)}
             onClick={() => {
-              if (!value) return;
+              if (!value) {
+                setDraftTime("");
+                backFromHora();
+                return;
+              }
               onChange(localDateAtNoon(value));
               setDraftTime("");
-              setPanel("calendario");
+              backFromHora();
             }}
           >
             Remover hora
           </Button>
           <div className="flex gap-2">
-            <Button type="button" variant="ghost" size="sm" onClick={() => setPanel("calendario")}>
+            <Button type="button" variant="ghost" size="sm" onClick={backFromHora}>
               Voltar
             </Button>
             <Button
               type="button"
               size="sm"
-              disabled={!canEdit || !value}
+              disabled={!canEdit || (!value && !isRecorrenciaMode)}
               onClick={() => {
-                if (!value) return;
-                onChange(applyTimeToDate(value, draftTime || null));
-                setPanel("calendario");
+                const base = value ?? localDateAtNoon(new Date());
+                onChange(applyTimeToDate(base, draftTime || null));
+                backFromHora();
               }}
             >
               Aplicar
@@ -96,21 +113,47 @@ export function DataHoraRecorrenciaBody({
     );
   }
 
-  if (panel === "repetir" && showRecorrencia && onRecorrenciaChange) {
+  if (isRecorrenciaMode) {
+    if (!onRecorrenciaChange) {
+      return (
+        <div className="w-80 p-3 text-sm text-muted-foreground">
+          Recorrência indisponível.
+        </div>
+      );
+    }
     return (
-      <div className="w-80">
+      <div className="w-80 space-y-0">
         <RecorrenciaEditor
           key={formatRecorrencia(recorrenciaParsed)}
           value={recorrenciaParsed}
           canEdit={canEdit}
-          confirmAlteracao={!!recorrenciaParsed}
+          confirmAlteracao={false}
           nested
-          onCancel={() => setPanel("calendario")}
+          onCancel={() => undefined}
           onConfirm={async (config) => {
             await onRecorrenciaChange(config);
-            setPanel("calendario");
           }}
         />
+        <div className="flex flex-wrap gap-2 border-t px-3 py-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            disabled={!canEdit}
+            onClick={() => setPanel("hora")}
+          >
+            <Clock className="h-3.5 w-3.5" />
+            {timeLabel ? `Hora ${timeLabel}` : "Hora"}
+          </Button>
+        </div>
+        {recorrenciaParsed && (
+          <div className="border-t px-3 py-2">
+            <p className="text-xs text-muted-foreground">
+              Atual: {formatRecorrencia(recorrenciaParsed)}
+            </p>
+          </div>
+        )}
       </div>
     );
   }
@@ -144,39 +187,7 @@ export function DataHoraRecorrenciaBody({
           <Clock className="h-3.5 w-3.5" />
           {timeLabel ? `Hora ${timeLabel}` : "Hora"}
         </Button>
-
-        {showRecorrencia && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="gap-1.5"
-            disabled={!canEdit}
-            onClick={() => setPanel("repetir")}
-          >
-            <RefreshCw className="h-3.5 w-3.5" />
-            Repetir
-          </Button>
-        )}
       </div>
-
-      {showRecorrencia && recorrenciaParsed && (
-        <div className="border-t px-3 py-2">
-          <p className="text-xs text-muted-foreground">
-            Atual: {formatRecorrencia(recorrenciaParsed)}
-          </p>
-          <Button
-            type="button"
-            variant="link"
-            size="sm"
-            className="h-auto px-0 text-xs"
-            disabled={!canEdit}
-            onClick={() => setPanel("repetir")}
-          >
-            Alterar frequência
-          </Button>
-        </div>
-      )}
 
       {value && (
         <div className="border-t p-2">
@@ -201,4 +212,15 @@ export function formatDataHoraLabel(date: Date | null): string {
   const base = format(date, "dd/MM/yyyy", { locale: ptBR });
   if (!hasExplicitTime(date)) return `Data: ${base}`;
   return `Data: ${base} ${getTimeInputValue(date)}`;
+}
+
+export function formatRecorrenciaHoraLabel(
+  recorrencia: RecorrenciaConfig | null,
+  date: Date | null,
+): string {
+  const freq = recorrencia ? formatRecorrencia(recorrencia) : "Definir recorrência";
+  if (date && hasExplicitTime(date)) {
+    return `${freq} · ${getTimeInputValue(date)}`;
+  }
+  return freq;
 }

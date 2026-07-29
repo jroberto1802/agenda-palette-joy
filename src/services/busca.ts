@@ -76,10 +76,25 @@ export async function buscarConteudo(termo: string): Promise<BuscaResultados> {
   if (error) throw error;
 
   const payload = (data ?? {}) as Record<string, unknown>;
+  const tarefasRaw = asArray<BuscaTarefaResult>(payload.tarefas);
+  const tarefaIds = tarefasRaw.map((t) => t.id);
+  let tarefas = tarefasRaw;
+  if (tarefaIds.length > 0) {
+    const { data: meta } = await supabase
+      .from("tarefas")
+      .select("id, serie_raiz_id")
+      .in("id", tarefaIds);
+    const modelos = new Set(
+      (meta ?? [])
+        .filter((r) => r.serie_raiz_id && r.serie_raiz_id === r.id)
+        .map((r) => r.id),
+    );
+    tarefas = tarefasRaw.filter((t) => !modelos.has(t.id));
+  }
 
   return {
     projetos: asArray<BuscaProjetoResult>(payload.projetos),
-    tarefas: asArray<BuscaTarefaResult>(payload.tarefas),
+    tarefas,
     subtarefas: asArray<BuscaSubtarefaResult>(payload.subtarefas),
     avisos: asArray<BuscaAvisoResult>(payload.avisos),
     comentarios: asArray<BuscaComentarioResult>(payload.comentarios),
@@ -96,7 +111,20 @@ export async function buscarTarefaIds(termo: string): Promise<string[]> {
   });
 
   if (error) throw error;
-  return Array.isArray(data) ? (data as string[]) : [];
+  const ids = Array.isArray(data) ? (data as string[]) : [];
+  if (ids.length === 0) return [];
+
+  // Exclui modelos de série (aparecem só em Recorrentes).
+  const { data: rows, error: metaError } = await supabase
+    .from("tarefas")
+    .select("id, serie_raiz_id")
+    .in("id", ids)
+    .is("deleted_at", null);
+  if (metaError) throw metaError;
+
+  return (rows ?? [])
+    .filter((row) => !row.serie_raiz_id || row.serie_raiz_id !== row.id)
+    .map((row) => row.id);
 }
 
 /** IDs de projetos para filtro local do menu Projetos. */

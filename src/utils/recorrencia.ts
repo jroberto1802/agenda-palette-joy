@@ -334,6 +334,45 @@ export function offsetDiasSubtarefaNoCiclo(
   return offset;
 }
 
+/** Tipos que usam campo Dia (1–31) nas subtarefas do modelo. */
+export function isRecorrenciaMensalLike(config: RecorrenciaConfig | null): boolean {
+  if (!config) return false;
+  if (config.tipo === "mensal" || config.tipo === "anual") return true;
+  return config.tipo === "personalizada" && (config.datas_livres?.length ?? 0) > 0;
+}
+
+/**
+ * Data civil da subtarefa numa ocorrência do pai (Dia fixo, offset explícito ou legado).
+ */
+export function dataSubtarefaNaOcorrencia(
+  ocorrenciaPai: Date,
+  config: RecorrenciaConfig,
+  subtarefa: {
+    data_inicio?: string | null;
+    dia_no_mes?: number | null;
+    offset_dias?: number | null;
+  },
+  ancora: string | null,
+): Date | null {
+  const paiDay = startOfDay(ocorrenciaPai);
+
+  if (subtarefa.dia_no_mes != null && isRecorrenciaMensalLike(config)) {
+    const year = paiDay.getFullYear();
+    const month = paiDay.getMonth();
+    const last = new Date(year, month + 1, 0).getDate();
+    const day = Math.min(subtarefa.dia_no_mes, last);
+    return new Date(year, month, day, 12, 0, 0, 0);
+  }
+
+  if (subtarefa.offset_dias != null) {
+    return addDays(paiDay, subtarefa.offset_dias);
+  }
+
+  const offset = offsetDiasSubtarefaNoCiclo(subtarefa.data_inicio, ancora, config);
+  if (offset == null) return null;
+  return addDays(paiDay, offset);
+}
+
 export function sameCalendarDay(a: string | null | undefined, b: Date): boolean {
   const key = toLocalDateKey(a);
   if (!key) return false;

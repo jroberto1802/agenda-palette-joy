@@ -15,6 +15,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedTarefasRouteImport } from './routes/_authenticated/tarefas'
 import { Route as AuthenticatedSetoresRouteImport } from './routes/_authenticated/setores'
 import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated/relatorios'
+import { Route as AuthenticatedRecorrentesRouteImport } from './routes/_authenticated/recorrentes'
 import { Route as AuthenticatedProjetosRouteImport } from './routes/_authenticated/projetos'
 import { Route as AuthenticatedPessoasRouteImport } from './routes/_authenticated/pessoas'
 import { Route as AuthenticatedFinalizadosRouteImport } from './routes/_authenticated/finalizados'
@@ -56,6 +57,12 @@ const AuthenticatedRelatoriosRoute = AuthenticatedRelatoriosRouteImport.update({
   path: '/relatorios',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedRecorrentesRoute =
+  AuthenticatedRecorrentesRouteImport.update({
+    id: '/recorrentes',
+    path: '/recorrentes',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedProjetosRoute = AuthenticatedProjetosRouteImport.update({
   id: '/projetos',
   path: '/projetos',
@@ -128,6 +135,7 @@ export interface FileRoutesByFullPath {
   '/finalizados': typeof AuthenticatedFinalizadosRoute
   '/pessoas': typeof AuthenticatedPessoasRoute
   '/projetos': typeof AuthenticatedProjetosRoute
+  '/recorrentes': typeof AuthenticatedRecorrentesRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/setores': typeof AuthenticatedSetoresRoute
   '/tarefas': typeof AuthenticatedTarefasRoute
@@ -146,6 +154,7 @@ export interface FileRoutesByTo {
   '/finalizados': typeof AuthenticatedFinalizadosRoute
   '/pessoas': typeof AuthenticatedPessoasRoute
   '/projetos': typeof AuthenticatedProjetosRoute
+  '/recorrentes': typeof AuthenticatedRecorrentesRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/setores': typeof AuthenticatedSetoresRoute
   '/tarefas': typeof AuthenticatedTarefasRoute
@@ -166,6 +175,7 @@ export interface FileRoutesById {
   '/_authenticated/finalizados': typeof AuthenticatedFinalizadosRoute
   '/_authenticated/pessoas': typeof AuthenticatedPessoasRoute
   '/_authenticated/projetos': typeof AuthenticatedProjetosRoute
+  '/_authenticated/recorrentes': typeof AuthenticatedRecorrentesRoute
   '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
   '/_authenticated/setores': typeof AuthenticatedSetoresRoute
   '/_authenticated/tarefas': typeof AuthenticatedTarefasRoute
@@ -186,6 +196,7 @@ export interface FileRouteTypes {
     | '/finalizados'
     | '/pessoas'
     | '/projetos'
+    | '/recorrentes'
     | '/relatorios'
     | '/setores'
     | '/tarefas'
@@ -204,6 +215,7 @@ export interface FileRouteTypes {
     | '/finalizados'
     | '/pessoas'
     | '/projetos'
+    | '/recorrentes'
     | '/relatorios'
     | '/setores'
     | '/tarefas'
@@ -223,6 +235,7 @@ export interface FileRouteTypes {
     | '/_authenticated/finalizados'
     | '/_authenticated/pessoas'
     | '/_authenticated/projetos'
+    | '/_authenticated/recorrentes'
     | '/_authenticated/relatorios'
     | '/_authenticated/setores'
     | '/_authenticated/tarefas'
@@ -278,6 +291,13 @@ declare module '@tanstack/react-router' {
       path: '/relatorios'
       fullPath: '/relatorios'
       preLoaderRoute: typeof AuthenticatedRelatoriosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/recorrentes': {
+      id: '/_authenticated/recorrentes'
+      path: '/recorrentes'
+      fullPath: '/recorrentes'
+      preLoaderRoute: typeof AuthenticatedRecorrentesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/projetos': {
@@ -370,6 +390,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedFinalizadosRoute: typeof AuthenticatedFinalizadosRoute
   AuthenticatedPessoasRoute: typeof AuthenticatedPessoasRoute
   AuthenticatedProjetosRoute: typeof AuthenticatedProjetosRoute
+  AuthenticatedRecorrentesRoute: typeof AuthenticatedRecorrentesRoute
   AuthenticatedRelatoriosRoute: typeof AuthenticatedRelatoriosRoute
   AuthenticatedSetoresRoute: typeof AuthenticatedSetoresRoute
   AuthenticatedTarefasRoute: typeof AuthenticatedTarefasRoute
@@ -387,6 +408,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedFinalizadosRoute: AuthenticatedFinalizadosRoute,
   AuthenticatedPessoasRoute: AuthenticatedPessoasRoute,
   AuthenticatedProjetosRoute: AuthenticatedProjetosRoute,
+  AuthenticatedRecorrentesRoute: AuthenticatedRecorrentesRoute,
   AuthenticatedRelatoriosRoute: AuthenticatedRelatoriosRoute,
   AuthenticatedSetoresRoute: AuthenticatedSetoresRoute,
   AuthenticatedTarefasRoute: AuthenticatedTarefasRoute,

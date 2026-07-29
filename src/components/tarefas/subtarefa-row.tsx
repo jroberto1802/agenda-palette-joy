@@ -28,7 +28,18 @@ import type {
   TarefaWithRelations,
 } from "@/types";
 import { VISIBILIDADE_PESSOAS } from "@/utils/escopo-tarefa";
+import { isRecorrenciaMensalLike } from "@/utils/recorrencia";
 import { TAREFA_PRIORIDADE_BAND_CLASS } from "@/utils/tarefas";
+import type { RecorrenciaConfig } from "@/types";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 /** Acima de Dialog/Sheet (z-50) e do drawer de subtarefa (z-[70]). */
 const META_OVERLAY_Z = "z-[100]";
@@ -123,6 +134,9 @@ export function SubtarefaRow({
   onUpdateMeta,
   dragHandle,
   isDragging,
+  /** Quando true, mostra Dia/offset em vez de calendário (template do modelo). */
+  modeloSerieMode = false,
+  modeloRecorrencia = null,
 }: {
   subtarefa: SubtarefaWithAuthors;
   canEdit: boolean;
@@ -137,9 +151,13 @@ export function SubtarefaRow({
     atribuido_ids?: string[];
     observador_ids?: string[];
     visibilidade?: SubtarefaWithAuthors["visibilidade"];
+    dia_no_mes?: number | null;
+    offset_dias?: number | null;
   }) => Promise<void>;
   dragHandle?: ReactNode;
   isDragging?: boolean;
+  modeloSerieMode?: boolean;
+  modeloRecorrencia?: RecorrenciaConfig | null;
 }) {
   const [saving, setSaving] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
@@ -177,12 +195,30 @@ export function SubtarefaRow({
     ? new Date(subtarefa.data_inicio)
     : null;
 
+  const mensalLike = isRecorrenciaMensalLike(modeloRecorrencia);
+  const precisaReconfigurarModelo =
+    modeloSerieMode &&
+    subtarefa.dia_no_mes == null &&
+    subtarefa.offset_dias == null;
+
+  const labelModeloData = mensalLike
+    ? subtarefa.dia_no_mes != null
+      ? `Dia ${subtarefa.dia_no_mes}`
+      : "Definir dia"
+    : subtarefa.offset_dias != null
+      ? subtarefa.offset_dias === 0
+        ? "No dia"
+        : `+${subtarefa.offset_dias} dia${subtarefa.offset_dias === 1 ? "" : "s"}`
+      : "Definir offset";
+
   const runMeta = async (
     meta: {
       data_inicio?: string | null;
       atribuido_ids?: string[];
       observador_ids?: string[];
       visibilidade?: SubtarefaWithAuthors["visibilidade"];
+      dia_no_mes?: number | null;
+      offset_dias?: number | null;
     },
   ) => {
     setSaving(true);
@@ -230,16 +266,36 @@ export function SubtarefaRow({
           className="flex shrink-0 items-center gap-0.5"
           onClick={(event) => event.stopPropagation()}
         >
-          {/* Data + Hora */}
+          {/* Data: calendário (ocorrência) ou Dia/offset (modelo) */}
           <Popover>
             <PopoverTrigger asChild>
               <span>
                 <MetaIconButton
-                  label={formatDataHoraLabel(dataInicio)}
-                  active={!!dataInicio}
+                  label={
+                    modeloSerieMode
+                      ? precisaReconfigurarModelo
+                        ? "Reconfigurar data da subtarefa"
+                        : labelModeloData
+                      : formatDataHoraLabel(dataInicio)
+                  }
+                  active={
+                    modeloSerieMode
+                      ? subtarefa.dia_no_mes != null || subtarefa.offset_dias != null
+                      : !!dataInicio
+                  }
                   disabled={!canEdit || saving}
                 >
-                  {dataInicio ? (
+                  {modeloSerieMode ? (
+                    <span className="text-[10px] font-medium leading-none">
+                      {precisaReconfigurarModelo
+                        ? "!"
+                        : mensalLike
+                          ? `D${subtarefa.dia_no_mes ?? "?"}`
+                          : subtarefa.offset_dias != null
+                            ? `+${subtarefa.offset_dias}`
+                            : "?"}
+                    </span>
+                  ) : dataInicio ? (
                     <span className="text-[10px] font-medium leading-none">
                       {format(dataInicio, "dd/MM", { locale: ptBR })}
                     </span>
@@ -250,16 +306,73 @@ export function SubtarefaRow({
               </span>
             </PopoverTrigger>
             <PopoverContent className={cn("w-auto p-0", META_OVERLAY_Z)} align="end">
-              <DataHoraRecorrenciaBody
-                value={dataInicio}
-                canEdit={canEdit && !saving}
-                showRecorrencia={false}
-                onChange={(date) =>
-                  void runMeta({
-                    data_inicio: date ? date.toISOString() : null,
-                  })
-                }
-              />
+              {modeloSerieMode ? (
+                <div className="w-64 space-y-3 p-3">
+                  {precisaReconfigurarModelo && (
+                    <p className="text-xs text-amber-700 dark:text-amber-400">
+                      Formato antigo (offset implícito). Reconfigure com o novo campo — sem
+                      conversão automática.
+                    </p>
+                  )}
+                  {mensalLike ? (
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Dia do mês (1–31)</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={31}
+                        defaultValue={subtarefa.dia_no_mes ?? ""}
+                        disabled={!canEdit || saving}
+                        onBlur={(e) => {
+                          const n = Number(e.target.value);
+                          if (!Number.isFinite(n) || n < 1 || n > 31) return;
+                          void runMeta({ dia_no_mes: Math.trunc(n), offset_dias: null });
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Deslocamento</Label>
+                      <Select
+                        value={
+                          subtarefa.offset_dias != null
+                            ? String(subtarefa.offset_dias)
+                            : undefined
+                        }
+                        disabled={!canEdit || saving}
+                        onValueChange={(v) => {
+                          void runMeta({
+                            offset_dias: Number(v),
+                            dia_no_mes: null,
+                          });
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Escolha…" />
+                        </SelectTrigger>
+                        <SelectContent className={META_OVERLAY_Z}>
+                          {Array.from({ length: 15 }, (_, i) => (
+                            <SelectItem key={i} value={String(i)}>
+                              {i === 0 ? "No dia" : `+${i} dia${i === 1 ? "" : "s"}`}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <DataHoraRecorrenciaBody
+                  value={dataInicio}
+                  canEdit={canEdit && !saving}
+                  dateMode="calendario"
+                  onChange={(date) =>
+                    void runMeta({
+                      data_inicio: date ? date.toISOString() : null,
+                    })
+                  }
+                />
+              )}
             </PopoverContent>
           </Popover>
 

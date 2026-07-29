@@ -532,8 +532,10 @@ export type Database = {
           criado_por: string | null;
           data_inicio: string | null;
           descricao: string | null;
+          dia_no_mes: number | null;
           id: string;
           lembretes: Json;
+          offset_dias: number | null;
           origem_subtarefa_id: string | null;
           posicao: number;
           prioridade: "P1" | "P2" | "P3" | "P4";
@@ -558,8 +560,10 @@ export type Database = {
           criado_por?: string | null;
           data_inicio?: string | null;
           descricao?: string | null;
+          dia_no_mes?: number | null;
           id?: string;
           lembretes?: Json;
+          offset_dias?: number | null;
           origem_subtarefa_id?: string | null;
           posicao?: number;
           prioridade?: "P1" | "P2" | "P3" | "P4";
@@ -584,8 +588,10 @@ export type Database = {
           criado_por?: string | null;
           data_inicio?: string | null;
           descricao?: string | null;
+          dia_no_mes?: number | null;
           id?: string;
           lembretes?: Json;
+          offset_dias?: number | null;
           origem_subtarefa_id?: string | null;
           posicao?: number;
           prioridade?: "P1" | "P2" | "P3" | "P4";
@@ -1213,6 +1219,7 @@ export type Database = {
           prioridade: "P1" | "P2" | "P3" | "P4";
           projeto_id: string | null;
           recorrencia: Json | null;
+          recorrencia_pasta_id: string | null;
           serie_raiz_id: string | null;
           setor_id: string | null;
           tags: string[];
@@ -1239,6 +1246,7 @@ export type Database = {
           prioridade?: "P1" | "P2" | "P3" | "P4";
           projeto_id?: string | null;
           recorrencia?: Json | null;
+          recorrencia_pasta_id?: string | null;
           serie_raiz_id?: string | null;
           setor_id?: string | null;
           tags?: string[];
@@ -1265,6 +1273,7 @@ export type Database = {
           prioridade?: "P1" | "P2" | "P3" | "P4";
           projeto_id?: string | null;
           recorrencia?: Json | null;
+          recorrencia_pasta_id?: string | null;
           serie_raiz_id?: string | null;
           setor_id?: string | null;
           tags?: string[];
