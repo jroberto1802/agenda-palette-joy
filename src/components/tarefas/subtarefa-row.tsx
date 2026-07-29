@@ -303,6 +303,7 @@ export function SubtarefaRow({
                 placeholder="Nenhum responsável"
                 emptyLabel="Nenhuma pessoa no escopo da tarefa"
                 showSelectAll
+                inline
               />
             </PopoverContent>
           </Popover>
@@ -358,6 +359,7 @@ export function SubtarefaRow({
                 emptyLabel="Nenhuma pessoa no escopo da tarefa"
                 searchPlaceholder="Buscar por nome..."
                 showSelectAll
+                inline
               />
             </PopoverContent>
           </Popover>

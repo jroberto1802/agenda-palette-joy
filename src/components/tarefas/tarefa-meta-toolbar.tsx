@@ -367,6 +367,7 @@ export function TarefaMetaToolbar({
                         : "Nenhum responsável"
                     }
                     emptyLabel={emptyResponsavelLabel}
+                    inline
                   />
                   <FormMessage />
                 </PopoverContent>
@@ -417,6 +418,7 @@ export function TarefaMetaToolbar({
                     placeholder="Selecione pessoas"
                     emptyLabel={emptyVisibilidadeLabel}
                     searchPlaceholder="Buscar por nome..."
+                    inline
                   />
                   <FormMessage />
                 </PopoverContent>

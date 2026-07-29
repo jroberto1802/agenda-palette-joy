@@ -404,13 +404,37 @@ export function SubtarefaPanelSheet({
         side="right"
         className="flex w-full flex-col gap-0 p-0 sm:max-w-[560px] z-[70] [&>button]:right-3 [&>button]:top-3 [&>button>svg]:h-3.5 [&>button>svg]:w-3.5"
         onInteractOutside={(event) => {
-          // Mantém o drawer aberto ao usar seletor de arquivos / cliques no overlay do dialog pai
+          const target = event.target as HTMLElement | null;
+          // Permite interação com popovers/selects portais (Responsável, Visibilidade, etc.).
+          if (
+            target?.closest(
+              "[data-radix-popper-content-wrapper], [role='listbox'], [data-radix-select-content]",
+            )
+          ) {
+            return;
+          }
           event.preventDefault();
         }}
         onFocusOutside={(event) => {
+          const target = event.target as HTMLElement | null;
+          if (
+            target?.closest(
+              "[data-radix-popper-content-wrapper], [role='listbox'], [data-radix-select-content]",
+            )
+          ) {
+            return;
+          }
           event.preventDefault();
         }}
         onPointerDownOutside={(event) => {
+          const target = event.target as HTMLElement | null;
+          if (
+            target?.closest(
+              "[data-radix-popper-content-wrapper], [role='listbox'], [data-radix-select-content]",
+            )
+          ) {
+            return;
+          }
           event.preventDefault();
         }}
       >
