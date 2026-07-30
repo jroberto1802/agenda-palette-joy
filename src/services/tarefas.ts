@@ -386,6 +386,17 @@ export async function listTarefas(filters: TarefaFilters = {}): Promise<TarefaWi
     query = query.eq("projeto_id", filters.projeto_id);
   }
 
+  if (filters.recorrencia_pasta_id && filters.recorrencia_pasta_id !== "all") {
+    if (
+      filters.recorrencia_pasta_id === "entradas" ||
+      filters.recorrencia_pasta_id === "null"
+    ) {
+      query = query.is("recorrencia_pasta_id", null);
+    } else {
+      query = query.eq("recorrencia_pasta_id", filters.recorrencia_pasta_id);
+    }
+  }
+
   /** Interseção de IDs (busca local + responsáveis) — evita dois `.in("id")` conflitantes. */
   let allowedIds: string[] | null = null;
 
@@ -592,10 +603,13 @@ export async function createTarefa(payload: TarefaFormData): Promise<TarefaWithR
       tags: normalized.tags,
       recorrencia: recorrenciaComAncora,
       serie_raiz_id: recorrenciaComAncora ? tarefaId : null,
+      recorrencia_pasta_id: recorrenciaComAncora
+        ? (normalized.recorrencia_pasta_id ?? null)
+        : null,
       visibilidade,
       lembretes: serializeLembretes(normalized.lembretes),
       criado_por: user.id,
-    });
+    } as never);
 
   if (error) throw error;
 

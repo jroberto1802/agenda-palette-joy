@@ -296,6 +296,7 @@ function toRecorrenciaPayload(
 function toPayload(
   values: TarefaPanelSchema,
   existingRecorrencia?: RecorrenciaConfig | null,
+  recorrenciaPastaId?: string | null,
 ): TarefaFormData {
   return {
     titulo: values.titulo,
@@ -311,6 +312,7 @@ function toPayload(
     visibilidade: VISIBILIDADE_PESSOAS,
     observador_ids: values.observador_ids,
     lembretes: values.lembretes,
+    recorrencia_pasta_id: recorrenciaPastaId ?? null,
   };
 }
 
@@ -329,6 +331,8 @@ export function TarefaPanelSheet({
   initialSubtarefaId = null,
   /** Fluxo dedicado do menu Recorrentes (modelo de série). */
   serieModeloMode = false,
+  /** Pasta em que a nova série nasce (null = Entradas). */
+  defaultRecorrenciaPastaId = null,
 }: {
   tarefaId: string | null;
   open: boolean;
@@ -345,6 +349,7 @@ export function TarefaPanelSheet({
   highlightComentarioId?: string | null;
   initialSubtarefaId?: string | null;
   serieModeloMode?: boolean;
+  defaultRecorrenciaPastaId?: string | null;
 }) {
   const isCreate = !tarefaId;
   const { data: profile } = useProfile();
@@ -665,7 +670,12 @@ export function TarefaPanelSheet({
         const existingRec = ehModeloSerie
           ? parseRecorrencia(tarefa?.recorrencia)
           : null;
-        const payload = toPayload(values, existingRec);
+        const pastaId =
+          isCreate && ehModeloSerie
+            ? defaultRecorrenciaPastaId
+            : ((tarefa as { recorrencia_pasta_id?: string | null } | null | undefined)
+                ?.recorrencia_pasta_id ?? defaultRecorrenciaPastaId);
+        const payload = toPayload(values, existingRec, pastaId);
         // Fora de Recorrentes / ocorrência: nunca grava regra de recorrência.
         if (!ehModeloSerie) {
           payload.recorrencia = null;

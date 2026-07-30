@@ -28,15 +28,18 @@ export function SerieModeloBadge({
     return (
       <Badge
         variant="secondary"
-        className={cn("gap-1 px-1.5 py-0 text-[10px]", className)}
+        className={cn(
+          "gap-1 border-emerald-200 bg-emerald-50 px-1.5 py-0 text-[10px] text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400",
+          className,
+        )}
         title={
           proxima
             ? `Modelo da série • Próxima: ${proxima} • ${regra}`
             : `Modelo da série • ${regra}`
         }
       >
-        <RefreshCw className="h-3 w-3" />
-        Série
+        <RefreshCw className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+        {regra}
       </Badge>
     );
   }

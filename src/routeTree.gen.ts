@@ -25,6 +25,7 @@ import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authen
 import { Route as AuthenticatedCalendarioRouteImport } from './routes/_authenticated/calendario'
 import { Route as AuthenticatedAvisosRouteImport } from './routes/_authenticated/avisos'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as AuthenticatedRecorrentesPastaIdRouteImport } from './routes/_authenticated/recorrentes_.$pastaId'
 import { Route as AuthenticatedProjetosProjetoIdRouteImport } from './routes/_authenticated/projetos_.$projetoId'
 import { Route as AuthenticatedEquipePessoaIdRouteImport } from './routes/_authenticated/equipe_.$pessoaId'
 
@@ -110,6 +111,12 @@ const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedRecorrentesPastaIdRoute =
+  AuthenticatedRecorrentesPastaIdRouteImport.update({
+    id: '/recorrentes_/$pastaId',
+    path: '/recorrentes/$pastaId',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedProjetosProjetoIdRoute =
   AuthenticatedProjetosProjetoIdRouteImport.update({
     id: '/projetos_/$projetoId',
@@ -141,6 +148,7 @@ export interface FileRoutesByFullPath {
   '/tarefas': typeof AuthenticatedTarefasRoute
   '/equipe/$pessoaId': typeof AuthenticatedEquipePessoaIdRoute
   '/projetos/$projetoId': typeof AuthenticatedProjetosProjetoIdRoute
+  '/recorrentes/$pastaId': typeof AuthenticatedRecorrentesPastaIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -160,6 +168,7 @@ export interface FileRoutesByTo {
   '/tarefas': typeof AuthenticatedTarefasRoute
   '/equipe/$pessoaId': typeof AuthenticatedEquipePessoaIdRoute
   '/projetos/$projetoId': typeof AuthenticatedProjetosProjetoIdRoute
+  '/recorrentes/$pastaId': typeof AuthenticatedRecorrentesPastaIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -181,6 +190,7 @@ export interface FileRoutesById {
   '/_authenticated/tarefas': typeof AuthenticatedTarefasRoute
   '/_authenticated/equipe_/$pessoaId': typeof AuthenticatedEquipePessoaIdRoute
   '/_authenticated/projetos_/$projetoId': typeof AuthenticatedProjetosProjetoIdRoute
+  '/_authenticated/recorrentes_/$pastaId': typeof AuthenticatedRecorrentesPastaIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -202,6 +212,7 @@ export interface FileRouteTypes {
     | '/tarefas'
     | '/equipe/$pessoaId'
     | '/projetos/$projetoId'
+    | '/recorrentes/$pastaId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -221,6 +232,7 @@ export interface FileRouteTypes {
     | '/tarefas'
     | '/equipe/$pessoaId'
     | '/projetos/$projetoId'
+    | '/recorrentes/$pastaId'
   id:
     | '__root__'
     | '/'
@@ -241,6 +253,7 @@ export interface FileRouteTypes {
     | '/_authenticated/tarefas'
     | '/_authenticated/equipe_/$pessoaId'
     | '/_authenticated/projetos_/$projetoId'
+    | '/_authenticated/recorrentes_/$pastaId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -363,6 +376,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/recorrentes_/$pastaId': {
+      id: '/_authenticated/recorrentes_/$pastaId'
+      path: '/recorrentes/$pastaId'
+      fullPath: '/recorrentes/$pastaId'
+      preLoaderRoute: typeof AuthenticatedRecorrentesPastaIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/projetos_/$projetoId': {
       id: '/_authenticated/projetos_/$projetoId'
       path: '/projetos/$projetoId'
@@ -396,6 +416,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedTarefasRoute: typeof AuthenticatedTarefasRoute
   AuthenticatedEquipePessoaIdRoute: typeof AuthenticatedEquipePessoaIdRoute
   AuthenticatedProjetosProjetoIdRoute: typeof AuthenticatedProjetosProjetoIdRoute
+  AuthenticatedRecorrentesPastaIdRoute: typeof AuthenticatedRecorrentesPastaIdRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -414,6 +435,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedTarefasRoute: AuthenticatedTarefasRoute,
   AuthenticatedEquipePessoaIdRoute: AuthenticatedEquipePessoaIdRoute,
   AuthenticatedProjetosProjetoIdRoute: AuthenticatedProjetosProjetoIdRoute,
+  AuthenticatedRecorrentesPastaIdRoute: AuthenticatedRecorrentesPastaIdRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =

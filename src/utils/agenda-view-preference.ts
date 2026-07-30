@@ -10,7 +10,8 @@ export type AgendaViewPreferenceScope =
   | "agenda-visualizando"
   | "finalizados"
   | "equipe"
-  | "projeto-detalhe";
+  | "projeto-detalhe"
+  | "recorrentes-pasta";
 
 export function normalizeAgendaViewMode(view: string | null | undefined): AgendaViewMode {
   if (view === "kanban" || view === "colunas") return "colunas";

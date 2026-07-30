@@ -74,6 +74,9 @@ export function useTarefas(
     data_inicio_ate: filters.data_inicio_ate ?? "",
     somente_atrasadas: filters.somente_atrasadas ? "1" : "0",
     somente_visualizando: filters.somente_visualizando ? "1" : "0",
+    somente_modelos: filters.somente_modelos ? "1" : "0",
+    incluir_modelos: filters.incluir_modelos ? "1" : "0",
+    recorrencia_pasta_id: filters.recorrencia_pasta_id ?? "all",
   };
 
   return useQuery({

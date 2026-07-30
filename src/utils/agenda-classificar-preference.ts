@@ -9,7 +9,8 @@ export type AgendaClassificarScope =
   | "agenda-geral"
   | "agenda-visualizando"
   | "equipe"
-  | "projeto-detalhe";
+  | "projeto-detalhe"
+  | "recorrentes-pasta";
 
 export const TAREFA_CLASSIFICAR_LABELS: Record<TarefaClassificar, string> = {
   prioridade: "Por Prioridade",

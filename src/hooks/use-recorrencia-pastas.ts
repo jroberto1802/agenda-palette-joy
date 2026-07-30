@@ -3,37 +3,70 @@ import { recorrenciaPastaKeys, tarefaKeys } from "@/lib/query-keys";
 import {
   createRecorrenciaPasta,
   deleteRecorrenciaPasta,
+  getRecorrenciaPasta,
+  listRecorrenciaPastaMembros,
   listRecorrenciaPastas,
   moveSerieParaPasta,
-  renameRecorrenciaPasta,
   setRecorrenciaPastaMembros,
+  updateRecorrenciaPasta,
+  type RecorrenciaPastaFormData,
 } from "@/services/recorrencia-pastas";
 
-export function useRecorrenciaPastas() {
+export function useRecorrenciaPastas(search?: string) {
   return useQuery({
-    queryKey: recorrenciaPastaKeys.list(),
-    queryFn: () => listRecorrenciaPastas(),
+    queryKey: [...recorrenciaPastaKeys.list(), search ?? ""] as const,
+    queryFn: () => listRecorrenciaPastas(search),
+  });
+}
+
+export function useRecorrenciaPasta(id: string | undefined) {
+  return useQuery({
+    queryKey: recorrenciaPastaKeys.detail(id ?? ""),
+    queryFn: () => getRecorrenciaPasta(id!),
+    enabled: !!id,
+  });
+}
+
+export function useRecorrenciaPastaMembros(pastaId: string | undefined) {
+  return useQuery({
+    queryKey: recorrenciaPastaKeys.membros(pastaId ?? ""),
+    queryFn: () => listRecorrenciaPastaMembros(pastaId!),
+    enabled: !!pastaId && pastaId !== "entradas",
   });
 }
 
 function invalidatePastas(queryClient: ReturnType<typeof useQueryClient>) {
   void queryClient.invalidateQueries({ queryKey: recorrenciaPastaKeys.all });
-  void queryClient.invalidateQueries({ queryKey: tarefaKeys.seriesModelos() });
+  void queryClient.invalidateQueries({ queryKey: tarefaKeys.all });
 }
 
 export function useCreateRecorrenciaPasta() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (nome: string) => createRecorrenciaPasta(nome),
+    mutationFn: (data: RecorrenciaPastaFormData) => createRecorrenciaPasta(data),
     onSuccess: () => invalidatePastas(queryClient),
   });
 }
 
+export function useUpdateRecorrenciaPasta() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: RecorrenciaPastaFormData }) =>
+      updateRecorrenciaPasta(id, data),
+    onSuccess: () => invalidatePastas(queryClient),
+  });
+}
+
+/** @deprecated Preferir useUpdateRecorrenciaPasta */
 export function useRenameRecorrenciaPasta() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, nome }: { id: string; nome: string }) =>
-      renameRecorrenciaPasta(id, nome),
+      updateRecorrenciaPasta(id, {
+        nome,
+        responsavel_id: null,
+        membro_ids: [],
+      }),
     onSuccess: () => invalidatePastas(queryClient),
   });
 }

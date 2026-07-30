@@ -155,6 +155,8 @@ export type TarefaFormData = {
   visibilidade: TarefaVisibilidade;
   observador_ids: string[];
   lembretes: TarefaLembreteOpcao[];
+  /** Pasta de série no menu Recorrentes (null = Entradas). */
+  recorrencia_pasta_id?: string | null;
 };
 
 export type TarefaAnexo = Tables<"tarefa_anexos">;
@@ -194,6 +196,11 @@ export type TarefaFilters = {
   somente_modelos?: boolean;
   /** Se true, não remove modelos da listagem (padrão: exclui modelos). */
   incluir_modelos?: boolean;
+  /**
+   * Filtra modelos por pasta de recorrência.
+   * Use `"entradas"` (ou o slug) para séries sem pasta (`recorrencia_pasta_id` null).
+   */
+  recorrencia_pasta_id?: string | "entradas" | "all";
 };
 
 export type Subtarefa = Tables<"subtarefas">;

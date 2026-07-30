@@ -1,3 +1,4 @@
+import { RefreshCw } from "lucide-react";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
 import { ConclusaoBolinha } from "@/components/tarefas/conclusao-bolinha";
 import { DescricaoPreview } from "@/components/tarefas/descricao-preview";
@@ -10,6 +11,12 @@ import {
 } from "@/components/tarefas/tarefa-card-indicadores";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { TAREFA_CARD_FIXED_CLASS } from "@/lib/layout";
 import type { TarefaWithRelations } from "@/types";
 import { isSerieModelo } from "@/utils/recorrencia";
@@ -17,7 +24,7 @@ import {
   TAREFA_PRIORIDADE_BAND_CLASS,
   TAREFA_PRIORIDADE_COLORS,
   formatResponsaveisLabel,
-  getTarefaResponsaveis,
+  getTarefaPessoasCard,
 } from "@/utils/tarefas";
 import { cn } from "@/lib/utils";
 
@@ -47,14 +54,14 @@ export function TarefaCard({
 }) {
   const podeAlternarConcluida =
     (canToggleConcluida ?? canEdit) && !isSerieModelo(tarefa);
-  const responsaveis = getTarefaResponsaveis(tarefa);
+  const pessoas = getTarefaPessoasCard(tarefa);
   const ehModelo = isSerieModelo(tarefa);
 
   return (
     <Card
       className={cn(
         TAREFA_CARD_FIXED_CLASS,
-        "flex flex-col border-l-4",
+        "relative flex flex-col border-l-4",
         TAREFA_PRIORIDADE_BAND_CLASS[tarefa.prioridade],
         tarefa.concluida && "opacity-75",
         onOpen && "cursor-pointer transition-colors hover:bg-muted/40",
@@ -73,6 +80,16 @@ export function TarefaCard({
           : undefined
       }
     >
+      {ehModelo && (
+        <div
+          className="pointer-events-none absolute -left-3 top-3 z-10 flex h-6 w-6 items-center justify-center rounded-md bg-emerald-500 text-white shadow-sm ring-2 ring-background"
+          title="Série recorrente"
+          aria-hidden
+        >
+          <RefreshCw className="h-3.5 w-3.5" strokeWidth={2.5} />
+        </div>
+      )}
+
       <CardHeader className="shrink-0 space-y-0 p-3 pb-1.5">
         <div className="flex items-start justify-between gap-2">
           <div className="flex min-w-0 flex-1 items-start gap-2">
@@ -126,7 +143,7 @@ export function TarefaCard({
               >
                 {tarefa.titulo}
               </CardTitle>
-              {ehModelo && <SerieModeloBadge tarefa={tarefa} />}
+              {ehModelo && <SerieModeloBadge tarefa={tarefa} compact />}
             </div>
           </div>
 
@@ -147,18 +164,26 @@ export function TarefaCard({
         </div>
 
         <div className="flex h-4 min-w-0 shrink-0 items-center gap-3 overflow-hidden text-muted-foreground">
-          {responsaveis.length > 0 ? (
+          {pessoas.length > 0 ? (
             <span className="flex min-w-0 items-center gap-1">
-              <div className="flex shrink-0 -space-x-1">
-                {responsaveis.slice(0, 3).map((pessoa) => (
-                  <ProfileAvatar
-                    key={pessoa.id}
-                    name={pessoa.nome_completo}
-                    avatarUrl={pessoa.avatar_url}
-                    className="h-4 w-4 ring-1 ring-background"
-                  />
-                ))}
-              </div>
+              <TooltipProvider delayDuration={200}>
+                <div className="flex shrink-0 -space-x-1">
+                  {pessoas.slice(0, 3).map((pessoa) => (
+                    <Tooltip key={pessoa.id}>
+                      <TooltipTrigger asChild>
+                        <span className="inline-flex">
+                          <ProfileAvatar
+                            name={pessoa.nome_completo}
+                            avatarUrl={pessoa.avatar_url}
+                            className="h-4 w-4 ring-1 ring-background"
+                          />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">{pessoa.nome_completo}</TooltipContent>
+                    </Tooltip>
+                  ))}
+                </div>
+              </TooltipProvider>
               <span className="truncate">{formatResponsaveisLabel(tarefa)}</span>
             </span>
           ) : (

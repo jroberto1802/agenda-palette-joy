@@ -45,7 +45,8 @@ function toClassificarScope(
     scope === "agenda-geral" ||
     scope === "agenda-visualizando" ||
     scope === "equipe" ||
-    scope === "projeto-detalhe"
+    scope === "projeto-detalhe" ||
+    scope === "recorrentes-pasta"
   ) {
     return scope;
   }
@@ -116,7 +117,10 @@ export function TarefaAgendaBoard({
   hideProjeto = false,
   hideResponsavel = false,
   forceProjetoId,
+  forceRecorrenciaPastaId,
+  somenteModelos = false,
   emptyMessage,
+  createLabel,
   canEdit,
   canDeleteTarefa,
   canToggleConcluida,
@@ -124,6 +128,7 @@ export function TarefaAgendaBoard({
   onCreate,
   onToggleConcluida,
   onDelete,
+  onMoveSerie,
   somenteFinalizadas = false,
   hideCreate = false,
   hideColunas = false,
@@ -138,7 +143,12 @@ export function TarefaAgendaBoard({
   hideProjeto?: boolean;
   hideResponsavel?: boolean;
   forceProjetoId?: string;
+  /** Pasta de recorrência (`entradas` = séries sem pasta). */
+  forceRecorrenciaPastaId?: string;
+  /** Lista apenas modelos de série. */
+  somenteModelos?: boolean;
   emptyMessage: string;
+  createLabel?: string;
   canEdit: (tarefa: TarefaWithRelations) => boolean;
   canDeleteTarefa: (tarefa: TarefaWithRelations) => boolean;
   /** Permissão específica da bolinha: concluir (aberta) ou reabrir (concluída, respeita janela de reabertura). */
@@ -147,6 +157,8 @@ export function TarefaAgendaBoard({
   onCreate: () => void;
   onToggleConcluida: (tarefa: TarefaWithRelations, concluida: boolean) => void;
   onDelete: (tarefa: TarefaWithRelations) => void;
+  /** Quando definido, o "Mover" abre este fluxo em vez do diálogo de projeto/setor. */
+  onMoveSerie?: (tarefa: TarefaWithRelations) => void;
   somenteFinalizadas?: boolean;
   hideCreate?: boolean;
   /** Quando true, oculta opção Colunas (Equipe, Finalizados, Projeto, etc.). */
@@ -219,14 +231,26 @@ export function TarefaAgendaBoard({
   const queryFilters = useMemo(() => {
     const base = somenteFinalizadas
       ? { ...debouncedFilters, somente_finalizadas: true as const }
-      : { ...debouncedFilters, excluir_finalizadas: true as const };
+      : somenteModelos
+        ? { ...debouncedFilters, somente_modelos: true as const }
+        : { ...debouncedFilters, excluir_finalizadas: true as const };
 
     if (forceProjetoId) {
       return { ...base, projeto_id: forceProjetoId };
     }
 
+    if (forceRecorrenciaPastaId) {
+      return { ...base, recorrencia_pasta_id: forceRecorrenciaPastaId };
+    }
+
     return base;
-  }, [debouncedFilters, forceProjetoId, somenteFinalizadas]);
+  }, [
+    debouncedFilters,
+    forceProjetoId,
+    forceRecorrenciaPastaId,
+    somenteFinalizadas,
+    somenteModelos,
+  ]);
 
   const { data: tarefas, isLoading } = useTarefas(queryFilters);
 
@@ -276,7 +300,12 @@ export function TarefaAgendaBoard({
               ))}
             </div>
           ) : !sortedTarefas.length ? (
-            <EmptyState message={emptyMessage} onCreate={onCreate} hideCreate={hideCreate} />
+            <EmptyState
+              message={emptyMessage}
+              onCreate={onCreate}
+              hideCreate={hideCreate}
+              createLabel={createLabel}
+            />
           ) : (
             <TarefaCardsGrid
               tarefas={sortedTarefas}
@@ -285,7 +314,7 @@ export function TarefaAgendaBoard({
               canToggleConcluida={canToggleConcluida}
               onOpenTarefa={onOpenTarefa}
               onDuplicate={(tarefa) => void handleDuplicate(tarefa)}
-              onMove={setMovingTarefa}
+              onMove={onMoveSerie ?? setMovingTarefa}
               onDelete={onDelete}
               onToggleConcluida={onToggleConcluida}
               enableReorder={enableReorder}
@@ -303,7 +332,12 @@ export function TarefaAgendaBoard({
               ))}
             </div>
           ) : !sortedTarefas.length ? (
-            <EmptyState message={emptyMessage} onCreate={onCreate} hideCreate={hideCreate} />
+            <EmptyState
+              message={emptyMessage}
+              onCreate={onCreate}
+              hideCreate={hideCreate}
+              createLabel={createLabel}
+            />
           ) : (
             <TarefaListView
               tarefas={sortedTarefas}
@@ -313,7 +347,7 @@ export function TarefaAgendaBoard({
               canEdit={canEdit}
               canDeleteTarefa={canDeleteTarefa}
               onDuplicate={(tarefa) => void handleDuplicate(tarefa)}
-              onMove={setMovingTarefa}
+              onMove={onMoveSerie ?? setMovingTarefa}
               onDelete={onDelete}
               enableReorder={enableReorder}
             />
@@ -330,7 +364,12 @@ export function TarefaAgendaBoard({
               ))}
             </div>
           ) : !sortedTarefas.length ? (
-            <EmptyState message={emptyMessage} onCreate={onCreate} hideCreate={hideCreate} />
+            <EmptyState
+              message={emptyMessage}
+              onCreate={onCreate}
+              hideCreate={hideCreate}
+              createLabel={createLabel}
+            />
           ) : (
             <TarefaColunasBoard
               tarefas={sortedTarefas}
@@ -348,8 +387,8 @@ export function TarefaAgendaBoard({
       )}
 
       <MoverTarefaDialog
-        tarefa={movingTarefa}
-        open={!!movingTarefa}
+        tarefa={onMoveSerie ? null : movingTarefa}
+        open={!onMoveSerie && !!movingTarefa}
         onOpenChange={(open) => {
           if (!open) setMovingTarefa(null);
         }}
@@ -364,10 +403,12 @@ function EmptyState({
   message,
   onCreate,
   hideCreate = false,
+  createLabel = "Criar primeira tarefa",
 }: {
   message: string;
   onCreate: () => void;
   hideCreate?: boolean;
+  createLabel?: string;
 }) {
   return (
     <div className="rounded-xl border border-dashed p-12 text-center">
@@ -375,7 +416,7 @@ function EmptyState({
       {!hideCreate && (
         <Button variant="outline" className="mt-4 gap-2" onClick={onCreate}>
           <Plus className="h-4 w-4" />
-          Criar primeira tarefa
+          {createLabel}
         </Button>
       )}
     </div>

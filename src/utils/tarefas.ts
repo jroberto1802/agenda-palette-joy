@@ -240,6 +240,25 @@ export function getTarefaResponsaveis(
   return [];
 }
 
+/** Responsáveis + visualizadores (únicos) para avatares no card. */
+export function getTarefaPessoasCard(
+  tarefa: TarefaWithRelations,
+): Pick<Profile, "id" | "nome_completo" | "avatar_url">[] {
+  const seen = new Set<string>();
+  const result: Pick<Profile, "id" | "nome_completo" | "avatar_url">[] = [];
+  for (const pessoa of [
+    ...getTarefaResponsaveis(tarefa),
+    ...(tarefa.observadores ?? [])
+      .map((o) => o.usuario)
+      .filter((u): u is Pick<Profile, "id" | "nome_completo" | "avatar_url"> => !!u),
+  ]) {
+    if (seen.has(pessoa.id)) continue;
+    seen.add(pessoa.id);
+    result.push(pessoa);
+  }
+  return result;
+}
+
 export function formatResponsaveisLabel(tarefa: TarefaWithRelations): string {
   const nomes = getTarefaResponsaveis(tarefa).map((r) => r.nome_completo);
   if (nomes.length === 0) return "Sem responsável";

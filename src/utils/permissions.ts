@@ -179,6 +179,7 @@ export function canManageProjetoMembros(
 }
 
 type RecorrenciaPastaEscopo = {
+  id?: string;
   criado_por: string | null;
   membros?: Array<{ usuario_id?: string; usuario?: { id: string } | null } | null> | null;
 };
@@ -219,10 +220,20 @@ export function canManageRecorrenciaPasta(
   return false;
 }
 
+/**
+ * Exclusão de pasta de recorrência (espelho de projetos):
+ * - pasta Entradas: nunca;
+ * - com ocorrências abertas: somente administrador;
+ * - sem abertas: criador, gestor participante ou administrador.
+ */
 export function canDeleteRecorrenciaPasta(
   profile: Profile | null | undefined,
   pasta: RecorrenciaPastaEscopo | null | undefined,
+  hasOpenActivities = false,
 ): boolean {
+  if (!profile || !pasta) return false;
+  if (pasta.id === "entradas") return false;
+  if (hasOpenActivities) return isAdmin(profile);
   return canManageRecorrenciaPasta(profile, pasta);
 }
 

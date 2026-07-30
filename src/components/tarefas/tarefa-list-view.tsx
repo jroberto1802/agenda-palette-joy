@@ -17,6 +17,7 @@ import {
   AlertTriangle,
   ChevronRight,
   GripVertical,
+  RefreshCw,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
@@ -30,6 +31,12 @@ import {
   TarefaCardIndicadores,
 } from "@/components/tarefas/tarefa-card-indicadores";
 import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useReorderTarefasLista, useSyncTarefaBoardItens, useTarefaBoardItens } from "@/hooks/use-tarefa-board";
 import { cn } from "@/lib/utils";
 import type { TarefaWithRelations } from "@/types";
@@ -39,7 +46,7 @@ import {
   TAREFA_PRIORIDADE_COLORS,
   TAREFA_PRIORIDADE_LABELS,
   formatResponsaveisLabel,
-  getTarefaResponsaveis,
+  getTarefaPessoasCard,
 } from "@/utils/tarefas";
 
 export function TarefaListRowContent({
@@ -62,15 +69,25 @@ export function TarefaListRowContent({
   showAtrasadaBadge?: boolean;
 }) {
   const ehModelo = isSerieModelo(tarefa);
+  const pessoas = getTarefaPessoasCard(tarefa);
 
   return (
     <div
       className={cn(
-        "flex w-full items-center gap-2 rounded-xl border border-l-4 bg-card px-2 py-3 text-left shadow-sm transition-colors hover:bg-muted/40 sm:gap-3 sm:px-4",
+        "relative flex w-full items-center gap-2 rounded-xl border border-l-4 bg-card px-2 py-3 text-left shadow-sm transition-colors hover:bg-muted/40 sm:gap-3 sm:px-4",
         TAREFA_PRIORIDADE_BAND_CLASS[tarefa.prioridade],
         isDragging && "opacity-60 ring-2 ring-primary",
       )}
     >
+      {ehModelo && (
+        <div
+          className="pointer-events-none absolute -left-3 top-1/2 z-10 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md bg-emerald-500 text-white shadow-sm ring-2 ring-background"
+          title="Série recorrente"
+          aria-hidden
+        >
+          <RefreshCw className="h-3.5 w-3.5" strokeWidth={2.5} />
+        </div>
+      )}
       {dragHandle}
       {onToggleConcluida && !ehModelo && (
         <ConclusaoBolinha
@@ -90,7 +107,7 @@ export function TarefaListRowContent({
           {tarefa.titulo}
         </p>
         <DescricaoPreview descricao={tarefa.descricao} />
-        {ehModelo && <SerieModeloBadge tarefa={tarefa} />}
+        {ehModelo && <SerieModeloBadge tarefa={tarefa} compact />}
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           {showAtrasadaBadge && (
             <Badge variant="destructive" className="gap-1 px-1.5 py-0 text-[10px]">
@@ -105,21 +122,32 @@ export function TarefaListRowContent({
             {TAREFA_PRIORIDADE_LABELS[tarefa.prioridade]}
           </Badge>
           <MinhaAgendaBadge tarefa={tarefa} className="px-1.5 py-0 text-[10px]" />
-          {getTarefaResponsaveis(tarefa).length > 0 && (
+          {pessoas.length > 0 && (
             <span className="inline-flex items-center gap-1">
-              <ProfileAvatar
-                name={getTarefaResponsaveis(tarefa)[0]?.nome_completo ?? "?"}
-                avatarUrl={getTarefaResponsaveis(tarefa)[0]?.avatar_url}
-                className="h-4 w-4"
-              />
+              <TooltipProvider delayDuration={200}>
+                <div className="flex -space-x-1">
+                  {pessoas.slice(0, 3).map((pessoa) => (
+                    <Tooltip key={pessoa.id}>
+                      <TooltipTrigger asChild>
+                        <span className="inline-flex">
+                          <ProfileAvatar
+                            name={pessoa.nome_completo}
+                            avatarUrl={pessoa.avatar_url}
+                            className="h-4 w-4 ring-1 ring-background"
+                          />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">{pessoa.nome_completo}</TooltipContent>
+                    </Tooltip>
+                  ))}
+                </div>
+              </TooltipProvider>
               <span className="truncate">{formatResponsaveisLabel(tarefa)}</span>
             </span>
           )}
           <TarefaCardDataInicio
             dataInicio={tarefa.data_inicio}
             concluida={tarefa.concluida}
-            hideWhenModelo
-            isModelo={ehModelo}
           />
           <TarefaCardIndicadores tarefa={tarefa} />
         </div>
