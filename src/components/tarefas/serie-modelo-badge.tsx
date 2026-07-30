@@ -34,12 +34,12 @@ export function SerieModeloBadge({
         )}
         title={
           proxima
-            ? `Modelo da série • Próxima: ${proxima} • ${regra}`
-            : `Modelo da série • ${regra}`
+            ? `Próxima ocorrência: ${proxima} • ${regra}`
+            : regra
         }
       >
         <RefreshCw className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
-        {regra}
+        {proxima ? `Próx. ${proxima}` : regra}
       </Badge>
     );
   }
@@ -47,16 +47,16 @@ export function SerieModeloBadge({
   return (
     <div
       className={cn(
-        "mt-1 space-y-0.5 text-[11px] leading-snug text-muted-foreground",
+        "space-y-0.5 text-[11px] leading-snug text-muted-foreground",
         className,
       )}
     >
-      <p className="inline-flex items-center gap-1 font-medium text-foreground/80">
-        <RefreshCw className="h-3 w-3" />
-        Modelo da série
+      {proxima && (
+        <p className="font-medium text-foreground/80">Próxima ocorrência: {proxima}</p>
+      )}
+      <p className="truncate" title={regra}>
+        {regra}
       </p>
-      {proxima && <p>Próxima ocorrência: {proxima}</p>}
-      <p>Recorrência: {regra}</p>
     </div>
   );
 }

@@ -22,7 +22,6 @@ import {
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
 import { ConclusaoBolinha } from "@/components/tarefas/conclusao-bolinha";
-import { DescricaoPreview } from "@/components/tarefas/descricao-preview";
 import { SerieModeloBadge } from "@/components/tarefas/serie-modelo-badge";
 import { MinhaAgendaBadge } from "@/components/tarefas/subtarefa-row";
 import { TarefaActionsMenu } from "@/components/tarefas/tarefa-actions-menu";
@@ -79,16 +78,16 @@ export function TarefaListRowContent({
         isDragging && "opacity-60 ring-2 ring-primary",
       )}
     >
+      {dragHandle}
       {ehModelo && (
         <div
-          className="pointer-events-none absolute -left-3 top-1/2 z-10 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md bg-emerald-500 text-white shadow-sm ring-2 ring-background"
+          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-emerald-500 text-white shadow-sm"
           title="Série recorrente"
           aria-hidden
         >
-          <RefreshCw className="h-3.5 w-3.5" strokeWidth={2.5} />
+          <RefreshCw className="h-3 w-3" strokeWidth={2.5} />
         </div>
       )}
-      {dragHandle}
       {onToggleConcluida && !ehModelo && (
         <ConclusaoBolinha
           concluida={tarefa.concluida}
@@ -106,8 +105,7 @@ export function TarefaListRowContent({
         >
           {tarefa.titulo}
         </p>
-        <DescricaoPreview descricao={tarefa.descricao} />
-        {ehModelo && <SerieModeloBadge tarefa={tarefa} compact />}
+        {ehModelo && <SerieModeloBadge tarefa={tarefa} />}
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           {showAtrasadaBadge && (
             <Badge variant="destructive" className="gap-1 px-1.5 py-0 text-[10px]">
@@ -145,10 +143,12 @@ export function TarefaListRowContent({
               <span className="truncate">{formatResponsaveisLabel(tarefa)}</span>
             </span>
           )}
-          <TarefaCardDataInicio
-            dataInicio={tarefa.data_inicio}
-            concluida={tarefa.concluida}
-          />
+          {!ehModelo && (
+            <TarefaCardDataInicio
+              dataInicio={tarefa.data_inicio}
+              concluida={tarefa.concluida}
+            />
+          )}
           <TarefaCardIndicadores tarefa={tarefa} />
         </div>
       </button>

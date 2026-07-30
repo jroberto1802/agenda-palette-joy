@@ -1,7 +1,6 @@
 import { RefreshCw } from "lucide-react";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
 import { ConclusaoBolinha } from "@/components/tarefas/conclusao-bolinha";
-import { DescricaoPreview } from "@/components/tarefas/descricao-preview";
 import { SerieModeloBadge } from "@/components/tarefas/serie-modelo-badge";
 import { MinhaAgendaBadge } from "@/components/tarefas/subtarefa-row";
 import { TarefaActionsMenu } from "@/components/tarefas/tarefa-actions-menu";
@@ -82,15 +81,15 @@ export function TarefaCard({
     >
       {ehModelo && (
         <div
-          className="pointer-events-none absolute -left-3 top-3 z-10 flex h-6 w-6 items-center justify-center rounded-md bg-emerald-500 text-white shadow-sm ring-2 ring-background"
+          className="pointer-events-none absolute left-2 top-2 z-10 flex h-5 w-5 items-center justify-center rounded-md bg-emerald-500 text-white shadow-sm"
           title="Série recorrente"
           aria-hidden
         >
-          <RefreshCw className="h-3.5 w-3.5" strokeWidth={2.5} />
+          <RefreshCw className="h-3 w-3" strokeWidth={2.5} />
         </div>
       )}
 
-      <CardHeader className="shrink-0 space-y-0 p-3 pb-1.5">
+      <CardHeader className={cn("shrink-0 space-y-0 p-3 pb-1.5", ehModelo && "pt-8")}>
         <div className="flex items-start justify-between gap-2">
           <div className="flex min-w-0 flex-1 items-start gap-2">
             {!ehModelo && (
@@ -143,7 +142,6 @@ export function TarefaCard({
               >
                 {tarefa.titulo}
               </CardTitle>
-              {ehModelo && <SerieModeloBadge tarefa={tarefa} compact />}
             </div>
           </div>
 
@@ -159,11 +157,11 @@ export function TarefaCard({
       </CardHeader>
 
       <CardContent className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden p-3 pt-0 text-xs">
-        <div className="min-h-[2.25rem] shrink-0">
-          <DescricaoPreview descricao={tarefa.descricao} />
+        <div className="min-h-0 shrink-0">
+          {ehModelo ? <SerieModeloBadge tarefa={tarefa} /> : null}
         </div>
 
-        <div className="flex h-4 min-w-0 shrink-0 items-center gap-3 overflow-hidden text-muted-foreground">
+        <div className="mt-auto flex h-4 min-w-0 shrink-0 items-center gap-3 overflow-hidden text-muted-foreground">
           {pessoas.length > 0 ? (
             <span className="flex min-w-0 items-center gap-1">
               <TooltipProvider delayDuration={200}>
@@ -191,7 +189,7 @@ export function TarefaCard({
               —
             </span>
           )}
-          {tarefa.data_inicio ? (
+          {!ehModelo && tarefa.data_inicio ? (
             <TarefaCardDataInicio
               dataInicio={tarefa.data_inicio}
               concluida={tarefa.concluida}
