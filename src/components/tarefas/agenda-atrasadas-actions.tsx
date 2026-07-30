@@ -118,3 +118,85 @@ export function AgendaAtrasadasActionsMenu({
     </div>
   );
 }
+
+/** Atalho no título da seção: reagenda todos os itens atrasados editáveis. */
+export function AgendaAtrasadasBulkReagendarMenu({
+  onReagendarTodas,
+  disabled = false,
+}: {
+  onReagendarTodas: (dataInicio: string) => void | Promise<void>;
+  disabled?: boolean;
+}) {
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [pending, setPending] = useState(false);
+
+  const reagendarPara = async (date: Date) => {
+    if (pending) return;
+    setPending(true);
+    try {
+      await onReagendarTodas(localDateAtNoon(date).toISOString());
+    } finally {
+      setPending(false);
+    }
+  };
+
+  return (
+    <div className="flex shrink-0 items-center">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 shrink-0 text-destructive hover:text-destructive"
+            aria-label="Reagendar todas as atrasadas"
+            disabled={disabled || pending}
+          >
+            <MoreHorizontal className="h-3.5 w-3.5" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start">
+          <DropdownMenuItem
+            disabled={pending}
+            onClick={() => void reagendarPara(startOfTodayLocal())}
+          >
+            Hoje
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            disabled={pending}
+            onClick={() => void reagendarPara(addDays(startOfTodayLocal(), 1))}
+          >
+            Amanhã
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            disabled={pending}
+            onSelect={(event) => {
+              event.preventDefault();
+              setCalendarOpen(true);
+            }}
+          >
+            Escolher data…
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <Dialog open={calendarOpen} onOpenChange={setCalendarOpen}>
+        <DialogContent className="w-auto max-w-fit p-3">
+          <DialogHeader>
+            <DialogTitle>Escolher data</DialogTitle>
+          </DialogHeader>
+          <Calendar
+            mode="single"
+            locale={ptBR}
+            onSelect={(date) => {
+              if (!date) return;
+              setCalendarOpen(false);
+              void reagendarPara(date);
+            }}
+            initialFocus
+          />
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

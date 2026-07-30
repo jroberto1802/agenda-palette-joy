@@ -1,11 +1,15 @@
 import { AlertTriangle } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ConfirmDeleteDialog } from "@/components/common/confirm-delete-dialog";
-import { AgendaAtrasadasActionsMenu } from "@/components/tarefas/agenda-atrasadas-actions";
+import {
+  AgendaAtrasadasActionsMenu,
+  AgendaAtrasadasBulkReagendarMenu,
+} from "@/components/tarefas/agenda-atrasadas-actions";
 import { ConfirmSerieDeleteDialog } from "@/components/tarefas/confirm-serie-delete-dialog";
 import { SubtarefaAgendaListRow } from "@/components/tarefas/subtarefa-agenda-item";
 import { TarefaListRowContent } from "@/components/tarefas/tarefa-list-view";
+import { useProfile } from "@/hooks/use-profile";
 import {
   useDeleteSubtarefa,
   useSoftDeleteTarefaComEscopo,
@@ -17,7 +21,9 @@ import {
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
 import type { EscopoExclusaoSerie } from "@/services/tarefa-recorrencia";
 import type { SubtarefaAgendaItem, TarefaWithRelations } from "@/types";
+import { isAdmin, isGerente } from "@/utils/permissions";
 import { pertenceASerie } from "@/utils/recorrencia";
+import { canEditTarefa } from "@/utils/tarefas";
 
 type AgendaAtrasadaItem =
   | { kind: "tarefa"; tarefa: TarefaWithRelations }
@@ -26,6 +32,19 @@ type AgendaAtrasadaItem =
 type DeletingItem =
   | { kind: "tarefa"; id: string; titulo: string; isSerie: boolean }
   | { kind: "subtarefa"; id: string; titulo: string };
+
+function canEditSubtarefaAtrasada(
+  subtarefa: SubtarefaAgendaItem,
+  userId: string | undefined,
+  isAdminUser: boolean,
+): boolean {
+  if (!userId) return false;
+  if (isAdminUser) return true;
+  if (subtarefa.concluida) return false;
+  if (subtarefa.criado_por === userId) return true;
+  if (subtarefa.responsaveis?.some((r) => r.usuario_id === userId)) return true;
+  return false;
+}
 
 export function AgendaAtrasadasSection({
   items,
@@ -36,6 +55,7 @@ export function AgendaAtrasadasSection({
   onOpenTarefa: (tarefa: TarefaWithRelations) => void;
   onOpenSubtarefa: (subtarefa: SubtarefaAgendaItem) => void;
 }) {
+  const { data: profile } = useProfile();
   const updateConclusao = useUpdateTarefaConclusao();
   const updateDataInicio = useUpdateTarefaDataInicio();
   const softDelete = useSoftDeleteTarefaComEscopo();
@@ -44,6 +64,24 @@ export function AgendaAtrasadasSection({
   const deleteSubtarefa = useDeleteSubtarefa();
 
   const [deleting, setDeleting] = useState<DeletingItem | null>(null);
+
+  const admin = isAdmin(profile);
+  const gerente = isGerente(profile);
+
+  const canEditItem = useMemo(() => {
+    return (item: AgendaAtrasadaItem) => {
+      if (item.kind === "tarefa") {
+        return canEditTarefa(
+          item.tarefa,
+          profile?.id,
+          admin,
+          gerente,
+          profile?.setor_id,
+        );
+      }
+      return canEditSubtarefaAtrasada(item.subtarefa, profile?.id, admin);
+    };
+  }, [profile?.id, profile?.setor_id, admin, gerente]);
 
   if (!items.length) return null;
 
@@ -99,6 +137,43 @@ export function AgendaAtrasadasSection({
     }
   };
 
+  const handleReagendarTodas = async (dataInicio: string) => {
+    const editaveis = items.filter(canEditItem);
+    if (editaveis.length === 0) {
+      toast.message("Nenhum item atrasado com permissão de edição");
+      return;
+    }
+
+    let ok = 0;
+    let falhas = 0;
+
+    for (const item of editaveis) {
+      try {
+        if (item.kind === "tarefa") {
+          await updateDataInicio.mutateAsync({ id: item.tarefa.id, dataInicio });
+        } else {
+          await updateSubtarefaMeta.mutateAsync({
+            id: item.subtarefa.id,
+            data: { data_inicio: dataInicio },
+          });
+        }
+        ok += 1;
+      } catch {
+        falhas += 1;
+      }
+    }
+
+    if (ok > 0 && falhas === 0) {
+      toast.success(
+        ok === 1 ? "1 item reagendado" : `${ok} itens reagendados`,
+      );
+    } else if (ok > 0 && falhas > 0) {
+      toast.warning(`${ok} reagendado(s), ${falhas} com erro`);
+    } else {
+      toast.error("Erro ao reagendar itens atrasados");
+    }
+  };
+
   const handleManter = () => {
     toast.message("Item permanece atrasado");
   };
@@ -137,6 +212,7 @@ export function AgendaAtrasadasSection({
         <AlertTriangle className="h-4 w-4 text-destructive" />
         <h3 className="text-sm font-semibold text-destructive">Atrasadas</h3>
         <span className="text-xs text-muted-foreground">({items.length})</span>
+        <AgendaAtrasadasBulkReagendarMenu onReagendarTodas={handleReagendarTodas} />
       </div>
       <ul className="space-y-2">
         {items.map((item) =>
