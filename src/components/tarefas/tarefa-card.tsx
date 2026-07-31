@@ -1,6 +1,7 @@
 import { RefreshCw } from "lucide-react";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
 import { ConclusaoBolinha } from "@/components/tarefas/conclusao-bolinha";
+import { DescricaoPreview } from "@/components/tarefas/descricao-preview";
 import { SerieModeloBadge } from "@/components/tarefas/serie-modelo-badge";
 import { MinhaAgendaBadge } from "@/components/tarefas/subtarefa-row";
 import { TarefaActionsMenu } from "@/components/tarefas/tarefa-actions-menu";
@@ -157,8 +158,15 @@ export function TarefaCard({
       </CardHeader>
 
       <CardContent className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden p-3 pt-0 text-xs">
-        <div className="min-h-0 shrink-0">
-          {ehModelo ? <SerieModeloBadge tarefa={tarefa} /> : null}
+        <div className="min-h-0 shrink-0 overflow-hidden">
+          {ehModelo ? (
+            <SerieModeloBadge tarefa={tarefa} />
+          ) : (
+            <DescricaoPreview
+              descricao={tarefa.descricao}
+              className="line-clamp-1 text-xs leading-snug text-muted-foreground"
+            />
+          )}
         </div>
 
         <div className="mt-auto flex h-4 min-w-0 shrink-0 items-center gap-3 overflow-hidden text-muted-foreground">

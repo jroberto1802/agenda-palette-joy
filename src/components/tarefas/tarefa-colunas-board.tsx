@@ -24,6 +24,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ConfirmDeleteDialog } from "@/components/common/confirm-delete-dialog";
 import { ConclusaoBolinha } from "@/components/tarefas/conclusao-bolinha";
+import { DescricaoPreview } from "@/components/tarefas/descricao-preview";
 import { MinhaAgendaBadge } from "@/components/tarefas/subtarefa-row";
 import { TarefaActionsMenu } from "@/components/tarefas/tarefa-actions-menu";
 import {
@@ -62,6 +63,7 @@ import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
 import { cn } from "@/lib/utils";
 import type { TarefaBoardColuna } from "@/services/tarefa-board";
 import type { TarefaWithRelations } from "@/types";
+import { isSerieModelo } from "@/utils/recorrencia";
 import {
   TAREFA_PRIORIDADE_BAND_CLASS,
   TAREFA_PRIORIDADE_COLORS,
@@ -160,6 +162,12 @@ function ColunaCardContent({
         )}
         <div className="min-w-0 flex-1 space-y-1">
           <p className="text-sm font-medium leading-snug">{tarefa.titulo}</p>
+          {!isSerieModelo(tarefa) && (
+            <DescricaoPreview
+              descricao={tarefa.descricao}
+              className="line-clamp-1 text-xs leading-snug text-muted-foreground"
+            />
+          )}
           <div className="mt-2 flex flex-wrap gap-1">
             <Badge
               variant="outline"

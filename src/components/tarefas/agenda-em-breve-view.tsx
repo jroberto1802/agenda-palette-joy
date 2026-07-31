@@ -2,6 +2,7 @@ import { addDays, format, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { DescricaoPreview } from "@/components/tarefas/descricao-preview";
 import { SubtarefaAgendaCard } from "@/components/tarefas/subtarefa-agenda-item";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -112,6 +113,10 @@ function EmBreveTaskCard({
       )}
     >
       <p className="line-clamp-2 text-sm font-medium leading-snug">{tarefa.titulo}</p>
+      <DescricaoPreview
+        descricao={tarefa.descricao}
+        className="mt-0.5 line-clamp-1 text-xs leading-snug text-muted-foreground"
+      />
       <div className="mt-1.5 flex flex-wrap gap-1">
         {tarefa.setor && (
           <Badge

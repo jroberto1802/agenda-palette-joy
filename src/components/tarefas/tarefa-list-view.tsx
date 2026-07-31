@@ -22,6 +22,7 @@ import {
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
 import { ConclusaoBolinha } from "@/components/tarefas/conclusao-bolinha";
+import { DescricaoPreview } from "@/components/tarefas/descricao-preview";
 import { SerieModeloBadge } from "@/components/tarefas/serie-modelo-badge";
 import { MinhaAgendaBadge } from "@/components/tarefas/subtarefa-row";
 import { TarefaActionsMenu } from "@/components/tarefas/tarefa-actions-menu";
@@ -105,7 +106,14 @@ export function TarefaListRowContent({
         >
           {tarefa.titulo}
         </p>
-        {ehModelo && <SerieModeloBadge tarefa={tarefa} />}
+        {ehModelo ? (
+          <SerieModeloBadge tarefa={tarefa} />
+        ) : (
+          <DescricaoPreview
+            descricao={tarefa.descricao}
+            className="line-clamp-1 text-xs leading-snug text-muted-foreground"
+          />
+        )}
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           {showAtrasadaBadge && (
             <Badge variant="destructive" className="gap-1 px-1.5 py-0 text-[10px]">
