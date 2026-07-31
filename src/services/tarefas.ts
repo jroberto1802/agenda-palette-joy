@@ -122,6 +122,22 @@ function mapTarefasWithIndicadores(data: unknown[] | null): TarefaWithRelations[
   );
 }
 
+function attachSubtarefaIndicadores(row: Record<string, unknown>): SubtarefaWithAuthors {
+  const {
+    comentarios_count: comentariosRaw,
+    anexos_count: anexosRaw,
+    ...rest
+  } = row;
+
+  return {
+    ...(rest as SubtarefaWithAuthors),
+    indicadores: {
+      comentarios_count: parseCountEmbed(comentariosRaw as CountEmbed),
+      anexos_count: parseCountEmbed(anexosRaw as CountEmbed),
+    },
+  };
+}
+
 function serializeLembretes(lembretes: TarefaLembreteOpcao[]): TarefaLembreteOpcao[] {
   return lembretes;
 }
@@ -970,6 +986,12 @@ const SUBTAREFA_COMENTARIO_SELECT = `
   )
 `;
 
+/** Embeds leves para indicadores da linha de subtarefa. */
+const SUBTAREFA_INDICADORES_SELECT = `
+  comentarios_count:subtarefa_comentarios(count),
+  anexos_count:subtarefa_anexos(count)
+`;
+
 export async function getTarefaDetail(id: string): Promise<TarefaDetail> {
   const { data, error } = await supabase
     .from("tarefas")
@@ -988,7 +1010,8 @@ export async function getTarefaDetail(id: string): Promise<TarefaDetail> {
         observadores:subtarefa_observadores(
           usuario_id,
           usuario:profiles!subtarefa_observadores_usuario_id_fkey(id, nome_completo, avatar_url)
-        )
+        ),
+        ${SUBTAREFA_INDICADORES_SELECT}
       ),
       comentarios:tarefa_comentarios(${COMENTARIO_SELECT}),
       anexos:tarefa_anexos(id, tarefa_id, storage_path, nome, tipo, tamanho, created_at)`,
@@ -1005,7 +1028,11 @@ export async function getTarefaDetail(id: string): Promise<TarefaDetail> {
 
   const detail = data as unknown as TarefaDetail;
   if (detail.subtarefas?.length) {
-    detail.subtarefas = sortSubtarefasList(detail.subtarefas);
+    detail.subtarefas = sortSubtarefasList(
+      detail.subtarefas.map((s) =>
+        attachSubtarefaIndicadores(s as unknown as Record<string, unknown>),
+      ),
+    );
   }
   return detail;
 }
@@ -1023,7 +1050,8 @@ const SUBTAREFA_SELECT = `
   observadores:subtarefa_observadores(
     usuario_id,
     usuario:profiles!subtarefa_observadores_usuario_id_fkey(id, nome_completo, avatar_url)
-  )
+  ),
+  ${SUBTAREFA_INDICADORES_SELECT}
 `;
 
 const SUBTAREFA_DETAIL_SELECT = `
@@ -1309,7 +1337,7 @@ async function getSubtarefaRow(id: string): Promise<SubtarefaWithAuthors> {
     .eq("id", id)
     .single();
   if (error) throw error;
-  return data as unknown as SubtarefaWithAuthors;
+  return attachSubtarefaIndicadores(data as unknown as Record<string, unknown>);
 }
 
 export async function createSubtarefa(
@@ -1343,7 +1371,7 @@ export async function createSubtarefa(
     .single();
 
   if (error) throw error;
-  return data as unknown as SubtarefaWithAuthors;
+  return attachSubtarefaIndicadores(data as unknown as Record<string, unknown>);
 }
 
 function tituloComSufixoCopia(titulo: string): string {

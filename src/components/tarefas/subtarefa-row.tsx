@@ -1,6 +1,6 @@
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarDays, Eye, UserRound } from "lucide-react";
+import { CalendarDays, Clock, Eye, MessageSquare, Paperclip, UserRound } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import { ConfirmDeleteDialog } from "@/components/common/confirm-delete-dialog";
 import { PessoasMultiSelect } from "@/components/common/pessoas-multi-select";
@@ -29,6 +29,7 @@ import type {
   TarefaPrioridade,
   TarefaWithRelations,
 } from "@/types";
+import { hasExplicitTime } from "@/utils/agenda-datas";
 import { VISIBILIDADE_PESSOAS } from "@/utils/escopo-tarefa";
 import { isRecorrenciaMensalLike } from "@/utils/recorrencia";
 import {
@@ -193,6 +194,11 @@ export function SubtarefaRow({
   const dataInicio = subtarefa.data_inicio
     ? new Date(subtarefa.data_inicio)
     : null;
+  const showHora = !!dataInicio && hasExplicitTime(dataInicio);
+  const comentariosCount = subtarefa.indicadores?.comentarios_count ?? 0;
+  const anexosCount = subtarefa.indicadores?.anexos_count ?? 0;
+  const showComentarios = comentariosCount > 0;
+  const showAnexos = anexosCount > 0;
 
   const mensalLike = isRecorrenciaMensalLike(modeloRecorrencia);
   const precisaReconfigurarModelo =
@@ -222,7 +228,7 @@ export function SubtarefaRow({
   return (
     <div
       className={cn(
-        "group flex items-start gap-2.5 overflow-hidden rounded-xl border border-l-4 bg-card px-3 py-3 shadow-sm",
+        "group flex items-center gap-2.5 overflow-hidden rounded-xl border border-l-4 bg-card px-3 py-3.5 shadow-sm",
         TAREFA_PRIORIDADE_BAND_CLASS[subtarefa.prioridade],
         isDragging && "opacity-60 ring-2 ring-primary",
       )}
@@ -232,7 +238,7 @@ export function SubtarefaRow({
         concluida={subtarefa.concluida}
         kind="subtarefa"
         disabled={!canEdit || saving}
-        className="mt-0.5"
+        className="shrink-0"
         onToggle={async (concluida) => {
           await onToggle(concluida);
         }}
@@ -253,7 +259,7 @@ export function SubtarefaRow({
 
       <TooltipProvider delayDuration={200}>
         <div
-          className="flex shrink-0 items-center gap-0.5"
+          className="flex shrink-0 items-center gap-1"
           onClick={(event) => event.stopPropagation()}
         >
           {/* Prioridade */}
@@ -320,6 +326,11 @@ export function SubtarefaRow({
                       : !!dataInicio
                   }
                   disabled={!canEdit || saving}
+                  className={cn(
+                    !modeloSerieMode &&
+                      showHora &&
+                      "h-7 w-auto min-w-7 gap-0.5 px-1.5",
+                  )}
                 >
                   {modeloSerieMode ? (
                     <span className="text-[10px] font-medium leading-none">
@@ -332,8 +343,21 @@ export function SubtarefaRow({
                             : "?"}
                     </span>
                   ) : dataInicio ? (
-                    <span className="text-[10px] font-medium leading-none">
-                      {format(dataInicio, "dd/MM", { locale: ptBR })}
+                    <span className="inline-flex items-center gap-0.5">
+                      <span className="text-[10px] font-medium leading-none">
+                        {format(dataInicio, "dd/MM", { locale: ptBR })}
+                      </span>
+                      {showHora && (
+                        <span
+                          className="inline-flex items-center gap-0.5"
+                          title="Horário"
+                        >
+                          <Clock className="h-3 w-3 shrink-0" aria-hidden />
+                          <span className="text-[10px] font-medium tabular-nums leading-none">
+                            {format(dataInicio, "HH:mm")}
+                          </span>
+                        </span>
+                      )}
                     </span>
                   ) : (
                     <CalendarDays className="h-3.5 w-3.5" />
@@ -411,6 +435,42 @@ export function SubtarefaRow({
               )}
             </PopoverContent>
           </Popover>
+
+          {/* Comentários / Anexos — mesmos ícones do card de tarefa */}
+          {(showComentarios || showAnexos) && (
+            <div className="flex items-center gap-1.5 px-0.5 text-[11px] text-foreground">
+              {showComentarios && (
+                <span
+                  className="inline-flex"
+                  title={`${comentariosCount} comentário${comentariosCount === 1 ? "" : "s"}`}
+                >
+                  <MessageSquare
+                    className="h-3 w-3 shrink-0 fill-current"
+                    aria-hidden
+                  />
+                  <span className="sr-only">
+                    {comentariosCount} comentário
+                    {comentariosCount === 1 ? "" : "s"}
+                  </span>
+                </span>
+              )}
+              {showAnexos && (
+                <span
+                  className="inline-flex"
+                  title={`${anexosCount} anexo${anexosCount === 1 ? "" : "s"}`}
+                >
+                  <Paperclip
+                    className="h-3 w-3 shrink-0"
+                    strokeWidth={2.5}
+                    aria-hidden
+                  />
+                  <span className="sr-only">
+                    {anexosCount} anexo{anexosCount === 1 ? "" : "s"}
+                  </span>
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Responsáveis */}
           <Popover>

@@ -206,6 +206,12 @@ export type TarefaFilters = {
 export type Subtarefa = Tables<"subtarefas">;
 export type SubtarefaAnexo = Tables<"subtarefa_anexos">;
 
+/** Contagens leves para indicadores na linha/card da subtarefa. */
+export type SubtarefaCardIndicadores = {
+  comentarios_count: number;
+  anexos_count: number;
+};
+
 export type SubtarefaWithAuthors = Subtarefa & {
   criador: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
   concluido_por_usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
@@ -217,6 +223,8 @@ export type SubtarefaWithAuthors = Subtarefa & {
     usuario_id: string;
     usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
   }[];
+  /** Presente nas listagens; ausente em alguns retornos de mutação até o refetch. */
+  indicadores?: SubtarefaCardIndicadores;
 };
 
 /** Subtarefa com data própria para as abas Hoje / Em breve da Agenda. */
