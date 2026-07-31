@@ -19,10 +19,13 @@ export function AvisoCard({
   aviso,
   lido,
   onOpen,
+  muted = false,
 }: {
   aviso: AvisoWithRelations;
   lido: boolean;
   onOpen: () => void;
+  /** Histórico (aba Finalizados): baixo contraste, só consulta. */
+  muted?: boolean;
 }) {
   const plain = stripHtml(aviso.conteudo);
   const preview = plain.length > 80 ? `${plain.slice(0, 80)}...` : plain;
@@ -30,35 +33,63 @@ export function AvisoCard({
   return (
     <Card
       className={cn(
-        "cursor-pointer overflow-hidden border-l-4 transition-colors hover:border-primary/40",
-        AVISO_PRIORIDADE_BAND_CLASS[aviso.prioridade],
-        !lido && "border-primary/30 bg-primary/5",
-        aviso.fixado && "ring-1 ring-amber-500/30",
+        "cursor-pointer overflow-hidden border-l-4 transition-colors",
+        muted
+          ? "border-l-muted-foreground/40 bg-muted/30 text-muted-foreground opacity-80 grayscale hover:border-muted-foreground/50 hover:bg-muted/40"
+          : cn(
+              AVISO_PRIORIDADE_BAND_CLASS[aviso.prioridade],
+              "hover:border-primary/40",
+              !lido && "border-primary/30 bg-primary/5",
+              aviso.fixado && "ring-1 ring-amber-500/30",
+            ),
       )}
       onClick={onOpen}
     >
       <CardHeader className="space-y-1.5 p-3 pb-1">
         <div className="flex items-start justify-between gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-1">
-            {aviso.fixado && <Pin className="h-3 w-3 shrink-0 text-amber-500" />}
+            {aviso.fixado && (
+              <Pin
+                className={cn(
+                  "h-3 w-3 shrink-0",
+                  muted ? "text-muted-foreground" : "text-amber-500",
+                )}
+              />
+            )}
             <Badge
               variant="outline"
               className={cn(
                 "shrink-0 px-1.5 py-0 text-[10px]",
-                AVISO_PRIORIDADE_BADGE_CLASS[aviso.prioridade],
+                muted
+                  ? "border-muted-foreground/30 bg-muted/50 text-muted-foreground"
+                  : AVISO_PRIORIDADE_BADGE_CLASS[aviso.prioridade],
               )}
             >
               {AVISO_PRIORIDADE_LABELS[aviso.prioridade]}
             </Badge>
           </div>
           {lido ? (
-            <CheckCircle2 className="h-3 w-3 shrink-0 text-green-600" aria-label="Lido" />
+            <CheckCircle2
+              className={cn(
+                "h-3 w-3 shrink-0",
+                muted ? "text-muted-foreground" : "text-green-600",
+              )}
+              aria-label="Lido"
+            />
           ) : (
-            <Circle className="h-3 w-3 shrink-0 text-muted-foreground" aria-label="Não lido" />
+            <Circle
+              className="h-3 w-3 shrink-0 text-muted-foreground"
+              aria-label="Não lido"
+            />
           )}
         </div>
 
-        <CardTitle className="line-clamp-2 text-sm font-semibold leading-snug">
+        <CardTitle
+          className={cn(
+            "line-clamp-2 text-sm font-semibold leading-snug",
+            muted && "text-muted-foreground",
+          )}
+        >
           {aviso.titulo}
         </CardTitle>
 
@@ -66,11 +97,16 @@ export function AvisoCard({
           <ProfileAvatar
             name={aviso.criador?.nome_completo ?? "Sistema"}
             avatarUrl={aviso.criador?.avatar_url}
-            className="h-4 w-4"
+            className={cn("h-4 w-4", muted && "opacity-70")}
             fallbackClassName="text-[8px]"
           />
           <div className="min-w-0">
-            <p className="truncate text-xs font-medium leading-tight">
+            <p
+              className={cn(
+                "truncate text-xs font-medium leading-tight",
+                muted && "text-muted-foreground",
+              )}
+            >
               {aviso.criador?.nome_completo ?? "Sistema"}
             </p>
             <p className="text-[10px] text-muted-foreground">
@@ -91,10 +127,26 @@ export function AvisoCard({
   );
 }
 
-export function AvisoEmptyState({ message = "Nenhum aviso publicado ainda." }: { message?: string }) {
+export function AvisoEmptyState({
+  message = "Nenhum aviso publicado ainda.",
+  muted = false,
+}: {
+  message?: string;
+  muted?: boolean;
+}) {
   return (
-    <div className="rounded-xl border border-dashed p-12 text-center">
-      <Megaphone className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
+    <div
+      className={cn(
+        "rounded-xl border border-dashed p-12 text-center",
+        muted && "border-muted-foreground/25 bg-muted/20",
+      )}
+    >
+      <Megaphone
+        className={cn(
+          "mx-auto mb-3 h-10 w-10 text-muted-foreground",
+          muted && "opacity-60",
+        )}
+      />
       <p className="text-muted-foreground">{message}</p>
     </div>
   );

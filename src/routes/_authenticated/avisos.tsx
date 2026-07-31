@@ -27,6 +27,7 @@ import { isAvisoLido } from "@/services/avisos";
 import type { AvisoAba, AvisoLeituraFiltro, AvisoWithRelations } from "@/types";
 import { isAvisoAtivo, isAvisoFinalizado, matchesAvisoSearch } from "@/utils/avisos";
 import { isAdmin, isAdminOrGerente } from "@/utils/permissions";
+import { cn } from "@/lib/utils";
 
 type AvisoSearch = {
   avisoId?: string;
@@ -264,6 +265,8 @@ function AvisosPage() {
   );
 
   function renderGrid() {
+    const muted = aba === "finalizados";
+
     if (isLoading) {
       return (
         <div className={DENSE_CARD_GRID_CLASS}>
@@ -275,16 +278,17 @@ function AvisosPage() {
     }
 
     if (!avisosFiltrados.length) {
-      return <AvisoEmptyState message={emptyMessage} />;
+      return <AvisoEmptyState message={emptyMessage} muted={muted} />;
     }
 
     return (
-      <div className={DENSE_CARD_GRID_CLASS}>
+      <div className={cn(DENSE_CARD_GRID_CLASS, muted && "opacity-95")}>
         {avisosFiltrados.map((aviso) => (
           <AvisoCard
             key={aviso.id}
             aviso={aviso}
             lido={isAvisoLido(aviso, profile?.id)}
+            muted={muted}
             onOpen={() => setDetailId(aviso.id)}
           />
         ))}

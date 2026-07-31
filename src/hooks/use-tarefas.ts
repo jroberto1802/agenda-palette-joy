@@ -344,12 +344,7 @@ export function useUpdateSubtarefaMeta() {
       data,
     }: {
       id: string;
-      data: {
-        data_inicio?: string | null;
-        atribuido_ids?: string[];
-        observador_ids?: string[];
-        visibilidade?: import("@/types").Subtarefa["visibilidade"];
-      };
+      data: import("@/types").SubtarefaMetaUpdate;
     }) => updateSubtarefaMeta(id, data),
     onSuccess: () => invalidateTarefas(queryClient),
   });

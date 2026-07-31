@@ -1626,6 +1626,7 @@ export async function updateSubtarefaMeta(
     atribuido_ids?: string[];
     observador_ids?: string[];
     visibilidade?: SubtarefaWithAuthors["visibilidade"];
+    prioridade?: import("@/types").TarefaPrioridade;
     dia_no_mes?: number | null;
     offset_dias?: number | null;
   },
@@ -1648,6 +1649,7 @@ export async function updateSubtarefaMeta(
   const patch: {
     data_inicio?: string | null;
     visibilidade?: SubtarefaWithAuthors["visibilidade"];
+    prioridade?: import("@/types").TarefaPrioridade;
     dia_no_mes?: number | null;
     offset_dias?: number | null;
     updated_at?: string;
@@ -1655,6 +1657,9 @@ export async function updateSubtarefaMeta(
 
   if (meta.data_inicio !== undefined) {
     patch.data_inicio = meta.data_inicio;
+  }
+  if (meta.prioridade !== undefined) {
+    patch.prioridade = meta.prioridade;
   }
   if (meta.dia_no_mes !== undefined) {
     patch.dia_no_mes = meta.dia_no_mes;

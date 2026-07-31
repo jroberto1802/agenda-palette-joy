@@ -24,12 +24,18 @@ import {
 import { cn } from "@/lib/utils";
 import type {
   ProfileWithSetor,
+  SubtarefaMetaUpdate,
   SubtarefaWithAuthors,
+  TarefaPrioridade,
   TarefaWithRelations,
 } from "@/types";
 import { VISIBILIDADE_PESSOAS } from "@/utils/escopo-tarefa";
 import { isRecorrenciaMensalLike } from "@/utils/recorrencia";
-import { TAREFA_PRIORIDADE_BAND_CLASS } from "@/utils/tarefas";
+import {
+  TAREFA_PRIORIDADE_BAND_CLASS,
+  TAREFA_PRIORIDADE_DOT,
+  TAREFA_PRIORIDADE_LABELS,
+} from "@/utils/tarefas";
 import type { RecorrenciaConfig } from "@/types";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -146,14 +152,7 @@ export function SubtarefaRow({
   onDuplicate?: () => void;
   onMove?: () => void;
   onDelete: () => Promise<void>;
-  onUpdateMeta: (meta: {
-    data_inicio?: string | null;
-    atribuido_ids?: string[];
-    observador_ids?: string[];
-    visibilidade?: SubtarefaWithAuthors["visibilidade"];
-    dia_no_mes?: number | null;
-    offset_dias?: number | null;
-  }) => Promise<void>;
+  onUpdateMeta: (meta: SubtarefaMetaUpdate) => Promise<void>;
   dragHandle?: ReactNode;
   isDragging?: boolean;
   modeloSerieMode?: boolean;
@@ -211,16 +210,7 @@ export function SubtarefaRow({
         : `+${subtarefa.offset_dias} dia${subtarefa.offset_dias === 1 ? "" : "s"}`
       : "Definir offset";
 
-  const runMeta = async (
-    meta: {
-      data_inicio?: string | null;
-      atribuido_ids?: string[];
-      observador_ids?: string[];
-      visibilidade?: SubtarefaWithAuthors["visibilidade"];
-      dia_no_mes?: number | null;
-      offset_dias?: number | null;
-    },
-  ) => {
+  const runMeta = async (meta: SubtarefaMetaUpdate) => {
     setSaving(true);
     try {
       await onUpdateMeta(meta);
@@ -266,6 +256,52 @@ export function SubtarefaRow({
           className="flex shrink-0 items-center gap-0.5"
           onClick={(event) => event.stopPropagation()}
         >
+          {/* Prioridade */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <span>
+                <MetaIconButton
+                  label={`Prioridade: ${subtarefa.prioridade}`}
+                  active
+                  disabled={!canEdit || saving}
+                >
+                  <span
+                    className={cn(
+                      "h-3.5 w-3.5 rounded-full",
+                      TAREFA_PRIORIDADE_DOT[subtarefa.prioridade],
+                    )}
+                  />
+                </MetaIconButton>
+              </span>
+            </PopoverTrigger>
+            <PopoverContent className={cn("w-52 space-y-2 p-3", META_OVERLAY_Z)} align="end">
+              <p className="text-xs font-medium text-muted-foreground">Prioridade</p>
+              <Select
+                value={subtarefa.prioridade}
+                onValueChange={(v) =>
+                  void runMeta({ prioridade: v as TarefaPrioridade })
+                }
+                disabled={!canEdit || saving}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className={META_OVERLAY_Z}>
+                  {(Object.keys(TAREFA_PRIORIDADE_LABELS) as TarefaPrioridade[]).map((p) => (
+                    <SelectItem key={p} value={p}>
+                      <span className="flex items-center gap-2">
+                        <span
+                          className={cn("h-2.5 w-2.5 rounded-full", TAREFA_PRIORIDADE_DOT[p])}
+                        />
+                        {TAREFA_PRIORIDADE_LABELS[p]}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </PopoverContent>
+          </Popover>
+
           {/* Data: calendário (ocorrência) ou Dia/offset (modelo) */}
           <Popover>
             <PopoverTrigger asChild>

@@ -250,6 +250,7 @@ export type SubtarefaMetaUpdate = {
   atribuido_ids?: string[];
   observador_ids?: string[];
   visibilidade?: Subtarefa["visibilidade"];
+  prioridade?: TarefaPrioridade;
   /** Dia fixo 1–31 (mensal-like no modelo). */
   dia_no_mes?: number | null;
   /** Offset em dias a partir da ocorrência pai (diária/semanal/intervalo). */
