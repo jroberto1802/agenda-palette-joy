@@ -23,6 +23,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
 import { ConclusaoBolinha } from "@/components/tarefas/conclusao-bolinha";
 import { DescricaoPreview } from "@/components/tarefas/descricao-preview";
+import { TarefaRecorrenciaBadge } from "@/components/tarefas/recorrencia-ocorrencia-badge";
 import { SerieModeloBadge } from "@/components/tarefas/serie-modelo-badge";
 import { MinhaAgendaBadge } from "@/components/tarefas/subtarefa-row";
 import { TarefaActionsMenu } from "@/components/tarefas/tarefa-actions-menu";
@@ -127,6 +128,7 @@ export function TarefaListRowContent({
           >
             {TAREFA_PRIORIDADE_LABELS[tarefa.prioridade]}
           </Badge>
+          <TarefaRecorrenciaBadge tarefa={tarefa} />
           <MinhaAgendaBadge tarefa={tarefa} className="px-1.5 py-0 text-[10px]" />
           {pessoas.length > 0 && (
             <span className="inline-flex items-center gap-1">

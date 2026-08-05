@@ -2,6 +2,7 @@ import { RefreshCw } from "lucide-react";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
 import { ConclusaoBolinha } from "@/components/tarefas/conclusao-bolinha";
 import { DescricaoPreview } from "@/components/tarefas/descricao-preview";
+import { TarefaRecorrenciaBadge } from "@/components/tarefas/recorrencia-ocorrencia-badge";
 import { SerieModeloBadge } from "@/components/tarefas/serie-modelo-badge";
 import { MinhaAgendaBadge } from "@/components/tarefas/subtarefa-row";
 import { TarefaActionsMenu } from "@/components/tarefas/tarefa-actions-menu";
@@ -113,6 +114,7 @@ export function TarefaCard({
                 >
                   {tarefa.prioridade}
                 </Badge>
+                <TarefaRecorrenciaBadge tarefa={tarefa} />
                 {tarefa.setor && (
                   <Badge
                     variant="outline"

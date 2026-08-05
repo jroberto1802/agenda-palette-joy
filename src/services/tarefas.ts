@@ -997,7 +997,7 @@ const SUBTAREFA_BASE_SELECT = `
   id, tarefa_id, titulo, concluida, posicao, created_at, criado_por, concluido_por,
   data_inicio, descricao, prioridade, lembretes,
   recorrencia, projeto_id, setor_id, visibilidade, updated_at,
-  dia_no_mes, offset_dias,
+  dia_no_mes, offset_dias, origem_subtarefa_id,
   criador:profiles!subtarefas_criado_por_fkey(id, nome_completo, avatar_url),
   concluido_por_usuario:profiles!subtarefas_concluido_por_fkey(id, nome_completo, avatar_url),
   responsaveis:subtarefa_responsaveis(

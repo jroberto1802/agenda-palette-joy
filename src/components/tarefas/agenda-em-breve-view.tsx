@@ -3,6 +3,7 @@ import { ptBR } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { startTransition, useEffect, useMemo, useState } from "react";
 import { DescricaoPreview } from "@/components/tarefas/descricao-preview";
+import { TarefaRecorrenciaBadge } from "@/components/tarefas/recorrencia-ocorrencia-badge";
 import { SubtarefaAgendaCard } from "@/components/tarefas/subtarefa-agenda-item";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -126,6 +127,7 @@ function EmBreveTaskCard({
         className="mt-0.5 line-clamp-1 text-xs leading-snug text-muted-foreground"
       />
       <div className="mt-1.5 flex flex-wrap gap-1">
+        <TarefaRecorrenciaBadge tarefa={tarefa} />
         {tarefa.setor && (
           <Badge
             variant="outline"

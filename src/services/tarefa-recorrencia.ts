@@ -10,7 +10,12 @@ import {
 import { endOfDay, startOfDay } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import type { RecorrenciaConfig, TarefaFormData, TarefaWithRelations } from "@/types";
-import { applyTimeFromIso, localDateAtNoon, toLocalDateKey } from "@/utils/agenda-datas";
+import {
+  applyTimeFromIso,
+  localDateAtNoon,
+  parseDayLocal,
+  toLocalDateKey,
+} from "@/utils/agenda-datas";
 
 const TAREFA_SELECT = `
   *,
@@ -158,11 +163,12 @@ export async function listPrevisoesOcorrencia(
   // Batch: todas as ocorrências existentes das séries + todos os templates de subtarefa
   const [{ data: existentesRaw, error: existentesError }, { data: templatesRaw, error: templatesError }] =
     await Promise.all([
+      // Sem filtro de deleted_at: data já materializada uma vez não volta a ser
+      // prevista, mesmo que a ocorrência tenha sido excluída depois.
       supabase
         .from("tarefas")
-        .select("id, data_inicio, serie_raiz_id")
-        .in("serie_raiz_id", modeloIds)
-        .is("deleted_at", null),
+        .select("id, data_inicio, serie_raiz_id, recorrencia_data_origem")
+        .in("serie_raiz_id", modeloIds),
       supabase
         .from("subtarefas")
         .select("id, tarefa_id, titulo, prioridade, data_inicio, setor_id, projeto_id, dia_no_mes, offset_dias")
@@ -175,7 +181,11 @@ export async function listPrevisoesOcorrencia(
   const diasExistentesPorSerie = new Map<string, Set<string>>();
   for (const e of existentesRaw ?? []) {
     if (!e.serie_raiz_id || e.id === e.serie_raiz_id) continue; // ignora o próprio modelo
-    const key = dayPrefix(e.data_inicio);
+    // A data ocupada é a de ORIGEM da ocorrência: reagendar não libera a data
+    // prevista para uma nova geração (fallback só para ocorrências legadas).
+    const key = e.recorrencia_data_origem
+      ? (toLocalDateKey(parseDayLocal(e.recorrencia_data_origem)) ?? null)
+      : dayPrefix(e.data_inicio);
     if (!key) continue;
     let set = diasExistentesPorSerie.get(e.serie_raiz_id);
     if (!set) {

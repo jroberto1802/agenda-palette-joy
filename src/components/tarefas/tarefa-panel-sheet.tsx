@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { CommentsThread } from "@/components/common/comments-thread";
 import { EditableOnDoubleClick } from "@/components/common/editable-on-double-click";
+import { TarefaRecorrenciaBadge } from "@/components/tarefas/recorrencia-ocorrencia-badge";
 import { SubtarefaPanelSheet } from "@/components/tarefas/subtarefa-panel-sheet";
 import { SubtarefaRow } from "@/components/tarefas/subtarefa-row";
 import { MoverSubtarefaDialog } from "@/components/tarefas/mover-subtarefa-dialog";
@@ -851,6 +852,11 @@ export function TarefaPanelSheet({
                               >
                                 {tarefa.prioridade}
                               </Badge>
+                              <TarefaRecorrenciaBadge
+                                tarefa={tarefa}
+                                detalhado
+                                className="text-xs"
+                              />
                               <Badge
                                 variant="secondary"
                                 className={getTarefaConclusaoColorClass(tarefa.concluida)}

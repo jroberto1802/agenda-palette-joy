@@ -1219,6 +1219,8 @@ export type Database = {
           prioridade: "P1" | "P2" | "P3" | "P4";
           projeto_id: string | null;
           recorrencia: Json | null;
+          /** Data prevista pela regra que gerou a ocorrência (imutável). */
+          recorrencia_data_origem: string | null;
           recorrencia_pasta_id: string | null;
           serie_raiz_id: string | null;
           setor_id: string | null;
@@ -1246,6 +1248,7 @@ export type Database = {
           prioridade?: "P1" | "P2" | "P3" | "P4";
           projeto_id?: string | null;
           recorrencia?: Json | null;
+          recorrencia_data_origem?: string | null;
           recorrencia_pasta_id?: string | null;
           serie_raiz_id?: string | null;
           setor_id?: string | null;
@@ -1273,6 +1276,7 @@ export type Database = {
           prioridade?: "P1" | "P2" | "P3" | "P4";
           projeto_id?: string | null;
           recorrencia?: Json | null;
+          recorrencia_data_origem?: string | null;
           recorrencia_pasta_id?: string | null;
           serie_raiz_id?: string | null;
           setor_id?: string | null;

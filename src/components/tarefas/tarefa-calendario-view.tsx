@@ -11,6 +11,10 @@ import { ptBR } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, ListTodo } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import {
+  SubtarefaRecorrenciaBadge,
+  TarefaRecorrenciaBadge,
+} from "@/components/tarefas/recorrencia-ocorrencia-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -250,6 +254,7 @@ function TimelineItem({
         <Badge variant="outline" className={TAREFA_PRIORIDADE_COLORS[tarefa.prioridade]}>
           {tarefa.prioridade}
         </Badge>
+        <TarefaRecorrenciaBadge tarefa={tarefa} />
         {tarefa.setor && (
           <Badge variant="outline" style={{ borderColor: tarefa.setor.cor ?? undefined }}>
             {tarefa.setor.nome}
@@ -298,6 +303,7 @@ function SubtarefaTimelineItem({
         <Badge variant="outline" className={TAREFA_PRIORIDADE_COLORS[subtarefa.prioridade]}>
           {subtarefa.prioridade}
         </Badge>
+        <SubtarefaRecorrenciaBadge subtarefa={subtarefa} />
       </div>
       <p className="font-medium">{subtarefa.titulo}</p>
       <p className="mt-1 text-xs text-muted-foreground">de: {parentTitle}</p>

@@ -1,5 +1,6 @@
 import { DescricaoPreview } from "@/components/tarefas/descricao-preview";
 import { ConclusaoBolinha } from "@/components/tarefas/conclusao-bolinha";
+import { SubtarefaRecorrenciaBadge } from "@/components/tarefas/recorrencia-ocorrencia-badge";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { SubtarefaAgendaItem } from "@/types";
@@ -69,6 +70,7 @@ export function SubtarefaAgendaListRow({
           >
             {TAREFA_PRIORIDADE_LABELS[subtarefa.prioridade]}
           </Badge>
+          <SubtarefaRecorrenciaBadge subtarefa={subtarefa} />
           <span className="truncate">de: {parentTitle}</span>
           {subtarefa.data_inicio && (
             <span
@@ -145,6 +147,7 @@ export function SubtarefaAgendaCard({
           <ListTodo className={iconClass} />
           Subtarefa
         </Badge>
+        <SubtarefaRecorrenciaBadge subtarefa={subtarefa} compact={compact} />
         {subtarefa.setor && (
           <Badge
             variant="outline"

@@ -19,6 +19,7 @@ import {
   formatDataHoraLabel,
 } from "@/components/tarefas/data-hora-recorrencia-body";
 import { DescricaoPreview } from "@/components/tarefas/descricao-preview";
+import { SubtarefaRecorrenciaBadge } from "@/components/tarefas/recorrencia-ocorrencia-badge";
 import { TarefaActionsMenu } from "@/components/tarefas/tarefa-actions-menu";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -339,6 +340,7 @@ export function SubtarefaRow({
           await onToggle(concluida);
         }}
       />
+      <SubtarefaRecorrenciaBadge subtarefa={subtarefa} />
 
       <button
         type="button"

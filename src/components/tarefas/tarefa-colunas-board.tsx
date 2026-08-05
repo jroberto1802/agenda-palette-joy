@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { ConfirmDeleteDialog } from "@/components/common/confirm-delete-dialog";
 import { ConclusaoBolinha } from "@/components/tarefas/conclusao-bolinha";
 import { DescricaoPreview } from "@/components/tarefas/descricao-preview";
+import { TarefaRecorrenciaBadge } from "@/components/tarefas/recorrencia-ocorrencia-badge";
 import { MinhaAgendaBadge } from "@/components/tarefas/subtarefa-row";
 import { TarefaActionsMenu } from "@/components/tarefas/tarefa-actions-menu";
 import {
@@ -175,6 +176,7 @@ function ColunaCardContent({
             >
               {tarefa.prioridade}
             </Badge>
+            <TarefaRecorrenciaBadge tarefa={tarefa} />
             {tarefa.setor && (
               <Badge
                 variant="outline"
