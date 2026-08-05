@@ -152,8 +152,30 @@ export function deveGerarProximaOcorrencia(config: RecorrenciaConfig, proximaDat
 }
 
 /**
+ * Indica se `date` realmente satisfaz a periodicidade da regra (dia da
+ * semana em "semanal", dia do mês em "mensal"). Usado para não aceitar a
+ * âncora/cursor como ocorrência válida quando ela não corresponde ao dia
+ * configurado (ex.: âncora numa quarta-feira numa regra "toda quinta").
+ */
+function combinaComRegra(date: Date, config: RecorrenciaConfig): boolean {
+  switch (config.tipo) {
+    case "semanal": {
+      const dias = config.dias_semana?.length ? config.dias_semana : null;
+      if (!dias) return true;
+      return dias.includes(date.getDay());
+    }
+    case "mensal": {
+      const dia = config.dia_mes ?? date.getDate();
+      return date.getDate() === Math.min(Math.max(dia, 1), 28);
+    }
+    default:
+      return true;
+  }
+}
+
+/**
  * Próxima ocorrência prevista a partir de hoje (ou de `aPartirDe`).
- * Se a âncora ainda é futura, retorna a âncora.
+ * Se a âncora ainda é futura E satisfaz a regra, retorna a âncora.
  */
 export function calcularProximaOcorrenciaPrevista(
   ancora: string | null,
@@ -163,7 +185,7 @@ export function calcularProximaOcorrenciaPrevista(
   const limite = startOfDay(aPartirDe);
   let cursor = ancora ? parseDayLocal(ancora) : limite;
 
-  if (!isBefore(cursor, limite) && withinEnd(cursor, config)) {
+  if (!isBefore(cursor, limite) && withinEnd(cursor, config) && combinaComRegra(cursor, config)) {
     return cursor;
   }
 
@@ -207,8 +229,14 @@ export function expandirDatasOcorrencia(
 
   let cursor = ancora ? parseDayLocal(ancora) : rangeStart;
 
+  // Avança até estar dentro da janela pedida E satisfazer a regra (dia da
+  // semana / dia do mês) — sem essa checagem, a âncora era aceita como
+  // ocorrência mesmo quando não correspondia ao dia configurado.
   let guard = 0;
-  while (isBefore(cursor, rangeStart) && guard < 5000) {
+  while (
+    (isBefore(cursor, rangeStart) || !combinaComRegra(cursor, config)) &&
+    guard < 5000
+  ) {
     const next = calcularProximaData(toLocalDateKey(cursor), config);
     if (!next || !deveGerarProximaOcorrencia(config, next)) return results;
     cursor = startOfDay(next);
@@ -366,6 +394,12 @@ export function dataSubtarefaNaOcorrencia(
 
   if (subtarefa.offset_dias != null) {
     return addDays(paiDay, subtarefa.offset_dias);
+  }
+
+  // Diária: deslocamento não é configurável (campo oculto) — assume-se
+  // sempre o mesmo dia da ocorrência pai.
+  if (config.tipo === "diaria") {
+    return paiDay;
   }
 
   const offset = offsetDiasSubtarefaNoCiclo(subtarefa.data_inicio, ancora, config);

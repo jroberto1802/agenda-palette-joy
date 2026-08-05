@@ -3,6 +3,7 @@ import { Plus, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ConfirmDeleteDialog } from "@/components/common/confirm-delete-dialog";
+import { usePageHeader } from "@/contexts/page-header-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -144,32 +145,20 @@ function AvisosPage() {
       ? "Nenhum aviso ativo encontrado."
       : "Nenhum aviso finalizado encontrado.";
 
+  usePageHeader({
+    title: "Quadro de Avisos",
+    subtitle: (
+      <>
+        Comunicados internos da empresa
+        {naoLidos > 0 && (
+          <span className="font-medium text-primary"> · {naoLidos} não lido(s)</span>
+        )}
+      </>
+    ),
+  });
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Quadro de Avisos</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Comunicados internos da empresa
-            {naoLidos > 0 && (
-              <span className="font-medium text-primary"> · {naoLidos} não lido(s)</span>
-            )}
-          </p>
-        </div>
-        {canCreate && (
-          <Button
-            onClick={() => {
-              setEditing(null);
-              setDialogOpen(true);
-            }}
-            className="shrink-0 gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            Novo aviso
-          </Button>
-        )}
-      </div>
-
       <Tabs value={aba} onValueChange={(value) => setAba(value as AvisoAba)}>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <TabsList>
@@ -200,6 +189,18 @@ function AvisosPage() {
                 <SelectItem value="nao_lidos">Não lidos</SelectItem>
               </SelectContent>
             </Select>
+            {canCreate && (
+              <Button
+                onClick={() => {
+                  setEditing(null);
+                  setDialogOpen(true);
+                }}
+                className="shrink-0 gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Novo aviso
+              </Button>
+            )}
           </div>
         </div>
 

@@ -1,5 +1,5 @@
 import { Plus } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AgendaAtrasadasSection } from "@/components/tarefas/agenda-atrasadas-section";
 import { SubtarefaAgendaListRow } from "@/components/tarefas/subtarefa-agenda-item";
@@ -87,6 +87,9 @@ export function AgendaHojeView({
   const [debouncedFilters, setDebouncedFilters] = useState<TarefaFilters>(() =>
     createEmptyHojeFilters(),
   );
+  const filtersRef = useRef(filters);
+  filtersRef.current = filters;
+  const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!usuarioId) return;
@@ -99,22 +102,24 @@ export function AgendaHojeView({
     );
   }, [usuarioId]);
 
-  const handleFiltersChange = useMemo(() => {
-    let timeout: ReturnType<typeof setTimeout>;
-    return (next: TarefaFilters) => {
-      if (next.classificar && next.classificar !== filters.classificar) {
-        writeAgendaClassificarPreference(
-          usuarioId,
-          "agenda-hoje",
-          normalizeTarefaClassificar(next.classificar),
-        );
-      }
-      setFilters(next);
-      clearTimeout(timeout);
-      timeout = setTimeout(() => setDebouncedFilters(next), 300);
+  useEffect(() => {
+    return () => {
+      if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current);
     };
-  }, [filters.classificar, usuarioId]);
+  }, []);
 
+  const handleFiltersChange = (next: TarefaFilters) => {
+    if (next.classificar && next.classificar !== filtersRef.current.classificar) {
+      writeAgendaClassificarPreference(
+        usuarioId,
+        "agenda-hoje",
+        normalizeTarefaClassificar(next.classificar),
+      );
+    }
+    setFilters(next);
+    if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current);
+    debounceTimeoutRef.current = setTimeout(() => setDebouncedFilters(next), 300);
+  };
   const handleToggleConcluida = async (tarefa: TarefaWithRelations, concluida: boolean) => {
     try {
       await updateConclusao.mutateAsync({ id: tarefa.id, concluida });

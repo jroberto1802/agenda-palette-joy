@@ -1,4 +1,5 @@
 import { Search } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -21,6 +22,7 @@ import {
 import { TAREFA_PRIORIDADE_LABELS } from "@/utils/tarefas";
 
 const filterControlClass = "h-9 w-[168px] shrink-0";
+const SEARCH_DEBOUNCE_MS = 400;
 
 export function TarefaFiltersBar({
   filters,
@@ -57,138 +59,171 @@ export function TarefaFiltersBar({
   const showClassificar = !isFinalizados && classificarOptions.length > 0;
   const classificarValue = filters.classificar ?? "prioridade";
 
+  const filtersRef = useRef(filters);
+  filtersRef.current = filters;
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  const searchFocusedRef = useRef(false);
+
+  /** Estado local evita engolir caracteres enquanto o pai re-renderiza / refetch. */
+  const [search, setSearch] = useState(filters.search ?? "");
+
+  useEffect(() => {
+    if (searchFocusedRef.current) return;
+    setSearch(filters.search ?? "");
+  }, [filters.search]);
+
+  useEffect(() => {
+    const parentSearch = filtersRef.current.search ?? "";
+    if (search === parentSearch) return;
+
+    const timeout = window.setTimeout(() => {
+      onChangeRef.current({ ...filtersRef.current, search });
+    }, SEARCH_DEBOUNCE_MS);
+
+    return () => window.clearTimeout(timeout);
+  }, [search]);
+
+  const patchFilters = (patch: Partial<TarefaFilters>) => {
+    onChange({ ...filtersRef.current, search, ...patch });
+  };
+
   return (
-    <div className="-mx-1 overflow-x-auto pb-1">
-      <div className="flex w-max min-w-full items-center gap-3 px-1">
-        <div className="relative w-[280px] shrink-0 grow basis-[220px] sm:w-[320px]">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar título, descrição ou comentário..."
-            className="pl-9"
-            value={filters.search ?? ""}
-            onChange={(e) => onChange({ ...filters, search: e.target.value })}
-          />
-        </div>
-
-        {showClassificar && (
-          <Select
-            value={classificarValue}
-            onValueChange={(v) =>
-              onChange({
-                ...filters,
-                classificar: v as TarefaClassificar,
-              })
+    <div className="flex flex-wrap items-center gap-3">
+      <div className="relative w-full min-w-[220px] max-w-full grow basis-[220px] sm:w-[280px] sm:max-w-[320px]">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          placeholder="Buscar título, descrição ou comentário..."
+          className="pl-9"
+          value={search}
+          onFocus={() => {
+            searchFocusedRef.current = true;
+          }}
+          onBlur={() => {
+            searchFocusedRef.current = false;
+            const parentSearch = filtersRef.current.search ?? "";
+            if (search !== parentSearch) {
+              onChangeRef.current({ ...filtersRef.current, search });
             }
-          >
-            <SelectTrigger className={filterControlClass} aria-label="Classificar">
-              <SelectValue placeholder="Classificar" />
-            </SelectTrigger>
-            <SelectContent>
-              {classificarOptions.map((option) => (
-                <SelectItem key={option} value={option}>
-                  {TAREFA_CLASSIFICAR_LABELS[option]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
+          }}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
 
-        {showPrioridade && (
-          <Select
-            value={filters.prioridade ?? "all"}
-            onValueChange={(v) =>
-              onChange({ ...filters, prioridade: v as TarefaFilters["prioridade"] })
-            }
-          >
-            <SelectTrigger className={filterControlClass}>
-              <SelectValue placeholder="Prioridade" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas prioridades</SelectItem>
-              {Object.entries(TAREFA_PRIORIDADE_LABELS).map(([value, label]) => (
-                <SelectItem key={value} value={value}>
-                  {label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-
+      {showClassificar && (
         <Select
-          value={filters.setor_id ?? "all"}
-          onValueChange={(v) => onChange({ ...filters, setor_id: v })}
+          value={classificarValue}
+          onValueChange={(v) =>
+            patchFilters({ classificar: v as TarefaClassificar })
+          }
         >
-          <SelectTrigger className={filterControlClass}>
-            <SelectValue placeholder="Setor" />
+          <SelectTrigger className={filterControlClass} aria-label="Classificar">
+            <SelectValue placeholder="Classificar" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos os setores</SelectItem>
-            {setores.map((s) => (
-              <SelectItem key={s.id} value={s.id}>
-                {s.nome}
+            {classificarOptions.map((option) => (
+              <SelectItem key={option} value={option}>
+                {TAREFA_CLASSIFICAR_LABELS[option]}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
+      )}
 
-        {showProjeto && (
-          <Select
-            value={filters.projeto_id ?? "all"}
-            onValueChange={(v) => onChange({ ...filters, projeto_id: v })}
-          >
-            <SelectTrigger className={filterControlClass}>
-              <SelectValue placeholder="Projeto" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os projetos</SelectItem>
-              {projetos.map((projeto) => (
-                <SelectItem key={projeto.id} value={projeto.id}>
-                  {projeto.nome}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
+      {showPrioridade && (
+        <Select
+          value={filters.prioridade ?? "all"}
+          onValueChange={(v) =>
+            patchFilters({ prioridade: v as TarefaFilters["prioridade"] })
+          }
+        >
+          <SelectTrigger className={filterControlClass}>
+            <SelectValue placeholder="Prioridade" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas prioridades</SelectItem>
+            {Object.entries(TAREFA_PRIORIDADE_LABELS).map(([value, label]) => (
+              <SelectItem key={value} value={value}>
+                {label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
 
-        {showResponsavel && (
-          <div className="w-[180px] shrink-0 [&>button]:h-9">
-            <PessoasMultiSelect
-              pessoas={pessoas}
-              value={atribuidoIds}
-              onChange={(ids) =>
-                onChange({
-                  ...filters,
-                  atribuido_ids: ids,
-                  atribuido_a: "all",
-                })
-              }
-              placeholder="Todos responsáveis"
-              showSelectAll
-            />
-          </div>
-        )}
+      <Select
+        value={filters.setor_id ?? "all"}
+        onValueChange={(v) => patchFilters({ setor_id: v })}
+      >
+        <SelectTrigger className={filterControlClass}>
+          <SelectValue placeholder="Setor" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Todos os setores</SelectItem>
+          {setores.map((s) => (
+            <SelectItem key={s.id} value={s.id}>
+              {s.nome}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
 
-        {isFinalizados ? (
-          <>
-            <Input
-              type="date"
-              aria-label="Período — de"
-              title="Data de conclusão — de"
-              className="h-9 w-[148px] shrink-0"
-              value={filters.periodo_inicio ?? ""}
-              onChange={(e) => onChange({ ...filters, periodo_inicio: e.target.value })}
-            />
-            <Input
-              type="date"
-              aria-label="Período — até"
-              title="Data de conclusão — até"
-              className="h-9 w-[148px] shrink-0"
-              value={filters.periodo_fim ?? ""}
-              onChange={(e) => onChange({ ...filters, periodo_fim: e.target.value })}
-            />
-          </>
-        ) : null}
-      </div>
+      {showProjeto && (
+        <Select
+          value={filters.projeto_id ?? "all"}
+          onValueChange={(v) => patchFilters({ projeto_id: v })}
+        >
+          <SelectTrigger className={filterControlClass}>
+            <SelectValue placeholder="Projeto" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os projetos</SelectItem>
+            {projetos.map((projeto) => (
+              <SelectItem key={projeto.id} value={projeto.id}>
+                {projeto.nome}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+
+      {showResponsavel && (
+        <div className="w-[180px] shrink-0 [&>button]:h-9">
+          <PessoasMultiSelect
+            pessoas={pessoas}
+            value={atribuidoIds}
+            onChange={(ids) =>
+              patchFilters({
+                atribuido_ids: ids,
+                atribuido_a: "all",
+              })
+            }
+            placeholder="Todos responsáveis"
+            showSelectAll
+          />
+        </div>
+      )}
+
+      {isFinalizados ? (
+        <>
+          <Input
+            type="date"
+            aria-label="Período — de"
+            title="Data de conclusão — de"
+            className="h-9 w-[148px] shrink-0"
+            value={filters.periodo_inicio ?? ""}
+            onChange={(e) => patchFilters({ periodo_inicio: e.target.value })}
+          />
+          <Input
+            type="date"
+            aria-label="Período — até"
+            title="Data de conclusão — até"
+            className="h-9 w-[148px] shrink-0"
+            value={filters.periodo_fim ?? ""}
+            onChange={(e) => patchFilters({ periodo_fim: e.target.value })}
+          />
+        </>
+      ) : null}
     </div>
   );
 }

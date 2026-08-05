@@ -719,7 +719,7 @@ export function TarefaColunasBoard({
           items={orderedColunas.map((c) => colunaSortId(c.id))}
           strategy={horizontalListSortingStrategy}
         >
-          <div className="flex gap-4 overflow-x-auto pb-4">
+          <div className="flex min-w-0 gap-4 overflow-x-auto pb-4">
             {orderedColunas.map((coluna) => (
               <DroppableColuna
                 key={coluna.id}

@@ -173,6 +173,7 @@ export function TarefaAgendaBoard({
   const { filters, debouncedFilters } = state;
   const stateRef = useRef(state);
   stateRef.current = state;
+  const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const duplicateTarefa = useDuplicateTarefa();
   const [movingTarefa, setMovingTarefa] = useState<TarefaWithRelations | null>(null);
@@ -188,37 +189,33 @@ export function TarefaAgendaBoard({
     }
   };
 
-  const handleFiltersChange = useMemo(() => {
-    let timeout: ReturnType<typeof setTimeout>;
-    return (next: TarefaFilters) => {
-      const classificarScope = toClassificarScope(preferenceScope);
-      if (
-        classificarScope &&
-        next.classificar &&
-        next.classificar !== stateRef.current.filters.classificar
-      ) {
-        writeAgendaClassificarPreference(
-          preferenceUserId,
-          classificarScope,
-          normalizeTarefaClassificar(next.classificar),
-        );
-      }
+  const handleFiltersChange = (next: TarefaFilters) => {
+    const classificarScope = toClassificarScope(preferenceScope);
+    if (
+      classificarScope &&
+      next.classificar &&
+      next.classificar !== stateRef.current.filters.classificar
+    ) {
+      writeAgendaClassificarPreference(
+        preferenceUserId,
+        classificarScope,
+        normalizeTarefaClassificar(next.classificar),
+      );
+    }
 
+    onStateChange({
+      ...stateRef.current,
+      filters: next,
+    });
+    if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current);
+    debounceTimeoutRef.current = setTimeout(() => {
       onStateChange({
         ...stateRef.current,
         filters: next,
+        debouncedFilters: next,
       });
-      clearTimeout(timeout);
-      timeout = setTimeout(() => {
-        onStateChange({
-          ...stateRef.current,
-          filters: next,
-          debouncedFilters: next,
-        });
-      }, 300);
-    };
-  }, [onStateChange, preferenceScope, preferenceUserId]);
-
+    }, 300);
+  };
   const handleViewChange = (nextView: AgendaViewMode) => {
     const normalized = normalizeView(nextView);
     writeAgendaViewPreference(preferenceUserId, preferenceScope, normalized);
@@ -269,8 +266,8 @@ export function TarefaAgendaBoard({
     : ["prioridade", "data_asc"];
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-start gap-2">
+    <div className="min-w-0 space-y-4">
+      <div className="flex min-w-0 items-start gap-2">
         <div className="min-w-0 flex-1">
           <TarefaFiltersBar
             filters={filters}
@@ -356,9 +353,9 @@ export function TarefaAgendaBoard({
       )}
 
       {effectiveView === "colunas" && !colunasDesabilitadas && (
-        <div>
+        <div className="min-w-0">
           {isLoading ? (
-            <div className="flex gap-4">
+            <div className="flex gap-4 overflow-x-auto pb-4">
               {Array.from({ length: 3 }).map((_, i) => (
                 <Skeleton key={i} className="h-[520px] min-w-[280px] flex-1 rounded-xl" />
               ))}

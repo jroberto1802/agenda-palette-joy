@@ -12,10 +12,11 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { ConfirmDeleteDialog } from "@/components/common/confirm-delete-dialog";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
+import { usePageHeader } from "@/contexts/page-header-context";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -208,6 +209,7 @@ function EquipeGrupoSection({
   tarefas,
   onRename,
   onDelete,
+  headerAction,
 }: {
   secao: EquipeSecao;
   canManage: boolean;
@@ -216,6 +218,7 @@ function EquipeGrupoSection({
   tarefas: TarefaWithRelations[] | undefined;
   onRename: (id: string, nome: string) => void;
   onDelete: (id: string, nome: string) => void;
+  headerAction?: ReactNode;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `grupo:${secao.id}`,
@@ -229,13 +232,15 @@ function EquipeGrupoSection({
         <h2 className="text-lg font-semibold tracking-tight text-foreground/90">
           {secao.nome}
         </h2>
-        {canManage && !secao.isOutros && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
+        <div className="flex shrink-0 items-center gap-2">
+          {headerAction}
+          {canManage && !secao.isOutros && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
                 className="h-8 w-8 shrink-0 text-muted-foreground"
                 aria-label={`Opções do grupo ${secao.nome}`}
               >
@@ -256,7 +261,8 @@ function EquipeGrupoSection({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-        )}
+          )}
+        </div>
       </div>
 
       <div
@@ -441,34 +447,32 @@ function EquipePage() {
     loadingGrupos ||
     (canManage && loadingTarefas);
 
+  const novoGrupoButton = canManage ? (
+    <Button
+      type="button"
+      className="shrink-0 gap-2"
+      onClick={() => {
+        setCreateNome("");
+        setCreateOpen(true);
+      }}
+    >
+      <Plus className="h-4 w-4" />
+      Novo grupo
+    </Button>
+  ) : null;
+
+  usePageHeader({
+    title: "Equipe",
+    subtitle: canManage
+      ? "Organize colaboradores em grupos e arraste os cards entre seções. Clique no card para abrir a agenda."
+      : "Visualize os grupos e pessoas da equipe. Contador de tarefas e agenda detalhada ficam restritos a Administrador e Gestor.",
+  });
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Equipe</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {canManage
-              ? "Organize colaboradores em grupos e arraste os cards entre seções. Clique no card para abrir a agenda."
-              : "Visualize os grupos e pessoas da equipe. Contador de tarefas e agenda detalhada ficam restritos a Administrador e Gestor."}
-          </p>
-        </div>
-        {canManage && (
-          <Button
-            type="button"
-            className="shrink-0 gap-2"
-            onClick={() => {
-              setCreateNome("");
-              setCreateOpen(true);
-            }}
-          >
-            <Plus className="h-4 w-4" />
-            Novo grupo
-          </Button>
-        )}
-      </div>
-
       {loading ? (
         <div className="space-y-8">
+          {novoGrupoButton && <div className="flex justify-end">{novoGrupoButton}</div>}
           {Array.from({ length: 2 }).map((_, index) => (
             <div key={index} className="space-y-4">
               <Skeleton className="h-6 w-40" />
@@ -481,8 +485,11 @@ function EquipePage() {
           ))}
         </div>
       ) : !pessoasAtivas.length ? (
-        <div className="rounded-xl border border-dashed p-12 text-center text-muted-foreground">
-          Nenhuma pessoa encontrada.
+        <div className="space-y-4">
+          {novoGrupoButton && <div className="flex justify-end">{novoGrupoButton}</div>}
+          <div className="rounded-xl border border-dashed p-12 text-center text-muted-foreground">
+            Nenhuma pessoa encontrada.
+          </div>
         </div>
       ) : (
         <DndContext
@@ -491,7 +498,7 @@ function EquipePage() {
           onDragEnd={handleDragEnd}
         >
           <div className="space-y-8">
-            {secoes.map((secao) => (
+            {secoes.map((secao, index) => (
               <EquipeGrupoSection
                 key={secao.id}
                 secao={secao}
@@ -504,6 +511,7 @@ function EquipePage() {
                   setRenameNome(nome);
                 }}
                 onDelete={(id, nome) => setDeleteTarget({ id, nome })}
+                headerAction={index === 0 ? novoGrupoButton : undefined}
               />
             ))}
           </div>

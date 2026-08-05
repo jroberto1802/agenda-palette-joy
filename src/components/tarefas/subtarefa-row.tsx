@@ -1,7 +1,15 @@
-import { format } from "date-fns";
+import { addDays, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarDays, Clock, Eye, MessageSquare, Paperclip, UserRound } from "lucide-react";
-import { useMemo, useState, type ReactNode } from "react";
+import {
+  CalendarDays,
+  ChevronDown,
+  Clock,
+  Eye,
+  MessageSquare,
+  Paperclip,
+  UserRound,
+} from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ConfirmDeleteDialog } from "@/components/common/confirm-delete-dialog";
 import { PessoasMultiSelect } from "@/components/common/pessoas-multi-select";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
@@ -14,6 +22,7 @@ import { DescricaoPreview } from "@/components/tarefas/descricao-preview";
 import { TarefaActionsMenu } from "@/components/tarefas/tarefa-actions-menu";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Tooltip,
@@ -30,18 +39,112 @@ import type {
 } from "@/types";
 import { hasExplicitTime } from "@/utils/agenda-datas";
 import { VISIBILIDADE_PESSOAS } from "@/utils/escopo-tarefa";
-import { isRecorrenciaMensalLike } from "@/utils/recorrencia";
+import { calcularProximaOcorrenciaPrevista } from "@/utils/recorrencia";
 import { TAREFA_PRIORIDADE_BAND_CLASS } from "@/utils/tarefas";
 import type { RecorrenciaConfig } from "@/types";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+
+const OFFSET_PRESETS = Array.from({ length: 11 }, (_, i) => i);
+
+function formatOffsetLabel(dias: number): string {
+  if (dias === 0) return "No dia";
+  return `+${dias} dia${dias === 1 ? "" : "s"}`;
+}
+
+/**
+ * Deslocamento (em dias) da subtarefa em relação à ocorrência da tarefa pai.
+ * Combobox: lista rápida de presets (0–10) + input numérico que aceita
+ * digitar qualquer quantidade de dias.
+ */
+function SubtarefaOffsetInput({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: number | null;
+  disabled?: boolean;
+  onChange: (value: number) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState(value != null ? String(value) : "");
+
+  useEffect(() => {
+    setText(value != null ? String(value) : "");
+  }, [value]);
+
+  const commit = (raw: string) => {
+    const trimmed = raw.trim();
+    const n = Math.trunc(Number(trimmed));
+    if (trimmed === "" || !Number.isFinite(n) || n < 0) {
+      setText(value != null ? String(value) : "");
+      return;
+    }
+    setText(String(n));
+    if (n !== value) onChange(n);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <div
+        className={cn(
+          "flex h-7 shrink-0 items-center gap-0.5 rounded-md border border-input bg-background pl-1.5 pr-0.5",
+          value == null && "border-amber-400 dark:border-amber-500",
+        )}
+      >
+        <span className="text-[11px] text-muted-foreground">+</span>
+        <Input
+          type="number"
+          min={0}
+          inputMode="numeric"
+          value={text}
+          disabled={disabled}
+          placeholder="0"
+          className="h-6 w-9 border-0 bg-transparent px-0 text-center text-xs shadow-none focus-visible:ring-0"
+          onFocus={() => setOpen(true)}
+          onChange={(e) => setText(e.target.value)}
+          onBlur={(e) => commit(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              commit((e.target as HTMLInputElement).value);
+              setOpen(false);
+            }
+          }}
+        />
+        <span className="text-[11px] text-muted-foreground">d</span>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            disabled={disabled}
+            className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground disabled:pointer-events-none"
+            aria-label="Escolher deslocamento em dias"
+          >
+            <ChevronDown className="h-3 w-3" />
+          </button>
+        </PopoverTrigger>
+      </div>
+      <PopoverContent className="w-36 p-1" align="end">
+        <div className="max-h-56 space-y-0.5 overflow-y-auto">
+          {OFFSET_PRESETS.map((dias) => (
+            <button
+              key={dias}
+              type="button"
+              className={cn(
+                "flex w-full items-center rounded px-2 py-1.5 text-left text-xs hover:bg-muted",
+                value === dias && "bg-muted font-medium",
+              )}
+              onClick={() => {
+                setText(String(dias));
+                onChange(dias);
+                setOpen(false);
+              }}
+            >
+              {formatOffsetLabel(dias)}
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 /** Acima de Dialog/Sheet (z-50) e do drawer de subtarefa (z-[70]). */
 const META_OVERLAY_Z = "z-[100]";
@@ -195,21 +298,19 @@ export function SubtarefaRow({
   const showComentarios = comentariosCount > 0;
   const showAnexos = anexosCount > 0;
 
-  const mensalLike = isRecorrenciaMensalLike(modeloRecorrencia);
-  const precisaReconfigurarModelo =
-    modeloSerieMode &&
-    subtarefa.dia_no_mes == null &&
-    subtarefa.offset_dias == null;
+  const proximaOcorrenciaPai = useMemo(() => {
+    if (!modeloSerieMode || !modeloRecorrencia) return null;
+    return calcularProximaOcorrenciaPrevista(
+      modeloRecorrencia.data_ancora ?? null,
+      modeloRecorrencia,
+    );
+  }, [modeloSerieMode, modeloRecorrencia]);
 
-  const labelModeloData = mensalLike
-    ? subtarefa.dia_no_mes != null
-      ? `Dia ${subtarefa.dia_no_mes}`
-      : "Definir dia"
-    : subtarefa.offset_dias != null
-      ? subtarefa.offset_dias === 0
-        ? "No dia"
-        : `+${subtarefa.offset_dias} dia${subtarefa.offset_dias === 1 ? "" : "s"}`
-      : "Definir offset";
+  const offsetPreviewLabel = useMemo(() => {
+    if (!proximaOcorrenciaPai || subtarefa.offset_dias == null) return null;
+    const alvo = addDays(proximaOcorrenciaPai, subtarefa.offset_dias);
+    return format(alvo, "dd/MM (EEEE)", { locale: ptBR });
+  }, [proximaOcorrenciaPai, subtarefa.offset_dias]);
 
   const runMeta = async (meta: SubtarefaMetaUpdate) => {
     setSaving(true);
@@ -257,120 +358,65 @@ export function SubtarefaRow({
           className="flex shrink-0 items-center gap-1"
           onClick={(event) => event.stopPropagation()}
         >
-          {/* Data: calendário (ocorrência) ou Dia/offset (modelo) */}
-          <Popover>
-            <PopoverTrigger asChild>
-              <span>
-                <MetaIconButton
-                  label={
-                    modeloSerieMode
-                      ? precisaReconfigurarModelo
-                        ? "Reconfigurar data da subtarefa"
-                        : labelModeloData
-                      : formatDataHoraLabel(dataInicio)
-                  }
-                  active={
-                    modeloSerieMode
-                      ? subtarefa.dia_no_mes != null || subtarefa.offset_dias != null
-                      : !!dataInicio
-                  }
-                  disabled={!canEdit || saving}
-                  className={cn(
-                    !modeloSerieMode &&
-                      showHora &&
-                      "h-7 w-auto min-w-7 gap-0.5 px-1.5",
-                  )}
-                >
-                  {modeloSerieMode ? (
-                    <span className="text-[10px] font-medium leading-none">
-                      {precisaReconfigurarModelo
-                        ? "!"
-                        : mensalLike
-                          ? `D${subtarefa.dia_no_mes ?? "?"}`
-                          : subtarefa.offset_dias != null
-                            ? `+${subtarefa.offset_dias}`
-                            : "?"}
-                    </span>
-                  ) : dataInicio ? (
-                    <span className="inline-flex items-center gap-0.5">
-                      <span className="text-[10px] font-medium leading-none">
-                        {format(dataInicio, "dd/MM", { locale: ptBR })}
-                      </span>
-                      {showHora && (
-                        <span
-                          className="inline-flex items-center gap-0.5"
-                          title="Horário"
-                        >
-                          <Clock className="h-3 w-3 shrink-0" aria-hidden />
-                          <span className="text-[10px] font-medium tabular-nums leading-none">
-                            {format(dataInicio, "HH:mm")}
-                          </span>
+          {modeloSerieMode && modeloRecorrencia?.tipo === "diaria" ? null : modeloSerieMode ? (
+            /* Deslocamento (dias a partir da ocorrência da tarefa pai) —
+               sempre visível no card, sem precisar abrir menu/popover.
+               Oculto quando a recorrência é diária (não há o que configurar:
+               a subtarefa acompanha o mesmo dia da ocorrência pai). */
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>
+                  <SubtarefaOffsetInput
+                    value={subtarefa.offset_dias ?? null}
+                    disabled={!canEdit || saving}
+                    onChange={(dias) =>
+                      void runMeta({ offset_dias: dias, dia_no_mes: null })
+                    }
+                  />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top" className={META_OVERLAY_Z}>
+                {subtarefa.offset_dias == null
+                  ? "Deslocamento não configurado — defina quantos dias após a tarefa pai"
+                  : "Deslocamento a partir da data da tarefa pai"}
+                {offsetPreviewLabel && ` — próxima: ${offsetPreviewLabel}`}
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            /* Data: calendário da ocorrência materializada */
+            <Popover>
+              <PopoverTrigger asChild>
+                <span>
+                  <MetaIconButton
+                    label={formatDataHoraLabel(dataInicio)}
+                    active={!!dataInicio}
+                    disabled={!canEdit || saving}
+                    className={cn(showHora && "h-7 w-auto min-w-7 gap-0.5 px-1.5")}
+                  >
+                    {dataInicio ? (
+                      <span className="inline-flex items-center gap-0.5">
+                        <span className="text-[10px] font-medium leading-none">
+                          {format(dataInicio, "dd/MM", { locale: ptBR })}
                         </span>
-                      )}
-                    </span>
-                  ) : (
-                    <CalendarDays className="h-3.5 w-3.5" />
-                  )}
-                </MetaIconButton>
-              </span>
-            </PopoverTrigger>
-            <PopoverContent className={cn("w-auto p-0", META_OVERLAY_Z)} align="end">
-              {modeloSerieMode ? (
-                <div className="w-64 space-y-3 p-3">
-                  {precisaReconfigurarModelo && (
-                    <p className="text-xs text-amber-700 dark:text-amber-400">
-                      Formato antigo (offset implícito). Reconfigure com o novo campo — sem
-                      conversão automática.
-                    </p>
-                  )}
-                  {mensalLike ? (
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Dia do mês (1–31)</Label>
-                      <Input
-                        type="number"
-                        min={1}
-                        max={31}
-                        defaultValue={subtarefa.dia_no_mes ?? ""}
-                        disabled={!canEdit || saving}
-                        onBlur={(e) => {
-                          const n = Number(e.target.value);
-                          if (!Number.isFinite(n) || n < 1 || n > 31) return;
-                          void runMeta({ dia_no_mes: Math.trunc(n), offset_dias: null });
-                        }}
-                      />
-                    </div>
-                  ) : (
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Deslocamento</Label>
-                      <Select
-                        value={
-                          subtarefa.offset_dias != null
-                            ? String(subtarefa.offset_dias)
-                            : undefined
-                        }
-                        disabled={!canEdit || saving}
-                        onValueChange={(v) => {
-                          void runMeta({
-                            offset_dias: Number(v),
-                            dia_no_mes: null,
-                          });
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Escolha…" />
-                        </SelectTrigger>
-                        <SelectContent className={META_OVERLAY_Z}>
-                          {Array.from({ length: 15 }, (_, i) => (
-                            <SelectItem key={i} value={String(i)}>
-                              {i === 0 ? "No dia" : `+${i} dia${i === 1 ? "" : "s"}`}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                </div>
-              ) : (
+                        {showHora && (
+                          <span
+                            className="inline-flex items-center gap-0.5"
+                            title="Horário"
+                          >
+                            <Clock className="h-3 w-3 shrink-0" aria-hidden />
+                            <span className="text-[10px] font-medium tabular-nums leading-none">
+                              {format(dataInicio, "HH:mm")}
+                            </span>
+                          </span>
+                        )}
+                      </span>
+                    ) : (
+                      <CalendarDays className="h-3.5 w-3.5" />
+                    )}
+                  </MetaIconButton>
+                </span>
+              </PopoverTrigger>
+              <PopoverContent className={cn("w-auto p-0", META_OVERLAY_Z)} align="end">
                 <DataHoraRecorrenciaBody
                   value={dataInicio}
                   canEdit={canEdit && !saving}
@@ -381,9 +427,9 @@ export function SubtarefaRow({
                     })
                   }
                 />
-              )}
-            </PopoverContent>
-          </Popover>
+              </PopoverContent>
+            </Popover>
+          )}
 
           {/* Comentários / Anexos — mesmos ícones do card de tarefa */}
           {(showComentarios || showAnexos) && (

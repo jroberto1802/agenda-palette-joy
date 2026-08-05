@@ -116,6 +116,9 @@ export type PrevisoesAgenda = {
  *
  * A janela é limitada a 1 ano à frente de hoje. Além disso nada é previsto,
  * mesmo com a série ativa — é limite de exibição, não de vigência da série.
+ *
+ * Performance: 3 queries no total (modelos + ocorrências existentes + templates),
+ * sem N+1 por série — crítico para a navegação rápida da aba Em breve.
  */
 export async function listPrevisoesOcorrencia(
   deIsoDate: string,
@@ -131,9 +134,16 @@ export async function listPrevisoesOcorrencia(
   const ate =
     ateSolicitado.getTime() > limitePrevisao.getTime() ? limitePrevisao : ateSolicitado;
 
+  // Select leve: só o necessário para montar o card de previsão.
   const { data: candidatas, error } = await supabase
     .from("tarefas")
-    .select(TAREFA_SELECT)
+    .select(
+      `
+      id, titulo, prioridade, recorrencia, data_inicio, serie_raiz_id,
+      setor:setores(id, nome, cor),
+      projeto:projetos(id, nome)
+    `,
+    )
     .is("deleted_at", null)
     .not("recorrencia", "is", null)
     .not("serie_raiz_id", "is", null);
@@ -141,6 +151,50 @@ export async function listPrevisoesOcorrencia(
   if (error) throw error;
 
   const modelos = ((candidatas ?? []) as TarefaWithRelations[]).filter((t) => isSerieModelo(t));
+  if (modelos.length === 0) return { tarefas: [], subtarefas: [] };
+
+  const modeloIds = modelos.map((m) => m.id);
+
+  // Batch: todas as ocorrências existentes das séries + todos os templates de subtarefa
+  const [{ data: existentesRaw, error: existentesError }, { data: templatesRaw, error: templatesError }] =
+    await Promise.all([
+      supabase
+        .from("tarefas")
+        .select("id, data_inicio, serie_raiz_id")
+        .in("serie_raiz_id", modeloIds)
+        .is("deleted_at", null),
+      supabase
+        .from("subtarefas")
+        .select("id, tarefa_id, titulo, prioridade, data_inicio, setor_id, projeto_id, dia_no_mes, offset_dias")
+        .in("tarefa_id", modeloIds),
+    ]);
+
+  if (existentesError) throw existentesError;
+  if (templatesError) throw templatesError;
+
+  const diasExistentesPorSerie = new Map<string, Set<string>>();
+  for (const e of existentesRaw ?? []) {
+    if (!e.serie_raiz_id || e.id === e.serie_raiz_id) continue; // ignora o próprio modelo
+    const key = dayPrefix(e.data_inicio);
+    if (!key) continue;
+    let set = diasExistentesPorSerie.get(e.serie_raiz_id);
+    if (!set) {
+      set = new Set();
+      diasExistentesPorSerie.set(e.serie_raiz_id, set);
+    }
+    set.add(key);
+  }
+
+  const templatesPorModelo = new Map<string, ModeloSubtarefaTemplate[]>();
+  for (const t of (templatesRaw ?? []) as (ModeloSubtarefaTemplate & { tarefa_id: string })[]) {
+    let list = templatesPorModelo.get(t.tarefa_id);
+    if (!list) {
+      list = [];
+      templatesPorModelo.set(t.tarefa_id, list);
+    }
+    list.push(t);
+  }
+
   const previsoesTarefa: PrevisaoOcorrencia[] = [];
   const previsoesSub: PrevisaoSubtarefa[] = [];
 
@@ -148,29 +202,11 @@ export async function listPrevisoesOcorrencia(
     const config = parseRecorrencia(modelo.recorrencia);
     if (!config) continue;
 
-    const { data: existentes } = await supabase
-      .from("tarefas")
-      .select("id, data_inicio")
-      .eq("serie_raiz_id", modelo.id)
-      .is("deleted_at", null)
-      .neq("id", modelo.id);
-
-    const diasExistentes = new Set(
-      (existentes ?? [])
-        .map((e) => dayPrefix(e.data_inicio))
-        .filter((d): d is string => !!d),
-    );
+    const diasExistentes = diasExistentesPorSerie.get(modelo.id) ?? new Set<string>();
+    const templates = templatesPorModelo.get(modelo.id) ?? [];
 
     const ancora = getAncoraSerie(modelo, config);
     const ancoraKey = ancora ? toLocalDateKey(ancora) ?? ancora : null;
-
-    // Templates do modelo: Dia fixo, offset explícito ou legado
-    const { data: templatesRaw } = await supabase
-      .from("subtarefas")
-      .select("id, titulo, prioridade, data_inicio, setor_id, projeto_id, dia_no_mes, offset_dias")
-      .eq("tarefa_id", modelo.id);
-
-    const templates = (templatesRaw ?? []) as ModeloSubtarefaTemplate[];
 
     // 1) Datas da TAREFA PRINCIPAL (única coisa que usa o motor de recorrência)
     const datasPai = expandirDatasOcorrencia(ancoraKey, config, de, ate, {

@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { CadastroProjetosPanel } from "@/components/settings/cadastro-projetos-panel";
+import { usePageHeader } from "@/contexts/page-header-context";
 import { useProfile } from "@/hooks/use-profile";
 import { canCreateProjetos } from "@/utils/permissions";
 
@@ -16,14 +17,13 @@ export const Route = createFileRoute("/_authenticated/projetos")({
 function ProjetosPage() {
   const { data: profile } = useProfile();
 
+  usePageHeader({
+    title: "Projetos",
+    subtitle: "Crie e gerencie projetos para agrupar tarefas relacionadas.",
+  });
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Projetos</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Crie e gerencie projetos para agrupar tarefas relacionadas.
-        </p>
-      </div>
       <CadastroProjetosPanel
         canManage={canCreateProjetos(profile)}
         compactHeader

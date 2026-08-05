@@ -8,6 +8,7 @@ import {
   type AgendaBoardState,
 } from "@/components/tarefas/tarefa-agenda-board";
 import { TarefaPanelSheet } from "@/components/tarefas/tarefa-panel-sheet";
+import { usePageHeader } from "@/contexts/page-header-context";
 import { usePessoas } from "@/hooks/use-pessoas";
 import { useProjetos } from "@/hooks/use-projetos";
 import { useProfile } from "@/hooks/use-profile";
@@ -129,15 +130,13 @@ function FinalizadosPage() {
     }
   };
 
+  usePageHeader({
+    title: "Finalizados",
+    subtitle: "Tarefas concluídas dos projetos e setores aos quais você tem acesso.",
+  });
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Finalizados</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Tarefas concluídas dos projetos e setores aos quais você tem acesso.
-        </p>
-      </div>
-
       <TarefaAgendaBoard
         state={boardState}
         onStateChange={setBoardState}

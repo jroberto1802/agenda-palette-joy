@@ -10,6 +10,7 @@ import {
   createVisualizandoBoardState,
   type VisualizandoBoardState,
 } from "@/components/tarefas/agenda-visualizando-view";
+import { usePageHeader } from "@/contexts/page-header-context";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -239,52 +240,52 @@ function AgendaPage() {
     };
   }, [boardState, profile?.id]);
 
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight">Minha Agenda</h1>
-        <Button
-          onClick={() =>
-            openCreate(agendaTab === "hoje" ? startOfTodayLocal() : null)
-          }
-          className="shrink-0 gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          Nova tarefa
-        </Button>
-      </div>
+  usePageHeader({ title: "Minha Agenda" });
 
+  return (
+    <div className="min-w-0 space-y-6">
       <Tabs
         value={agendaTab}
         onValueChange={(value) => setAgendaTab(value as AgendaTab)}
-        className="space-y-4"
+        className="min-w-0 space-y-4"
       >
-        <TabsList className="h-9 w-full justify-start gap-1 bg-transparent p-0 sm:w-auto">
-          <TabsTrigger
-            value="hoje"
-            className="rounded-none border-b-2 border-transparent px-3 pb-2 pt-1 shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <TabsList className="h-9 w-full justify-start gap-1 bg-transparent p-0 sm:w-auto">
+            <TabsTrigger
+              value="hoje"
+              className="rounded-none border-b-2 border-transparent px-3 pb-2 pt-1 shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+            >
+              Hoje
+            </TabsTrigger>
+            <TabsTrigger
+              value="em_breve"
+              className="rounded-none border-b-2 border-transparent px-3 pb-2 pt-1 shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+            >
+              Em breve
+            </TabsTrigger>
+            <TabsTrigger
+              value="geral"
+              className="rounded-none border-b-2 border-transparent px-3 pb-2 pt-1 shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+            >
+              Agenda geral
+            </TabsTrigger>
+            <TabsTrigger
+              value="visualizando"
+              className="rounded-none border-b-2 border-transparent px-3 pb-2 pt-1 shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+            >
+              Visualizando
+            </TabsTrigger>
+          </TabsList>
+          <Button
+            onClick={() =>
+              openCreate(agendaTab === "hoje" ? startOfTodayLocal() : null)
+            }
+            className="shrink-0 gap-2"
           >
-            Hoje
-          </TabsTrigger>
-          <TabsTrigger
-            value="em_breve"
-            className="rounded-none border-b-2 border-transparent px-3 pb-2 pt-1 shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
-          >
-            Em breve
-          </TabsTrigger>
-          <TabsTrigger
-            value="geral"
-            className="rounded-none border-b-2 border-transparent px-3 pb-2 pt-1 shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
-          >
-            Agenda geral
-          </TabsTrigger>
-          <TabsTrigger
-            value="visualizando"
-            className="rounded-none border-b-2 border-transparent px-3 pb-2 pt-1 shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
-          >
-            Visualizando
-          </TabsTrigger>
-        </TabsList>
+            <Plus className="h-4 w-4" />
+            Nova tarefa
+          </Button>
+        </div>
 
         <TabsContent value="hoje" className="mt-0 focus-visible:ring-0">
           <AgendaHojeView

@@ -6,6 +6,7 @@ import { CadastroPessoasPanel } from "@/components/settings/cadastro-pessoas-pan
 import { CadastroSetoresPanel } from "@/components/settings/cadastro-setores-panel";
 import { EmpresaSettingsCard } from "@/components/settings/empresa-settings-card";
 import { ThemeSettingsCard } from "@/components/settings/theme-settings-card";
+import { usePageHeader } from "@/contexts/page-header-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -65,6 +66,13 @@ function ConfiguracoesPage() {
   const showCadastros = canManageSetores(profile) && canManagePessoas(profile);
   const canManageCadastros = showCadastros;
   const showAparencia = canManageAparencia(profile);
+
+  usePageHeader({
+    title: "Configurações",
+    subtitle: showAdminSections
+      ? "Gerencie cadastros, aparência e segurança da sua conta."
+      : "Cadastre e gerencie setores e pessoas da organização.",
+  });
 
   useEffect(() => {
     if (!loadingProfile && profile && !canAccessConfiguracoes(profile)) {
@@ -131,13 +139,6 @@ function ConfiguracoesPage() {
   if (!showAdminSections) {
     return (
       <div className="space-y-6 max-w-5xl">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Configurações</h1>
-          <p className="text-muted-foreground">
-            Cadastre e gerencie setores e pessoas da organização.
-          </p>
-        </div>
-
         <Tabs defaultValue="setores">
           <TabsList>
             <TabsTrigger value="setores">Setores</TabsTrigger>
@@ -156,13 +157,6 @@ function ConfiguracoesPage() {
 
   return (
     <div className="space-y-6 max-w-5xl">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Configurações</h1>
-        <p className="text-muted-foreground">
-          Gerencie cadastros, aparência e segurança da sua conta.
-        </p>
-      </div>
-
       <Tabs defaultValue={showCadastros ? "cadastros" : "conta"}>
         <TabsList>
           {showCadastros && <TabsTrigger value="cadastros">Cadastros</TabsTrigger>}

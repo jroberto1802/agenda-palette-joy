@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { TarefaCalendarioView } from "@/components/tarefas/tarefa-calendario-view";
 import { TarefaPanelSheet } from "@/components/tarefas/tarefa-panel-sheet";
+import { usePageHeader } from "@/contexts/page-header-context";
 import type { SubtarefaAgendaItem } from "@/types";
 
 export const Route = createFileRoute("/_authenticated/calendario")({
@@ -31,15 +32,13 @@ function CalendarioPage() {
     setPanelOpen(true);
   };
 
+  usePageHeader({
+    title: "Calendário",
+    subtitle: "Tarefas organizadas por data com timeline diária.",
+  });
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Calendário</h1>
-        <p className="text-muted-foreground">
-          Tarefas organizadas por data com timeline diária.
-        </p>
-      </div>
-
       <TarefaCalendarioView
         onSelectTarefa={openTarefa}
         onSelectSubtarefa={openSubtarefa}

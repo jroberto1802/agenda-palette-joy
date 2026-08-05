@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { CadastroRecorrenciaPastasPanel } from "@/components/tarefas/cadastro-recorrencia-pastas-panel";
+import { usePageHeader } from "@/contexts/page-header-context";
 
 export const Route = createFileRoute("/_authenticated/recorrentes")({
   head: () => ({
@@ -15,15 +16,14 @@ export const Route = createFileRoute("/_authenticated/recorrentes")({
 });
 
 function RecorrentesPage() {
+  usePageHeader({
+    title: "Recorrentes",
+    subtitle:
+      "Crie pastas e gerencie modelos de série. A regra de recorrência só é criada e editada aqui.",
+  });
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Recorrentes</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Crie pastas e gerencie modelos de série. A regra de recorrência só é criada e editada
-          aqui.
-        </p>
-      </div>
       <CadastroRecorrenciaPastasPanel compactHeader />
     </div>
   );

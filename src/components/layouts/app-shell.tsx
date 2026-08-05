@@ -22,6 +22,7 @@ import { ProfileAvatar } from "@/components/common/profile-avatar";
 import { BuscaDialog } from "@/components/busca/busca-dialog";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { TarefaPanelSheet } from "@/components/tarefas/tarefa-panel-sheet";
+import { PageHeaderProvider, usePageHeaderValue } from "@/contexts/page-header-context";
 import {
   Sidebar,
   SidebarContent,
@@ -144,6 +145,15 @@ function SidebarNavItems({
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
+  return (
+    <PageHeaderProvider>
+      <AppShellContent>{children}</AppShellContent>
+    </PageHeaderProvider>
+  );
+}
+
+function AppShellContent({ children }: { children: ReactNode }) {
+  const pageHeader = usePageHeaderValue();
   const { user, signOut } = useAuth();
   const { data: profile } = useProfile();
   const { data: empresa } = useEmpresaConfig();
@@ -260,11 +270,24 @@ export function AppShell({ children }: { children: ReactNode }) {
         <SidebarRail />
       </Sidebar>
 
-      <SidebarInset>
-        <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 sm:px-6">
+      <SidebarInset className="min-w-0 overflow-x-hidden">
+        <header className="sticky top-0 z-30 flex min-h-14 shrink-0 items-center gap-3 border-b bg-background/95 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/60 sm:px-6">
           <SidebarTrigger className="-ml-1" />
-          <div className="flex-1" />
-          <div className="flex items-center gap-2">
+          <div className="min-w-0 flex-1">
+            {pageHeader && (
+              <>
+                <h1 className="truncate text-base font-semibold tracking-tight sm:text-lg">
+                  {pageHeader.title}
+                </h1>
+                {pageHeader.subtitle && (
+                  <p className="truncate text-xs text-muted-foreground">
+                    {pageHeader.subtitle}
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
             <NotificationBell />
             <Button variant="ghost" size="icon" onClick={toggleMode} aria-label="Alternar tema">
               {mode === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
@@ -272,7 +295,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 p-4 sm:p-6">{children}</main>
+        <main className="min-w-0 flex-1 overflow-x-hidden p-4 sm:p-6">{children}</main>
       </SidebarInset>
 
       <BuscaDialog open={buscaOpen} onOpenChange={setBuscaOpen} />

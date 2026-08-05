@@ -986,10 +986,45 @@ const SUBTAREFA_COMENTARIO_SELECT = `
   )
 `;
 
-/** Embeds leves para indicadores da linha de subtarefa. */
+/** Embeds leves para indicadores da linha de subtarefa (somente listagens). */
 const SUBTAREFA_INDICADORES_SELECT = `
   comentarios_count:subtarefa_comentarios(count),
   anexos_count:subtarefa_anexos(count)
+`;
+
+/** Campos base da subtarefa — sem aggregates de comentários/anexos. */
+const SUBTAREFA_BASE_SELECT = `
+  id, tarefa_id, titulo, concluida, posicao, created_at, criado_por, concluido_por,
+  data_inicio, descricao, prioridade, lembretes,
+  recorrencia, projeto_id, setor_id, visibilidade, updated_at,
+  dia_no_mes, offset_dias,
+  criador:profiles!subtarefas_criado_por_fkey(id, nome_completo, avatar_url),
+  concluido_por_usuario:profiles!subtarefas_concluido_por_fkey(id, nome_completo, avatar_url),
+  responsaveis:subtarefa_responsaveis(
+    usuario_id,
+    usuario:profiles!subtarefa_responsaveis_usuario_id_fkey(id, nome_completo, avatar_url)
+  ),
+  observadores:subtarefa_observadores(
+    usuario_id,
+    usuario:profiles!subtarefa_observadores_usuario_id_fkey(id, nome_completo, avatar_url)
+  )
+`;
+
+/** Listagens: base + counts (não usar junto com embed completo de comentários/anexos). */
+const SUBTAREFA_SELECT = `
+  ${SUBTAREFA_BASE_SELECT},
+  ${SUBTAREFA_INDICADORES_SELECT}
+`;
+
+/**
+ * Detalhe: base + linhas completas de comentários/anexos.
+ * Sem (count) — PostgREST quebra com GROUP BY se misturar aggregate + order no mesmo recurso.
+ */
+const SUBTAREFA_DETAIL_SELECT = `
+  ${SUBTAREFA_BASE_SELECT},
+  comentarios:subtarefa_comentarios(${SUBTAREFA_COMENTARIO_SELECT}),
+  anexos:subtarefa_anexos(id, subtarefa_id, storage_path, nome, tipo, tamanho, created_at),
+  tarefa:tarefas!subtarefas_tarefa_id_fkey(id, titulo)
 `;
 
 export async function getTarefaDetail(id: string): Promise<TarefaDetail> {
@@ -998,19 +1033,7 @@ export async function getTarefaDetail(id: string): Promise<TarefaDetail> {
     .select(
       `${TAREFA_SELECT},
       subtarefas(
-        id, tarefa_id, titulo, concluida, posicao, created_at, criado_por, concluido_por,
-        data_inicio, descricao, prioridade, lembretes,
-        recorrencia, projeto_id, setor_id, visibilidade, updated_at,
-        criador:profiles!subtarefas_criado_por_fkey(id, nome_completo, avatar_url),
-        concluido_por_usuario:profiles!subtarefas_concluido_por_fkey(id, nome_completo, avatar_url),
-        responsaveis:subtarefa_responsaveis(
-          usuario_id,
-          usuario:profiles!subtarefa_responsaveis_usuario_id_fkey(id, nome_completo, avatar_url)
-        ),
-        observadores:subtarefa_observadores(
-          usuario_id,
-          usuario:profiles!subtarefa_observadores_usuario_id_fkey(id, nome_completo, avatar_url)
-        ),
+        ${SUBTAREFA_BASE_SELECT},
         ${SUBTAREFA_INDICADORES_SELECT}
       ),
       comentarios:tarefa_comentarios(${COMENTARIO_SELECT}),
@@ -1036,30 +1059,6 @@ export async function getTarefaDetail(id: string): Promise<TarefaDetail> {
   }
   return detail;
 }
-
-const SUBTAREFA_SELECT = `
-  id, tarefa_id, titulo, concluida, posicao, created_at, criado_por, concluido_por,
-  data_inicio, descricao, prioridade, lembretes,
-  recorrencia, projeto_id, setor_id, visibilidade, updated_at,
-  criador:profiles!subtarefas_criado_por_fkey(id, nome_completo, avatar_url),
-  concluido_por_usuario:profiles!subtarefas_concluido_por_fkey(id, nome_completo, avatar_url),
-  responsaveis:subtarefa_responsaveis(
-    usuario_id,
-    usuario:profiles!subtarefa_responsaveis_usuario_id_fkey(id, nome_completo, avatar_url)
-  ),
-  observadores:subtarefa_observadores(
-    usuario_id,
-    usuario:profiles!subtarefa_observadores_usuario_id_fkey(id, nome_completo, avatar_url)
-  ),
-  ${SUBTAREFA_INDICADORES_SELECT}
-`;
-
-const SUBTAREFA_DETAIL_SELECT = `
-  ${SUBTAREFA_SELECT},
-  comentarios:subtarefa_comentarios(${SUBTAREFA_COMENTARIO_SELECT}),
-  anexos:subtarefa_anexos(id, subtarefa_id, storage_path, nome, tipo, tamanho, created_at),
-  tarefa:tarefas!subtarefas_tarefa_id_fkey(id, titulo)
-`;
 
 /**
  * Subtarefas para Agenda (Hoje / Em breve / Visualizando).
@@ -1327,7 +1326,18 @@ export async function getSubtarefaDetail(id: string): Promise<SubtarefaDetail> {
     .order("created_at", { referencedTable: "subtarefa_comentarios", ascending: true })
     .single();
   if (error) throw error;
-  return data as unknown as SubtarefaDetail;
+
+  const row = data as unknown as SubtarefaDetail & Record<string, unknown>;
+  const comentarios = row.comentarios ?? [];
+  const anexos = row.anexos ?? [];
+
+  return {
+    ...row,
+    indicadores: {
+      comentarios_count: comentarios.length,
+      anexos_count: anexos.length,
+    },
+  };
 }
 
 async function getSubtarefaRow(id: string): Promise<SubtarefaWithAuthors> {

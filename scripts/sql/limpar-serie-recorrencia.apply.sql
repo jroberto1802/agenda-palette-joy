@@ -13,6 +13,14 @@
 --  3) Soft-delete de ocorrências cuja data não bate com a regra do modelo
 --     (mensal / semanal / anual / personalizada com datas_livres)
 --  4) Remove subtarefas duplicadas na mesma ocorrência (mesmo título; mantém a mais antiga)
+--
+-- Observação: uma tarefa não pode ser soft-deleted enquanto tiver subtarefas
+-- abertas (trigger `tarefas_protect_delete_with_open_subtarefas`). Como as
+-- ocorrências removidas nos passos 2 e 3 são lixo (duplicadas/fora da regra),
+-- suas subtarefas (clones do template) são apagadas antes do soft-delete —
+-- em instruções SEPARADAS (tabela temporária), não numa CTE só: dentro de uma
+-- mesma CTE todas as sub-instruções compartilham o mesmo snapshot, então o
+-- gatilho ainda veria as subtarefas como "abertas" mesmo com o delete antes.
 -- =============================================================================
 
 begin;
@@ -29,7 +37,9 @@ where recorrencia is not null;
 -- ---------------------------------------------------------------------------
 -- 2) Duplicatas: mesma série + mesmo dia civil → soft-delete extras
 -- ---------------------------------------------------------------------------
-with ranked as (
+create temporary table _dup_extras on commit drop as
+select ranked.id
+from (
   select
     o.id,
     row_number() over (
@@ -43,19 +53,23 @@ with ranked as (
     and o.serie_raiz_id is not null
     and o.serie_raiz_id <> o.id
     and o.data_inicio is not null
-),
-extras as (
-  select id from ranked where rn > 1
-)
+) ranked
+where ranked.rn > 1;
+
+delete from public.subtarefas s
+using _dup_extras e
+where s.tarefa_id = e.id;
+
 update public.tarefas t
 set deleted_at = now()
-from extras e
+from _dup_extras e
 where t.id = e.id
   and t.deleted_at is null;
 
 -- ---------------------------------------------------------------------------
 -- 3) Ocorrências fora da regra do modelo
 -- ---------------------------------------------------------------------------
+create temporary table _regra_invalidas on commit drop as
 with modelos as (
   select
     t.id,
@@ -82,50 +96,53 @@ ocorrencias as (
   where o.deleted_at is null
     and o.id <> o.serie_raiz_id
     and o.data_inicio is not null
-),
-invalidas as (
-  select o.id
-  from ocorrencias o
-  where case o.regra->>'tipo'
-    when 'diaria' then false
-    when 'mensal' then
-      extract(day from o.dia_local)::int
-        is distinct from coalesce(
-          (o.regra->>'dia_mes')::int,
-          extract(day from o.ancora)::int
-        )
-    when 'semanal' then
-      not (
-        extract(dow from o.dia_local)::int = any (
-          select jsonb_array_elements_text(
-            case
-              when jsonb_typeof(o.regra->'dias_semana') = 'array'
-                and jsonb_array_length(o.regra->'dias_semana') > 0
-              then o.regra->'dias_semana'
-              else jsonb_build_array(extract(dow from o.ancora)::int)
-            end
-          )::int
+)
+select o.id
+from ocorrencias o
+where case o.regra->>'tipo'
+  when 'diaria' then false
+  when 'mensal' then
+    extract(day from o.dia_local)::int
+      is distinct from coalesce(
+        (o.regra->>'dia_mes')::int,
+        extract(day from o.ancora)::int
+      )
+  when 'semanal' then
+    not (
+      extract(dow from o.dia_local)::int = any (
+        select jsonb_array_elements_text(
+          case
+            when jsonb_typeof(o.regra->'dias_semana') = 'array'
+              and jsonb_array_length(o.regra->'dias_semana') > 0
+            then o.regra->'dias_semana'
+            else jsonb_build_array(extract(dow from o.ancora)::int)
+          end
+        )::int
+      )
+    )
+  when 'anual' then
+    to_char(o.dia_local, 'MM-DD') is distinct from to_char(o.ancora, 'MM-DD')
+  when 'personalizada' then
+    case
+      when jsonb_typeof(o.regra->'datas_livres') = 'array'
+        and jsonb_array_length(o.regra->'datas_livres') > 0
+      then not (
+        to_char(o.dia_local, 'YYYY-MM-DD') = any (
+          select jsonb_array_elements_text(o.regra->'datas_livres')
         )
       )
-    when 'anual' then
-      to_char(o.dia_local, 'MM-DD') is distinct from to_char(o.ancora, 'MM-DD')
-    when 'personalizada' then
-      case
-        when jsonb_typeof(o.regra->'datas_livres') = 'array'
-          and jsonb_array_length(o.regra->'datas_livres') > 0
-        then not (
-          to_char(o.dia_local, 'YYYY-MM-DD') = any (
-            select jsonb_array_elements_text(o.regra->'datas_livres')
-          )
-        )
-        else false
-      end
-    else false
-  end
-)
+      else false
+    end
+  else false
+end;
+
+delete from public.subtarefas s
+using _regra_invalidas i
+where s.tarefa_id = i.id;
+
 update public.tarefas t
 set deleted_at = now()
-from invalidas i
+from _regra_invalidas i
 where t.id = i.id
   and t.deleted_at is null;
 

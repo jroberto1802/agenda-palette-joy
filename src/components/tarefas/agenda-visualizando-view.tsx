@@ -116,36 +116,33 @@ export function AgendaVisualizandoView({
   const { filters, debouncedFilters } = state;
   const stateRef = useRef(state);
   stateRef.current = state;
+  const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const duplicateTarefa = useDuplicateTarefa();
   const toggleSubtarefaMut = useToggleSubtarefa();
   const [movingTarefa, setMovingTarefa] = useState<TarefaWithRelations | null>(null);
 
-  const handleFiltersChange = useMemo(() => {
-    let timeout: ReturnType<typeof setTimeout>;
-    return (next: TarefaFilters) => {
-      if (next.classificar && next.classificar !== stateRef.current.filters.classificar) {
-        writeAgendaClassificarPreference(
-          usuarioId,
-          "agenda-visualizando",
-          normalizeTarefaClassificar(next.classificar),
-        );
-      }
+  const handleFiltersChange = (next: TarefaFilters) => {
+    if (next.classificar && next.classificar !== stateRef.current.filters.classificar) {
+      writeAgendaClassificarPreference(
+        usuarioId,
+        "agenda-visualizando",
+        normalizeTarefaClassificar(next.classificar),
+      );
+    }
+    onStateChange({
+      ...stateRef.current,
+      filters: next,
+    });
+    if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current);
+    debounceTimeoutRef.current = setTimeout(() => {
       onStateChange({
         ...stateRef.current,
         filters: next,
+        debouncedFilters: next,
       });
-      clearTimeout(timeout);
-      timeout = setTimeout(() => {
-        onStateChange({
-          ...stateRef.current,
-          filters: next,
-          debouncedFilters: next,
-        });
-      }, 300);
-    };
-  }, [onStateChange, usuarioId]);
-
+    }, 300);
+  };
   const handleViewChange = (nextView: AgendaViewMode) => {
     const normalized = normalizeAgendaViewMode(nextView);
     const allowed = normalized === "colunas" ? "cards" : normalized;

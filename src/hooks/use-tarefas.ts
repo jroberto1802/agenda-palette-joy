@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { subtarefaKeys, tarefaKeys } from "@/lib/query-keys";
 import { toggleComentarioReacao } from "@/services/comentario-reacoes";
 import {
@@ -83,6 +83,7 @@ export function useTarefas(
     queryKey: tarefaKeys.list(filterKey),
     queryFn: () => listTarefas(filters),
     enabled: options?.enabled ?? true,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -115,6 +116,7 @@ export function useSubtarefasAgenda(
     queryKey: subtarefaKeys.agenda(filterKey),
     queryFn: () => listSubtarefasAgenda(filters),
     enabled: (options?.enabled ?? true) && !!filters.usuario_id,
+    placeholderData: keepPreviousData,
   });
 }
 

@@ -1,7 +1,7 @@
 import { addDays, format, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { startTransition, useEffect, useMemo, useState } from "react";
 import { DescricaoPreview } from "@/components/tarefas/descricao-preview";
 import { SubtarefaAgendaCard } from "@/components/tarefas/subtarefa-agenda-item";
 import { Badge } from "@/components/ui/badge";
@@ -31,7 +31,7 @@ import {
   startOfTodayLocal,
   toLocalDateKey,
 } from "@/utils/agenda-datas";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { listPrevisoesOcorrencia, type PrevisaoOcorrencia, type PrevisaoSubtarefa } from "@/services/tarefa-recorrencia";
 import { compareByClassificar, TAREFA_PRIORIDADE_BAND_CLASS } from "@/utils/tarefas";
 import { isSerieModelo } from "@/utils/recorrencia";
@@ -49,6 +49,14 @@ function buildYearOptions(): number[] {
     { length: YEAR_OPTIONS_FORWARD + 1 },
     (_, i) => YEAR_OPTIONS_START + i,
   );
+}
+
+function emBreveRangeKey(start: Date): { de: string; ate: string } {
+  const days = getEmBreveDays(start, AGENDA_EM_BREVE_PAGE_SIZE);
+  return {
+    de: toLocalDateKey(days[0])!,
+    ate: toLocalDateKey(days[days.length - 1])!,
+  };
 }
 
 type EmBreveItem =
@@ -151,6 +159,7 @@ export function AgendaEmBreveView({
   onOpenSubtarefa: (subtarefa: SubtarefaAgendaItem) => void;
   onCreateForDate: (date: Date) => void;
 }) {
+  const queryClient = useQueryClient();
   const [windowStart, setWindowStart] = useState(() => startOfTodayLocal());
   const [classificar, setClassificar] = useState<TarefaClassificar>("prioridade");
 
@@ -172,6 +181,7 @@ export function AgendaEmBreveView({
 
   const rangeDe = toLocalDateKey(days[0])!;
   const rangeAte = toLocalDateKey(days[days.length - 1])!;
+  const todayKey = useMemo(() => toLocalDateKey(startOfTodayLocal())!, []);
 
   const { data: tarefas, isLoading: loadingTarefas } = useTarefas(
     {
@@ -192,13 +202,45 @@ export function AgendaEmBreveView({
     { enabled: !!usuarioId },
   );
 
-  const { data: previsoesBundle, isLoading: loadingPrevisoes } = useQuery({
+  const {
+    data: previsoesBundle,
+    isLoading: loadingPrevisoes,
+    isFetching: fetchingPrevisoes,
+  } = useQuery({
     queryKey: ["recorrencia-previsoes", rangeDe, rangeAte],
     queryFn: () => listPrevisoesOcorrencia(rangeDe, rangeAte),
     enabled: !!usuarioId,
+    placeholderData: keepPreviousData,
+    staleTime: 60_000,
   });
 
-  const isLoading = loadingTarefas || loadingSubtarefas || loadingPrevisoes;
+  // Prefetch das janelas vizinhas para a próxima seta sentir instantânea.
+  useEffect(() => {
+    if (!usuarioId) return;
+
+    const neighbors = [
+      emBreveRangeKey(subDays(windowStart, AGENDA_EM_BREVE_PAGE_SIZE)),
+      emBreveRangeKey(addDays(windowStart, AGENDA_EM_BREVE_PAGE_SIZE)),
+    ];
+
+    for (const { de, ate } of neighbors) {
+      void queryClient.prefetchQuery({
+        queryKey: ["recorrencia-previsoes", de, ate],
+        queryFn: () => listPrevisoesOcorrencia(de, ate),
+        staleTime: 60_000,
+      });
+    }
+  }, [usuarioId, windowStart, queryClient]);
+
+  // Skeleton só no carregamento inicial — ao navegar com setas, mantém o conteúdo
+  // anterior (keepPreviousData) para a troca não “piscar”.
+  const isInitialLoading =
+    !usuarioId ||
+    ((loadingTarefas || loadingSubtarefas || loadingPrevisoes) &&
+      !tarefas &&
+      !subtarefas &&
+      !previsoesBundle);
+  const isRefreshing = fetchingPrevisoes && !isInitialLoading;
 
   const byDay = useMemo(() => {
     const map = new Map<string, EmBreveItem[]>();
@@ -269,8 +311,16 @@ export function AgendaEmBreveView({
     return years;
   }, [selectedYear]);
 
+  const shiftWindow = (deltaDays: number) => {
+    startTransition(() => {
+      setWindowStart((d) => addDays(d, deltaDays));
+    });
+  };
+
   const applyPeriod = (month: number, year: number) => {
-    setWindowStart(resolveWindowStartForMonth(new Date(year, month, 1)));
+    startTransition(() => {
+      setWindowStart(resolveWindowStartForMonth(new Date(year, month, 1)));
+    });
   };
 
   return (
@@ -333,9 +383,7 @@ export function AgendaEmBreveView({
             size="icon"
             className="h-8 w-8"
             aria-label="Dias anteriores"
-            onClick={() =>
-              setWindowStart((d) => subDays(d, AGENDA_EM_BREVE_PAGE_SIZE))
-            }
+            onClick={() => shiftWindow(-AGENDA_EM_BREVE_PAGE_SIZE)}
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
@@ -345,20 +393,23 @@ export function AgendaEmBreveView({
             size="icon"
             className="h-8 w-8"
             aria-label="Próximos dias"
-            onClick={() =>
-              setWindowStart((d) => addDays(d, AGENDA_EM_BREVE_PAGE_SIZE))
-            }
+            onClick={() => shiftWindow(AGENDA_EM_BREVE_PAGE_SIZE)}
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
       </div>
 
-      <div className="grid h-[min(720px,calc(100dvh-13rem))] min-h-[280px] grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div
+        className={cn(
+          "grid h-[min(720px,calc(100dvh-13rem))] min-h-[280px] grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4",
+          isRefreshing && "opacity-70 transition-opacity",
+        )}
+      >
         {days.map((day) => {
           const key = toLocalDateKey(day)!;
           const items = byDay.get(key) ?? [];
-          const isToday = key === toLocalDateKey(startOfTodayLocal());
+          const isToday = key === todayKey;
 
           return (
             <section
@@ -383,7 +434,7 @@ export function AgendaEmBreveView({
               </header>
 
               <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-2.5">
-                {isLoading || !usuarioId ? (
+                {isInitialLoading ? (
                   <>
                     <Skeleton className="h-14 rounded-lg" />
                     <Skeleton className="h-14 rounded-lg" />
