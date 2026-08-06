@@ -121,9 +121,15 @@ export function calcularProximaData(
       return addWeeks(from, 1);
     }
     case "mensal": {
-      const dia = config.dia_mes ?? from.getDate();
-      const next = addMonths(from, 1);
-      next.setDate(Math.min(dia, 28));
+      // Primeira data válida estritamente após `from`: se o dia configurado
+      // ainda ocorrer neste mês, usa o mês vigente; senão, o mês seguinte.
+      const dia = Math.min(Math.max(config.dia_mes ?? from.getDate(), 1), 28);
+      const noMesAtual = new Date(from.getFullYear(), from.getMonth(), dia);
+      if (isAfter(startOfDay(noMesAtual), startOfDay(from))) {
+        return noMesAtual;
+      }
+      const next = addMonths(new Date(from.getFullYear(), from.getMonth(), 1), 1);
+      next.setDate(dia);
       return next;
     }
     case "anual": {
