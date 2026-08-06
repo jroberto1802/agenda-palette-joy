@@ -16,12 +16,13 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import type { RecorrenciaTipo } from "@/types";
-import { DIAS_SEMANA, RECORRENCIA_LABELS } from "@/utils/recorrencia";
+import { DIAS_SEMANA, MESES_ANO, RECORRENCIA_LABELS } from "@/utils/recorrencia";
 
 export type RecorrenciaFormValues = {
   recorrencia_tipo: RecorrenciaTipo;
   recorrencia_dias_semana: number[];
   recorrencia_dia_mes: number;
+  recorrencia_mes: number;
   recorrencia_data_fim: Date | null;
 };
 
@@ -108,7 +109,7 @@ export function TarefaRecorrenciaFields({
             <FormItem>
               <FormLabel>Dia do mês</FormLabel>
               <Select
-                value={String(field.value)}
+                value={String(Math.min(field.value, 28))}
                 onValueChange={(v) => field.onChange(Number(v))}
               >
                 <FormControl>
@@ -128,6 +129,65 @@ export function TarefaRecorrenciaFields({
             </FormItem>
           )}
         />
+      )}
+
+      {tipo === "anual" && (
+        <div className="grid grid-cols-2 gap-3">
+          <FormField
+            control={form.control}
+            name="recorrencia_dia_mes"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Dia</FormLabel>
+                <Select
+                  value={String(field.value)}
+                  onValueChange={(v) => field.onChange(Number(v))}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                      <SelectItem key={d} value={String(d)}>
+                        {d}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="recorrencia_mes"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Mês</FormLabel>
+                <Select
+                  value={String(field.value)}
+                  onValueChange={(v) => field.onChange(Number(v))}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {MESES_ANO.map((m) => (
+                      <SelectItem key={m.value} value={String(m.value)}>
+                        {m.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
       )}
 
       {tipo !== "nenhuma" && (

@@ -165,6 +165,8 @@ export function TarefaMetaToolbar({
   const recorrenciaTipo = (form.watch("recorrencia_tipo") as RecorrenciaTipo | undefined) ?? "nenhuma";
   const recorrenciaDias = (form.watch("recorrencia_dias_semana") as number[] | undefined) ?? [];
   const recorrenciaDiaMes = (form.watch("recorrencia_dia_mes") as number | undefined) ?? 1;
+  const recorrenciaMes =
+    (form.watch("recorrencia_mes") as number | undefined) ?? new Date().getMonth() + 1;
   const recorrenciaIntervalo = (form.watch("recorrencia_intervalo") as number | undefined) ?? 1;
   const recorrenciaUnidade =
     (form.watch("recorrencia_unidade") as RecorrenciaConfig["unidade"] | undefined) ?? "dias";
@@ -179,6 +181,7 @@ export function TarefaMetaToolbar({
             tipo: recorrenciaTipo,
             dias_semana: recorrenciaDias,
             dia_mes: recorrenciaDiaMes,
+            mes: recorrenciaMes,
             intervalo: recorrenciaIntervalo,
             unidade: recorrenciaUnidade,
             datas_livres: recorrenciaDatasLivres,
@@ -187,6 +190,7 @@ export function TarefaMetaToolbar({
       recorrenciaTipo,
       recorrenciaDias,
       recorrenciaDiaMes,
+      recorrenciaMes,
       recorrenciaIntervalo,
       recorrenciaUnidade,
       recorrenciaDatasLivres,
@@ -203,7 +207,10 @@ export function TarefaMetaToolbar({
     form.setValue("recorrencia_dias_semana", config?.dias_semana ?? [], {
       shouldDirty: true,
     });
-    form.setValue("recorrencia_dia_mes", config?.dia_mes ?? 1, {
+    form.setValue("recorrencia_dia_mes", config?.dia_mes ?? new Date().getDate(), {
+      shouldDirty: true,
+    });
+    form.setValue("recorrencia_mes", config?.mes ?? new Date().getMonth() + 1, {
       shouldDirty: true,
     });
     form.setValue("recorrencia_intervalo", config?.intervalo ?? 1, {

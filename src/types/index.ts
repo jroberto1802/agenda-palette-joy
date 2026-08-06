@@ -125,8 +125,10 @@ export type RecorrenciaConfig = {
   tipo: RecorrenciaTipo;
   /** Semanal: 0=Dom … 6=Sáb */
   dias_semana?: number[];
-  /** Mensal: dia do mês (1–28) */
+  /** Mensal: dia do mês (1–28). Anual: dia (1–31). */
   dia_mes?: number;
+  /** Anual: mês (1=Janeiro … 12=Dezembro). */
+  mes?: number;
   /**
    * Personalizada: a cada X dias/semanas/meses.
    * Anual: a cada X anos (padrão 1).

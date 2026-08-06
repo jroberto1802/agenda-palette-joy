@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import type { RecorrenciaConfig, RecorrenciaTipo, RecorrenciaUnidade } from "@/types";
 import {
   DIAS_SEMANA,
+  MESES_ANO,
   RECORRENCIA_LABELS,
   formatRecorrencia,
   parseRecorrencia,
@@ -27,6 +28,13 @@ import { ptBR } from "date-fns/locale";
 import { toLocalDateKey } from "@/utils/agenda-datas";
 
 const OVERLAY_Z = "z-[100]";
+
+function defaultsAnual(from: Date = new Date()) {
+  return {
+    dia: from.getDate(),
+    mes: from.getMonth() + 1,
+  };
+}
 
 export type RecorrenciaEditorProps = {
   value: RecorrenciaConfig | null;
@@ -47,9 +55,11 @@ export function RecorrenciaEditor({
   onCancel,
   nested = false,
 }: RecorrenciaEditorProps) {
+  const anualDefaults = defaultsAnual();
   const [tipo, setTipo] = useState<RecorrenciaTipo>(value?.tipo ?? "nenhuma");
   const [diasSemana, setDiasSemana] = useState<number[]>(value?.dias_semana ?? []);
-  const [diaMes, setDiaMes] = useState(value?.dia_mes ?? 1);
+  const [diaMes, setDiaMes] = useState(value?.dia_mes ?? anualDefaults.dia);
+  const [mes, setMes] = useState(value?.mes ?? anualDefaults.mes);
   const [intervalo, setIntervalo] = useState(value?.intervalo ?? 1);
   const [unidade, setUnidade] = useState<RecorrenciaUnidade>(value?.unidade ?? "dias");
   const [datasLivres, setDatasLivres] = useState<Date[]>(
@@ -60,9 +70,11 @@ export function RecorrenciaEditor({
 
   useEffect(() => {
     const parsed = parseRecorrencia(value) ?? null;
+    const defs = defaultsAnual();
     setTipo(parsed?.tipo ?? "nenhuma");
     setDiasSemana(parsed?.dias_semana ?? []);
-    setDiaMes(parsed?.dia_mes ?? 1);
+    setDiaMes(parsed?.dia_mes ?? defs.dia);
+    setMes(parsed?.mes ?? defs.mes);
     setIntervalo(parsed?.intervalo ?? 1);
     setUnidade(parsed?.unidade ?? "dias");
     setDatasLivres((parsed?.datas_livres ?? []).map((d) => new Date(d + "T12:00:00")));
@@ -72,6 +84,7 @@ export function RecorrenciaEditor({
   }, [
     value?.tipo,
     value?.dia_mes,
+    value?.mes,
     value?.intervalo,
     value?.unidade,
     value?.data_ancora,
@@ -85,7 +98,8 @@ export function RecorrenciaEditor({
     return serializeRecorrencia({
       tipo,
       dias_semana: tipo === "semanal" ? diasSemana : undefined,
-      dia_mes: tipo === "mensal" ? diaMes : undefined,
+      dia_mes: tipo === "mensal" || tipo === "anual" ? diaMes : undefined,
+      mes: tipo === "anual" ? mes : undefined,
       intervalo: tipo === "personalizada" || tipo === "anual" ? intervalo : undefined,
       unidade: tipo === "personalizada" ? unidade : undefined,
       datas_livres:
@@ -150,7 +164,15 @@ export function RecorrenciaEditor({
         <Label className="text-xs">Frequência</Label>
         <Select
           value={tipo}
-          onValueChange={(v) => setTipo(v as RecorrenciaTipo)}
+          onValueChange={(v) => {
+            const next = v as RecorrenciaTipo;
+            setTipo(next);
+            if (next === "anual") {
+              const defs = defaultsAnual();
+              setDiaMes((d) => (d >= 1 && d <= 31 ? d : defs.dia));
+              setMes((m) => (m >= 1 && m <= 12 ? m : defs.mes));
+            }
+          }}
           disabled={!canEdit}
         >
           <SelectTrigger className="h-9">
@@ -201,7 +223,7 @@ export function RecorrenciaEditor({
         <div className="space-y-1.5">
           <Label className="text-xs">Dia do mês</Label>
           <Select
-            value={String(diaMes)}
+            value={String(Math.min(diaMes, 28))}
             onValueChange={(v) => setDiaMes(Number(v))}
             disabled={!canEdit}
           >
@@ -220,19 +242,61 @@ export function RecorrenciaEditor({
       )}
 
       {tipo === "anual" && (
-        <div className="flex items-center gap-2">
-          <Label className="shrink-0 text-xs">A cada</Label>
-          <Input
-            type="number"
-            min={1}
-            className="h-9 w-16"
-            value={intervalo}
-            disabled={!canEdit}
-            onChange={(e) => setIntervalo(Math.max(1, Number(e.target.value) || 1))}
-          />
-          <span className="text-xs text-muted-foreground">
-            {intervalo === 1 ? "ano (mesma data)" : "anos (mesma data)"}
-          </span>
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Label className="shrink-0 text-xs">A cada</Label>
+            <Input
+              type="number"
+              min={1}
+              className="h-9 w-16"
+              value={intervalo}
+              disabled={!canEdit}
+              onChange={(e) => setIntervalo(Math.max(1, Number(e.target.value) || 1))}
+            />
+            <span className="text-xs text-muted-foreground">
+              {intervalo === 1 ? "ano" : "anos"}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Dia</Label>
+              <Select
+                value={String(diaMes)}
+                onValueChange={(v) => setDiaMes(Number(v))}
+                disabled={!canEdit}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className={OVERLAY_Z}>
+                  {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                    <SelectItem key={d} value={String(d)}>
+                      {d}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Mês</Label>
+              <Select
+                value={String(mes)}
+                onValueChange={(v) => setMes(Number(v))}
+                disabled={!canEdit}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className={OVERLAY_Z}>
+                  {MESES_ANO.map((m) => (
+                    <SelectItem key={m.value} value={String(m.value)}>
+                      {m.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </div>
       )}
 

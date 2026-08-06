@@ -34,6 +34,30 @@ export const DIAS_SEMANA = [
   { value: 6, label: "Sáb" },
 ];
 
+/** Meses do ano (1–12) para recorrência anual. */
+export const MESES_ANO = [
+  { value: 1, label: "Janeiro" },
+  { value: 2, label: "Fevereiro" },
+  { value: 3, label: "Março" },
+  { value: 4, label: "Abril" },
+  { value: 5, label: "Maio" },
+  { value: 6, label: "Junho" },
+  { value: 7, label: "Julho" },
+  { value: 8, label: "Agosto" },
+  { value: 9, label: "Setembro" },
+  { value: 10, label: "Outubro" },
+  { value: 11, label: "Novembro" },
+  { value: 12, label: "Dezembro" },
+];
+
+/** Data civil no ano informado (mês 1–12); dia inválido é limitado ao último dia do mês. */
+export function dataAnualNoAno(year: number, mes: number, dia: number): Date {
+  const m = Math.min(Math.max(mes, 1), 12);
+  const lastDay = new Date(year, m, 0).getDate();
+  const d = Math.min(Math.max(dia, 1), lastDay);
+  return startOfDay(new Date(year, m - 1, d));
+}
+
 export function parseRecorrencia(raw: unknown): RecorrenciaConfig | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
@@ -49,6 +73,7 @@ export function parseRecorrencia(raw: unknown): RecorrenciaConfig | null {
     tipo,
     dias_semana: Array.isArray(r.dias_semana) ? (r.dias_semana as number[]) : undefined,
     dia_mes: typeof r.dia_mes === "number" ? r.dia_mes : undefined,
+    mes: typeof r.mes === "number" ? r.mes : undefined,
     intervalo: typeof r.intervalo === "number" && r.intervalo > 0 ? r.intervalo : undefined,
     unidade,
     datas_livres: Array.isArray(r.datas_livres)
@@ -134,7 +159,17 @@ export function calcularProximaData(
     }
     case "anual": {
       const n = config.intervalo && config.intervalo > 0 ? config.intervalo : 1;
-      return addYears(from, n);
+      // Sem dia/mês explícitos: comportamento legado (mesma data civil + N anos).
+      if (config.mes == null && config.dia_mes == null) {
+        return addYears(from, n);
+      }
+      const mes = Math.min(Math.max(config.mes ?? from.getMonth() + 1, 1), 12);
+      const dia = Math.min(Math.max(config.dia_mes ?? from.getDate(), 1), 31);
+      const nesteAno = dataAnualNoAno(from.getFullYear(), mes, dia);
+      if (isAfter(nesteAno, startOfDay(from))) {
+        return nesteAno;
+      }
+      return dataAnualNoAno(from.getFullYear() + n, mes, dia);
     }
     case "personalizada": {
       if (config.datas_livres?.length) {
@@ -173,6 +208,13 @@ function combinaComRegra(date: Date, config: RecorrenciaConfig): boolean {
     case "mensal": {
       const dia = config.dia_mes ?? date.getDate();
       return date.getDate() === Math.min(Math.max(dia, 1), 28);
+    }
+    case "anual": {
+      // Legado sem dia/mês: qualquer data serve como âncora.
+      if (config.mes == null && config.dia_mes == null) return true;
+      const mes = Math.min(Math.max(config.mes ?? date.getMonth() + 1, 1), 12);
+      const dia = Math.min(Math.max(config.dia_mes ?? date.getDate(), 1), 31);
+      return isSameDay(date, dataAnualNoAno(date.getFullYear(), mes, dia));
     }
     default:
       return true;
@@ -288,8 +330,16 @@ export function formatRecorrencia(config: RecorrenciaConfig | null): string {
       return `Mensal • Dia ${config.dia_mes ?? "—"}${fim}`;
     case "anual": {
       const n = config.intervalo && config.intervalo > 0 ? config.intervalo : 1;
-      if (n === 1) return `Anual${fim}`;
-      return `Anual • A cada ${n} anos${fim}`;
+      const mesLabel =
+        config.mes != null
+          ? MESES_ANO.find((m) => m.value === config.mes)?.label
+          : undefined;
+      const dataPart =
+        config.dia_mes != null && mesLabel
+          ? ` • ${config.dia_mes} de ${mesLabel}`
+          : "";
+      if (n === 1) return `Anual${dataPart}${fim}`;
+      return `Anual • A cada ${n} anos${dataPart}${fim}`;
     }
     case "personalizada": {
       if (config.datas_livres?.length) {

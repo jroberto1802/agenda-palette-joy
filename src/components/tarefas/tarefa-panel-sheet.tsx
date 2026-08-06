@@ -130,7 +130,8 @@ const tarefaPanelSchema = z
     lembretes: z.array(z.enum(["no_prazo", "1h_antes", "1d_antes", "1sem_antes"])),
     recorrencia_tipo: z.enum(["nenhuma", "diaria", "semanal", "mensal", "anual", "personalizada"]),
     recorrencia_dias_semana: z.array(z.number()),
-    recorrencia_dia_mes: z.number().min(1).max(28),
+    recorrencia_dia_mes: z.number().min(1).max(31),
+    recorrencia_mes: z.number().min(1).max(12),
     recorrencia_intervalo: z.number().min(1),
     recorrencia_unidade: z.enum(["dias", "semanas", "meses"]),
     recorrencia_datas_livres: z.array(z.string()),
@@ -261,7 +262,8 @@ function toFormValues(
     lembretes: parseLembretes(tarefa?.lembretes),
     recorrencia_tipo: rec?.tipo ?? "nenhuma",
     recorrencia_dias_semana: rec?.dias_semana ?? [],
-    recorrencia_dia_mes: rec?.dia_mes ?? 1,
+    recorrencia_dia_mes: rec?.dia_mes ?? new Date().getDate(),
+    recorrencia_mes: rec?.mes ?? new Date().getMonth() + 1,
     recorrencia_intervalo: rec?.intervalo ?? 1,
     recorrencia_unidade: rec?.unidade ?? "dias",
     recorrencia_datas_livres: rec?.datas_livres ?? [],
@@ -278,7 +280,11 @@ function toRecorrenciaPayload(
     tipo: values.recorrencia_tipo as RecorrenciaTipo,
     dias_semana:
       values.recorrencia_tipo === "semanal" ? values.recorrencia_dias_semana : undefined,
-    dia_mes: values.recorrencia_tipo === "mensal" ? values.recorrencia_dia_mes : undefined,
+    dia_mes:
+      values.recorrencia_tipo === "mensal" || values.recorrencia_tipo === "anual"
+        ? values.recorrencia_dia_mes
+        : undefined,
+    mes: values.recorrencia_tipo === "anual" ? values.recorrencia_mes : undefined,
     intervalo:
       values.recorrencia_tipo === "personalizada" || values.recorrencia_tipo === "anual"
         ? values.recorrencia_intervalo
@@ -1063,6 +1069,7 @@ export function TarefaPanelSheet({
                                             tipo: form.watch("recorrencia_tipo") as never,
                                             dias_semana: form.watch("recorrencia_dias_semana"),
                                             dia_mes: form.watch("recorrencia_dia_mes"),
+                                            mes: form.watch("recorrencia_mes"),
                                             intervalo: form.watch("recorrencia_intervalo"),
                                             unidade: form.watch("recorrencia_unidade"),
                                             datas_livres: form.watch("recorrencia_datas_livres"),
