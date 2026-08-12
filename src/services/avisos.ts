@@ -17,24 +17,24 @@ import type {
 
 const AVISO_SELECT = `
   *,
-  criador:profiles!criado_por(id, nome_completo, avatar_url),
+  criador:profiles!criado_por(id, nome_completo, avatar_url, ativo),
   setores:aviso_setores(setor:setores(id, nome)),
-  pessoas:aviso_pessoas(usuario:profiles(id, nome_completo, avatar_url)),
+  pessoas:aviso_pessoas(usuario:profiles(id, nome_completo, avatar_url, ativo)),
   lido_por:aviso_lido_por(usuario_id)
 `;
 
 const AVISO_SELECT_LITE = `
   *,
-  criador:profiles!criado_por(id, nome_completo, avatar_url)
+  criador:profiles!criado_por(id, nome_completo, avatar_url, ativo)
 `;
 
 const COMENTARIO_SELECT = `
   *,
-  usuario:profiles!usuario_id(id, nome_completo, avatar_url),
+  usuario:profiles!usuario_id(id, nome_completo, avatar_url, ativo),
   reacoes:aviso_comentario_reacoes(
     usuario_id,
     created_at,
-    usuario:profiles!aviso_comentario_reacoes_usuario_id_fkey(id, nome_completo, avatar_url)
+    usuario:profiles!aviso_comentario_reacoes_usuario_id_fkey(id, nome_completo, avatar_url, ativo)
   )
 `;
 

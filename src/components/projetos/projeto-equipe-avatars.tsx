@@ -43,6 +43,7 @@ export function ProjetoEquipeAvatars({
                   <ProfileAvatar
                     name={membro.nome_completo}
                     avatarUrl={membro.avatar_url}
+                    ativo={membro.ativo}
                     className="h-8 w-8 border-2 border-background"
                     fallbackClassName="text-[10px]"
                   />

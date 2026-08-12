@@ -20,6 +20,9 @@ import {
   getComentarioEditadoLabel,
 } from "@/utils/comentarios";
 import { formatDateTime } from "@/utils/formatters";
+import {
+  pessoaDesativadaNomeClassName,
+} from "@/utils/pessoas-display";
 import { stripHtml } from "@/utils/rich-text";
 
 export type ThreadComentario = {
@@ -35,11 +38,13 @@ export type ThreadComentario = {
     nome_completo: string;
     avatar_url?: string | null;
     papel?: Papel | null;
+    ativo?: boolean | null;
   } | null;
   editor?: {
     id: string;
     nome_completo: string;
     avatar_url?: string | null;
+    ativo?: boolean | null;
   } | null;
   reacoes?: ComentarioReacao[];
 };
@@ -134,9 +139,15 @@ function CommentReacoes({
                   <ProfileAvatar
                     name={r.usuario?.nome_completo ?? "?"}
                     avatarUrl={r.usuario?.avatar_url}
+                    ativo={r.usuario?.ativo}
                     className="h-6 w-6 shrink-0"
                   />
-                  <span className="truncate text-sm">
+                  <span
+                    className={cn(
+                      "truncate text-sm",
+                      pessoaDesativadaNomeClassName(r.usuario),
+                    )}
+                  >
                     {r.usuario?.nome_completo ?? "Usuário"}
                     {r.usuario_id === currentUserId ? " (você)" : ""}
                   </span>
@@ -294,6 +305,7 @@ export function CommentsThread({
         <ProfileAvatar
           name={c.usuario?.nome_completo ?? "?"}
           avatarUrl={c.usuario?.avatar_url}
+          ativo={c.usuario?.ativo}
           className={cn("shrink-0", compact ? "h-6 w-6" : "h-8 w-8")}
         />
         <div className="min-w-0 flex-1">
@@ -302,6 +314,7 @@ export function CommentsThread({
               className={cn(
                 "font-medium leading-tight",
                 compact ? "text-xs" : "text-sm",
+                pessoaDesativadaNomeClassName(c.usuario),
               )}
             >
               {c.usuario?.nome_completo}

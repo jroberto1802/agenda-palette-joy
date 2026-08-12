@@ -115,11 +115,19 @@ function PessoaCardContent({
         <ProfileAvatar
           name={pessoa.nome_completo}
           avatarUrl={pessoa.avatar_url}
+          ativo={pessoa.ativo}
           className="h-12 w-12 shrink-0"
           fallbackClassName="text-sm"
         />
         <div className="min-w-0 flex-1">
-          <p className="truncate font-semibold leading-tight">{pessoa.nome_completo}</p>
+          <p
+            className={cn(
+              "truncate font-semibold leading-tight",
+              pessoa.ativo === false && "text-muted-foreground/70",
+            )}
+          >
+            {pessoa.nome_completo}
+          </p>
           <p className="mt-0.5 truncate text-sm text-muted-foreground">
             {cargoSetor || "Sem cargo/setor"}
           </p>

@@ -13,7 +13,7 @@ export const Route = createFileRoute("/_authenticated")({
 });
 
 function AuthenticatedLayout() {
-  const { session, loading } = useAuth();
+  const { session, loading, signOut } = useAuth();
   const navigate = useNavigate();
   const { data: profile, isLoading: loadingProfile } = useProfile();
   const [ready, setReady] = useState(false);
@@ -57,10 +57,26 @@ function AuthenticatedLayout() {
     };
   }, [session, loading, navigate]);
 
+  // Pessoa desativada: encerra sessão imediatamente.
+  useEffect(() => {
+    if (loadingProfile || !profile) return;
+    if (profile.ativo === false) {
+      void signOut().then(() => navigate({ to: "/auth", replace: true }));
+    }
+  }, [profile, loadingProfile, signOut, navigate]);
+
   if (loading || !session || !ready || loadingProfile) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <p className="text-sm text-muted-foreground">Carregando...</p>
+      </div>
+    );
+  }
+
+  if (profile && profile.ativo === false) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <p className="text-sm text-muted-foreground">Acesso desativado...</p>
       </div>
     );
   }

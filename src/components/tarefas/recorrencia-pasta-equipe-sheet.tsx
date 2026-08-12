@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/sheet";
 import { useSetRecorrenciaPastaMembros } from "@/hooks/use-recorrencia-pastas";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
+import { cn } from "@/lib/utils";
 import type { RecorrenciaPasta, RecorrenciaPastaMembro } from "@/services/recorrencia-pastas";
 import type { ProfileWithSetor } from "@/types";
 
@@ -90,10 +91,18 @@ export function RecorrenciaPastaEquipeSheet({
                   <ProfileAvatar
                     name={membro.nome_completo}
                     avatarUrl={membro.avatar_url}
+                    ativo={membro.ativo}
                     className="h-8 w-8"
                   />
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{membro.nome_completo}</p>
+                    <p
+                      className={cn(
+                        "truncate text-sm font-medium",
+                        membro.ativo === false && "text-muted-foreground/70",
+                      )}
+                    >
+                      {membro.nome_completo}
+                    </p>
                     {membro.cargo && (
                       <p className="truncate text-xs text-muted-foreground">{membro.cargo}</p>
                     )}

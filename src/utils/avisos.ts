@@ -70,7 +70,12 @@ export function getAvisoDestinatarioLabel(aviso: AvisoWithRelations): string {
 
 export function getAvisoDestinatariosPessoas(
   aviso: AvisoWithRelations,
-): Array<{ id: string; nome_completo: string; avatar_url: string | null }> {
+): Array<{
+  id: string;
+  nome_completo: string;
+  avatar_url: string | null;
+  ativo?: boolean | null;
+}> {
   return aviso.pessoas
     .map((item) => item.usuario)
     .filter((usuario): usuario is NonNullable<typeof usuario> => !!usuario)
@@ -78,5 +83,6 @@ export function getAvisoDestinatariosPessoas(
       id: usuario.id,
       nome_completo: usuario.nome_completo,
       avatar_url: usuario.avatar_url ?? null,
+      ativo: usuario.ativo,
     }));
 }

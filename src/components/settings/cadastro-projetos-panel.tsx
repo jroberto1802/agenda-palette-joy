@@ -311,6 +311,7 @@ export function CadastroProjetosPanel({
                     <ProfileAvatar
                       name={projeto.criador?.nome_completo ?? "Não informado"}
                       avatarUrl={projeto.criador?.avatar_url}
+                      ativo={projeto.criador?.ativo}
                       className="h-4 w-4"
                       fallbackClassName="text-[8px]"
                     />

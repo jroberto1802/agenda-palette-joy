@@ -1,9 +1,21 @@
 import { supabase } from "@/integrations/supabase/client";
 import { criarUsuarioAdmin, excluirUsuarioAdmin } from "@/services/admin";
+import {
+  transferResponsavelSubtarefa,
+  transferResponsavelTarefa,
+  type ProjetoAtividadeTransferivel,
+  type ProjetoMembroTransferInput,
+} from "@/services/projetos";
 import { removeProfileAvatar, uploadProfileAvatar } from "@/services/profile-avatars";
 import type { ProfileFormData, ProfileWithSetor } from "@/types";
 
 const PESSOA_SELECT_BASIC = `*, setor:setores!profiles_setor_id_fkey(id, nome, cor)`;
+
+export type PessoaAtividadeTransferivel = ProjetoAtividadeTransferivel & {
+  contexto?: string | null;
+};
+
+export type PessoaDesativarTransferInput = ProjetoMembroTransferInput;
 
 type ProfileRow = Omit<ProfileWithSetor, "gestor">;
 
@@ -175,6 +187,197 @@ export async function deletePessoa(id: string): Promise<void> {
 
   await removeProfileAvatar(pessoa.avatar_url).catch(() => undefined);
   await excluirUsuarioAdmin(id);
+}
+
+/** Lista tarefas e subtarefas em que a pessoa é responsável (qualquer projeto ou avulsa). */
+export async function listAtividadesDoResponsavel(
+  usuarioId: string,
+): Promise<PessoaAtividadeTransferivel[]> {
+  const result: PessoaAtividadeTransferivel[] = [];
+
+  const { data: tarefaLinks, error: tarefaLinksError } = await supabase
+    .from("tarefa_responsaveis")
+    .select(
+      `
+      tarefa_id,
+      tarefa:tarefas!inner(
+        id,
+        titulo,
+        concluida,
+        deleted_at,
+        projeto:projetos(nome)
+      )
+    `,
+    )
+    .eq("usuario_id", usuarioId);
+
+  if (tarefaLinksError) throw tarefaLinksError;
+
+  for (const link of tarefaLinks ?? []) {
+    const tarefa = link.tarefa as unknown as {
+      id: string;
+      titulo: string;
+      concluida: boolean;
+      deleted_at: string | null;
+      projeto: { nome: string } | null;
+    } | null;
+    if (!tarefa || tarefa.deleted_at) continue;
+    result.push({
+      kind: "tarefa",
+      id: tarefa.id,
+      titulo: tarefa.titulo,
+      concluida: tarefa.concluida,
+      contexto: tarefa.projeto?.nome ?? null,
+    });
+  }
+
+  const { data: subtarefaLinks, error: subtarefaLinksError } = await supabase
+    .from("subtarefa_responsaveis")
+    .select(
+      `
+      subtarefa_id,
+      subtarefa:subtarefas!inner(
+        id,
+        titulo,
+        concluida,
+        tarefa:tarefas!inner(
+          deleted_at,
+          projeto:projetos(nome)
+        )
+      )
+    `,
+    )
+    .eq("usuario_id", usuarioId);
+
+  if (subtarefaLinksError) throw subtarefaLinksError;
+
+  for (const link of subtarefaLinks ?? []) {
+    const subtarefa = link.subtarefa as unknown as {
+      id: string;
+      titulo: string;
+      concluida: boolean;
+      tarefa: {
+        deleted_at: string | null;
+        projeto: { nome: string } | null;
+      } | null;
+    } | null;
+    if (!subtarefa || subtarefa.tarefa?.deleted_at) continue;
+    result.push({
+      kind: "subtarefa",
+      id: subtarefa.id,
+      titulo: subtarefa.titulo,
+      concluida: subtarefa.concluida,
+      contexto: subtarefa.tarefa?.projeto?.nome ?? null,
+    });
+  }
+
+  return result.sort((a, b) => a.titulo.localeCompare(b.titulo, "pt-BR"));
+}
+
+async function applyTransferenciaResponsabilidades(
+  usuarioId: string,
+  atividades: PessoaAtividadeTransferivel[],
+  transfer: PessoaDesativarTransferInput,
+): Promise<void> {
+  if (atividades.length === 0) return;
+
+  if (transfer.mode === "bulk") {
+    const novo = transfer.novoResponsavelId;
+    if (!novo || novo === usuarioId) {
+      throw new Error("Selecione um novo responsável válido.");
+    }
+    for (const atividade of atividades) {
+      if (atividade.kind === "tarefa") {
+        await transferResponsavelTarefa(atividade.id, usuarioId, novo);
+      } else {
+        await transferResponsavelSubtarefa(atividade.id, usuarioId, novo);
+      }
+    }
+    return;
+  }
+
+  const map = new Map(
+    transfer.assignments.map((a) => [`${a.kind}:${a.id}`, a.novoResponsavelId] as const),
+  );
+  for (const atividade of atividades) {
+    const novo = map.get(`${atividade.kind}:${atividade.id}`);
+    if (!novo || novo === usuarioId) {
+      throw new Error(
+        `Defina um novo responsável para "${atividade.titulo}" antes de desativar.`,
+      );
+    }
+    if (atividade.kind === "tarefa") {
+      await transferResponsavelTarefa(atividade.id, usuarioId, novo);
+    } else {
+      await transferResponsavelSubtarefa(atividade.id, usuarioId, novo);
+    }
+  }
+}
+
+/**
+ * Desativa a pessoa (revoga acesso). Se houver atividades sob responsabilidade,
+ * exige transferência (bulk ou individual) antes de concluir.
+ */
+export async function desativarPessoa(
+  id: string,
+  transfer?: PessoaDesativarTransferInput,
+): Promise<ProfileWithSetor> {
+  const { data: pessoa, error: fetchError } = await supabase
+    .from("profiles")
+    .select("papel, ativo, nome_completo, setor_id, gestor_id")
+    .eq("id", id)
+    .single();
+
+  if (fetchError) throw fetchError;
+  if (!pessoa.ativo) {
+    throw new Error("Esta pessoa já está desativada.");
+  }
+
+  if (pessoa.papel === "admin") {
+    const remaining = await countActiveAdmins(id);
+    if (remaining === 0) {
+      throw new Error("Não é possível desativar o último Administrador do sistema.");
+    }
+  }
+
+  const atividades = await listAtividadesDoResponsavel(id);
+  if (atividades.length > 0) {
+    if (!transfer) {
+      throw new Error(
+        "Esta pessoa possui atividades sob responsabilidade. Defina o novo responsável antes de desativar.",
+      );
+    }
+    await applyTransferenciaResponsabilidades(id, atividades, transfer);
+  }
+
+  return updatePessoa(id, {
+    nome_completo: pessoa.nome_completo,
+    setor_id: pessoa.setor_id,
+    papel: pessoa.papel,
+    gestor_id: pessoa.gestor_id,
+    ativo: false,
+  });
+}
+
+export async function reativarPessoa(id: string): Promise<ProfileWithSetor> {
+  const { data: pessoa, error: fetchError } = await supabase
+    .from("profiles")
+    .select("papel, ativo, nome_completo, setor_id, gestor_id")
+    .eq("id", id)
+    .single();
+
+  if (fetchError) throw fetchError;
+  if (pessoa.ativo) {
+    throw new Error("Esta pessoa já está ativa.");
+  }
+
+  return updatePessoa(id, {
+    nome_completo: pessoa.nome_completo,
+    setor_id: pessoa.setor_id,
+    papel: pessoa.papel,
+    gestor_id: pessoa.gestor_id,
+    ativo: true,
+  });
 }
 
 export async function updateMyProfile(payload: {

@@ -230,11 +230,11 @@ export function canToggleTarefaConclusao(
 
 export function getTarefaResponsaveis(
   tarefa: TarefaWithRelations,
-): Pick<Profile, "id" | "nome_completo" | "avatar_url">[] {
+): Pick<Profile, "id" | "nome_completo" | "avatar_url" | "ativo">[] {
   if (tarefa.responsaveis?.length) {
     return tarefa.responsaveis
       .map((r) => r.usuario)
-      .filter((u): u is Pick<Profile, "id" | "nome_completo" | "avatar_url"> => !!u);
+      .filter((u): u is Pick<Profile, "id" | "nome_completo" | "avatar_url" | "ativo"> => !!u);
   }
   if (tarefa.responsavel) return [tarefa.responsavel];
   return [];
@@ -243,14 +243,14 @@ export function getTarefaResponsaveis(
 /** Responsáveis + visualizadores (únicos) para avatares no card. */
 export function getTarefaPessoasCard(
   tarefa: TarefaWithRelations,
-): Pick<Profile, "id" | "nome_completo" | "avatar_url">[] {
+): Pick<Profile, "id" | "nome_completo" | "avatar_url" | "ativo">[] {
   const seen = new Set<string>();
-  const result: Pick<Profile, "id" | "nome_completo" | "avatar_url">[] = [];
+  const result: Pick<Profile, "id" | "nome_completo" | "avatar_url" | "ativo">[] = [];
   for (const pessoa of [
     ...getTarefaResponsaveis(tarefa),
     ...(tarefa.observadores ?? [])
       .map((o) => o.usuario)
-      .filter((u): u is Pick<Profile, "id" | "nome_completo" | "avatar_url"> => !!u),
+      .filter((u): u is Pick<Profile, "id" | "nome_completo" | "avatar_url" | "ativo"> => !!u),
   ]) {
     if (seen.has(pessoa.id)) continue;
     seen.add(pessoa.id);

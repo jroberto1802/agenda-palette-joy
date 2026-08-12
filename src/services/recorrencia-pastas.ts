@@ -16,11 +16,11 @@ export type RecorrenciaPasta = {
   criado_por: string;
   created_at: string;
   updated_at: string;
-  criador?: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
-  responsavel?: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
+  criador?: Pick<Profile, "id" | "nome_completo" | "avatar_url" | "ativo"> | null;
+  responsavel?: Pick<Profile, "id" | "nome_completo" | "avatar_url" | "ativo"> | null;
   membros?: {
     usuario_id: string;
-    usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url" | "cargo" | "papel"> | null;
+    usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url" | "ativo" | "cargo" | "papel"> | null;
   }[];
 };
 
@@ -33,16 +33,16 @@ export type RecorrenciaPastaFormData = {
 
 export type RecorrenciaPastaMembro = Pick<
   Profile,
-  "id" | "nome_completo" | "avatar_url" | "cargo" | "papel"
+  "id" | "nome_completo" | "avatar_url" | "ativo" | "cargo" | "papel"
 >;
 
 const PASTA_SELECT = `
   id, nome, descricao, responsavel_id, criado_por, created_at, updated_at,
-  criador:profiles!recorrencia_pastas_criado_por_fkey(id, nome_completo, avatar_url),
-  responsavel:profiles!recorrencia_pastas_responsavel_id_fkey(id, nome_completo, avatar_url),
+  criador:profiles!recorrencia_pastas_criado_por_fkey(id, nome_completo, avatar_url, ativo),
+  responsavel:profiles!recorrencia_pastas_responsavel_id_fkey(id, nome_completo, avatar_url, ativo),
   membros:recorrencia_pasta_membros(
     usuario_id,
-    usuario:profiles!recorrencia_pasta_membros_usuario_id_fkey(id, nome_completo, avatar_url, cargo, papel)
+    usuario:profiles!recorrencia_pasta_membros_usuario_id_fkey(id, nome_completo, avatar_url, ativo, cargo, papel)
   )
 `;
 

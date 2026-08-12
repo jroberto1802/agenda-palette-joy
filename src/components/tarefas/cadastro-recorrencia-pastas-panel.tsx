@@ -320,6 +320,7 @@ export function CadastroRecorrenciaPastasPanel({
                       <ProfileAvatar
                         name={pasta.criador?.nome_completo ?? "Não informado"}
                         avatarUrl={pasta.criador?.avatar_url}
+                        ativo={pasta.criador?.ativo}
                         className="h-4 w-4"
                         fallbackClassName="text-[8px]"
                       />

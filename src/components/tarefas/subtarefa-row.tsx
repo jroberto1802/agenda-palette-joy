@@ -169,21 +169,29 @@ function AuthorAvatar({
   name,
   avatarUrl,
   label,
+  ativo = true,
 }: {
   name: string;
   avatarUrl?: string | null;
   label: string;
+  ativo?: boolean | null;
 }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <span className="inline-flex shrink-0" aria-label={`${label}: ${name}`}>
-          <ProfileAvatar name={name} avatarUrl={avatarUrl} className="h-5 w-5" />
+          <ProfileAvatar
+            name={name}
+            avatarUrl={avatarUrl}
+            ativo={ativo}
+            className="h-5 w-5"
+          />
         </span>
       </TooltipTrigger>
       <TooltipContent side="top" className={META_OVERLAY_Z}>
         <p className="text-xs">
           {label}: {name}
+          {ativo === false ? " (desativada)" : ""}
         </p>
       </TooltipContent>
     </Tooltip>
@@ -489,6 +497,7 @@ export function SubtarefaRow({
                           key={pessoa.id}
                           name={pessoa.nome_completo}
                           avatarUrl={pessoa.avatar_url}
+                          ativo={pessoa.ativo}
                           className="h-4 w-4 ring-1 ring-background"
                         />
                       ))}
@@ -536,6 +545,7 @@ export function SubtarefaRow({
                           key={pessoa.id}
                           name={pessoa.nome_completo}
                           avatarUrl={pessoa.avatar_url}
+                          ativo={pessoa.ativo}
                           className="h-4 w-4 ring-1 ring-background"
                         />
                       ))}
@@ -573,12 +583,14 @@ export function SubtarefaRow({
           <AuthorAvatar
             name={criadorNome}
             avatarUrl={subtarefa.criador?.avatar_url}
+            ativo={subtarefa.criador?.ativo}
             label="Criado por"
           />
           {subtarefa.concluida && concluidoNome && (
             <AuthorAvatar
               name={concluidoNome}
               avatarUrl={subtarefa.concluido_por_usuario?.avatar_url}
+              ativo={subtarefa.concluido_por_usuario?.ativo}
               label="Concluído por"
             />
           )}

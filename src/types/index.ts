@@ -15,7 +15,7 @@ export type ProfileWithSetor = Profile & {
 };
 
 export type SetorWithGerente = Setor & {
-  gerente: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
+  gerente: Pick<Profile, "id" | "nome_completo" | "avatar_url" | "ativo"> | null;
 };
 
 export type SetorFormData = {
@@ -29,11 +29,11 @@ export type Projeto = Tables<"projetos">;
 export type ProjetoStatus = Projeto["status"];
 
 export type ProjetoWithResponsavel = Projeto & {
-  criador: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
-  responsavel: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
+  criador: Pick<Profile, "id" | "nome_completo" | "avatar_url" | "ativo"> | null;
+  responsavel: Pick<Profile, "id" | "nome_completo" | "avatar_url" | "ativo"> | null;
   membros?: {
     usuario_id: string;
-    usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url" | "cargo" | "papel"> | null;
+    usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url" | "ativo" | "cargo" | "papel"> | null;
   }[];
 };
 
@@ -47,7 +47,7 @@ export type ProjetoFormData = {
   status: ProjetoStatus;
 };
 
-export type ProjetoMembro = Pick<Profile, "id" | "nome_completo" | "avatar_url" | "cargo" | "papel">;
+export type ProjetoMembro = Pick<Profile, "id" | "nome_completo" | "avatar_url" | "ativo" | "cargo" | "papel">;
 
 export type EquipeGrupo = Tables<"equipe_grupos">;
 export type EquipeGrupoMembro = Tables<"equipe_grupo_membros">;
@@ -96,16 +96,16 @@ export type TarefaCardIndicadores = {
 export type TarefaWithRelations = Tarefa & {
   setor: Pick<Setor, "id" | "nome" | "cor"> | null;
   projeto: Pick<Projeto, "id" | "nome"> | null;
-  criador: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
+  criador: Pick<Profile, "id" | "nome_completo" | "avatar_url" | "ativo"> | null;
   /** @deprecated Preferir `responsaveis` — mantido para compatibilidade com embed legado */
-  responsavel: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
+  responsavel: Pick<Profile, "id" | "nome_completo" | "avatar_url" | "ativo"> | null;
   responsaveis?: {
     usuario_id: string;
-    usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
+    usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url" | "ativo"> | null;
   }[];
   observadores?: {
     usuario_id: string;
-    usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
+    usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url" | "ativo"> | null;
   }[];
   /** Presente nas listagens; ausente em alguns retornos de mutação até o refetch. */
   indicadores?: TarefaCardIndicadores;
@@ -215,15 +215,15 @@ export type SubtarefaCardIndicadores = {
 };
 
 export type SubtarefaWithAuthors = Subtarefa & {
-  criador: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
-  concluido_por_usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
+  criador: Pick<Profile, "id" | "nome_completo" | "avatar_url" | "ativo"> | null;
+  concluido_por_usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url" | "ativo"> | null;
   responsaveis?: {
     usuario_id: string;
-    usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
+    usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url" | "ativo"> | null;
   }[];
   observadores?: {
     usuario_id: string;
-    usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
+    usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url" | "ativo"> | null;
   }[];
   /** Presente nas listagens; ausente em alguns retornos de mutação até o refetch. */
   indicadores?: SubtarefaCardIndicadores;
@@ -284,19 +284,19 @@ export type SubtarefaFormData = {
 export type ComentarioReacao = {
   usuario_id: string;
   created_at: string;
-  usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
+  usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url" | "ativo"> | null;
 };
 
 export type SubtarefaComentario = Tables<"subtarefa_comentarios"> & {
-  usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url" | "papel"> | null;
-  editor?: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
+  usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url" | "ativo" | "papel"> | null;
+  editor?: Pick<Profile, "id" | "nome_completo" | "avatar_url" | "ativo"> | null;
   reacoes?: ComentarioReacao[];
 };
 
 export type SubtarefaDetail = SubtarefaWithAuthors & {
   observadores?: {
     usuario_id: string;
-    usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
+    usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url" | "ativo"> | null;
   }[];
   comentarios: SubtarefaComentario[];
   anexos: SubtarefaAnexo[];
@@ -304,8 +304,8 @@ export type SubtarefaDetail = SubtarefaWithAuthors & {
 };
 
 export type TarefaComentario = Tables<"tarefa_comentarios"> & {
-  usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url" | "papel"> | null;
-  editor?: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
+  usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url" | "ativo" | "papel"> | null;
+  editor?: Pick<Profile, "id" | "nome_completo" | "avatar_url" | "ativo"> | null;
   reacoes?: ComentarioReacao[];
 };
 
@@ -320,14 +320,14 @@ export type AvisoAlcance = Aviso["alcance"];
 export type AvisoPrioridade = Aviso["prioridade"];
 
 export type AvisoWithRelations = Aviso & {
-  criador: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
+  criador: Pick<Profile, "id" | "nome_completo" | "avatar_url" | "ativo"> | null;
   setores: { setor: Pick<Setor, "id" | "nome"> | null }[];
-  pessoas: { usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null }[];
+  pessoas: { usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url" | "ativo"> | null }[];
   lido_por: { usuario_id: string }[];
 };
 
 export type AvisoComentario = Tables<"aviso_comentarios"> & {
-  usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url"> | null;
+  usuario: Pick<Profile, "id" | "nome_completo" | "avatar_url" | "ativo"> | null;
   reacoes?: ComentarioReacao[];
 };
 

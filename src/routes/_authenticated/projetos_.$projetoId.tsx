@@ -194,10 +194,16 @@ function ProjetoDetailPage() {
                 <ProfileAvatar
                   name={projeto.criador?.nome_completo ?? "Não informado"}
                   avatarUrl={projeto.criador?.avatar_url}
+                  ativo={projeto.criador?.ativo}
                   className="h-8 w-8"
                 />
                 <div>
-                  <p className="text-sm font-medium">
+                  <p
+                    className={cn(
+                      "text-sm font-medium",
+                      projeto.criador?.ativo === false && "text-muted-foreground/70",
+                    )}
+                  >
                     {projeto.criador?.nome_completo ?? "Não informado"}
                   </p>
                   <p className="text-xs text-muted-foreground">

@@ -97,6 +97,7 @@ export function AvisoCard({
           <ProfileAvatar
             name={aviso.criador?.nome_completo ?? "Sistema"}
             avatarUrl={aviso.criador?.avatar_url}
+            ativo={aviso.criador?.ativo}
             className={cn("h-4 w-4", muted && "opacity-70")}
             fallbackClassName="text-[8px]"
           />
@@ -105,6 +106,7 @@ export function AvisoCard({
               className={cn(
                 "truncate text-xs font-medium leading-tight",
                 muted && "text-muted-foreground",
+                aviso.criador?.ativo === false && "text-muted-foreground/70",
               )}
             >
               {aviso.criador?.nome_completo ?? "Sistema"}

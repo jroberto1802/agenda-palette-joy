@@ -24,6 +24,7 @@ export function AvisoDestinatarioDisplay({
               key={pessoa.id}
               name={pessoa.nome_completo}
               avatarUrl={pessoa.avatar_url}
+              ativo={pessoa.ativo}
               className="h-5 w-5 border-2 border-background"
               fallbackClassName="text-[9px]"
             />

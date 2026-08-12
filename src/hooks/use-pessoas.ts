@@ -1,6 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { profileKeys, setorKeys } from "@/lib/query-keys";
-import { createPessoa, deletePessoa, listPessoas, updatePessoa } from "@/services/pessoas";
+import { profileKeys, projetoKeys, setorKeys, tarefaKeys } from "@/lib/query-keys";
+import {
+  createPessoa,
+  deletePessoa,
+  desativarPessoa,
+  listPessoas,
+  reativarPessoa,
+  updatePessoa,
+  type PessoaDesativarTransferInput,
+} from "@/services/pessoas";
 import type { ProfileFormData } from "@/types";
 
 export function usePessoas(search?: string) {
@@ -27,6 +35,38 @@ export function useUpdatePessoa() {
 
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: ProfileFormData }) => updatePessoa(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: profileKeys.all });
+      queryClient.invalidateQueries({ queryKey: setorKeys.all });
+    },
+  });
+}
+
+export function useDesativarPessoa() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      id,
+      transfer,
+    }: {
+      id: string;
+      transfer?: PessoaDesativarTransferInput;
+    }) => desativarPessoa(id, transfer),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: profileKeys.all });
+      queryClient.invalidateQueries({ queryKey: setorKeys.all });
+      queryClient.invalidateQueries({ queryKey: tarefaKeys.all });
+      queryClient.invalidateQueries({ queryKey: projetoKeys.all });
+    },
+  });
+}
+
+export function useReativarPessoa() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => reativarPessoa(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: profileKeys.all });
       queryClient.invalidateQueries({ queryKey: setorKeys.all });

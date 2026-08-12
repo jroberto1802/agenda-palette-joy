@@ -21,15 +21,15 @@ const TAREFA_SELECT = `
   *,
   setor:setores(id, nome, cor),
   projeto:projetos(id, nome),
-  criador:profiles!criado_por(id, nome_completo, avatar_url),
-  responsavel:profiles!atribuido_a(id, nome_completo, avatar_url),
+  criador:profiles!criado_por(id, nome_completo, avatar_url, ativo),
+  responsavel:profiles!atribuido_a(id, nome_completo, avatar_url, ativo),
   responsaveis:tarefa_responsaveis(
     usuario_id,
-    usuario:profiles!tarefa_responsaveis_usuario_id_fkey(id, nome_completo, avatar_url)
+    usuario:profiles!tarefa_responsaveis_usuario_id_fkey(id, nome_completo, avatar_url, ativo)
   ),
   observadores:tarefa_observadores(
     usuario_id,
-    usuario:profiles!tarefa_observadores_usuario_id_fkey(id, nome_completo, avatar_url)
+    usuario:profiles!tarefa_observadores_usuario_id_fkey(id, nome_completo, avatar_url, ativo)
   )
 `;
 

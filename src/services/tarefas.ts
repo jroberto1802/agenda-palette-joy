@@ -8,6 +8,7 @@ import {
   assertMentionsPermitidas,
   listSubtarefaMencionaveis,
   listTarefaMencionaveis,
+  notifySubtarefaAtribuida,
   notifySubtarefaMencao,
   notifySubtarefaPrazo,
   notifyTarefaComentario,
@@ -53,15 +54,15 @@ const TAREFA_SELECT = `
   *,
   setor:setores(id, nome, cor),
   projeto:projetos(id, nome),
-  criador:profiles!criado_por(id, nome_completo, avatar_url),
-  responsavel:profiles!atribuido_a(id, nome_completo, avatar_url),
+  criador:profiles!criado_por(id, nome_completo, avatar_url, ativo),
+  responsavel:profiles!atribuido_a(id, nome_completo, avatar_url, ativo),
   responsaveis:tarefa_responsaveis(
     usuario_id,
-    usuario:profiles!tarefa_responsaveis_usuario_id_fkey(id, nome_completo, avatar_url)
+    usuario:profiles!tarefa_responsaveis_usuario_id_fkey(id, nome_completo, avatar_url, ativo)
   ),
   observadores:tarefa_observadores(
     usuario_id,
-    usuario:profiles!tarefa_observadores_usuario_id_fkey(id, nome_completo, avatar_url)
+    usuario:profiles!tarefa_observadores_usuario_id_fkey(id, nome_completo, avatar_url, ativo)
   )
 `;
 
@@ -79,11 +80,11 @@ const TAREFA_SELECT_LITE = `
   *,
   setor:setores(id, nome, cor),
   projeto:projetos(id, nome),
-  criador:profiles!criado_por(id, nome_completo, avatar_url),
-  responsavel:profiles!atribuido_a(id, nome_completo, avatar_url),
+  criador:profiles!criado_por(id, nome_completo, avatar_url, ativo),
+  responsavel:profiles!atribuido_a(id, nome_completo, avatar_url, ativo),
   responsaveis:tarefa_responsaveis(
     usuario_id,
-    usuario:profiles!tarefa_responsaveis_usuario_id_fkey(id, nome_completo, avatar_url)
+    usuario:profiles!tarefa_responsaveis_usuario_id_fkey(id, nome_completo, avatar_url, ativo)
   )
 `;
 
@@ -966,23 +967,23 @@ export async function softDeleteTarefa(id: string): Promise<void> {
 
 const COMENTARIO_SELECT = `
   *,
-  usuario:profiles!usuario_id(id, nome_completo, avatar_url, papel),
-  editor:profiles!editado_por(id, nome_completo, avatar_url),
+  usuario:profiles!usuario_id(id, nome_completo, avatar_url, ativo, papel),
+  editor:profiles!editado_por(id, nome_completo, avatar_url, ativo),
   reacoes:tarefa_comentario_reacoes(
     usuario_id,
     created_at,
-    usuario:profiles!tarefa_comentario_reacoes_usuario_id_fkey(id, nome_completo, avatar_url)
+    usuario:profiles!tarefa_comentario_reacoes_usuario_id_fkey(id, nome_completo, avatar_url, ativo)
   )
 `;
 
 const SUBTAREFA_COMENTARIO_SELECT = `
   *,
-  usuario:profiles!usuario_id(id, nome_completo, avatar_url, papel),
-  editor:profiles!editado_por(id, nome_completo, avatar_url),
+  usuario:profiles!usuario_id(id, nome_completo, avatar_url, ativo, papel),
+  editor:profiles!editado_por(id, nome_completo, avatar_url, ativo),
   reacoes:subtarefa_comentario_reacoes(
     usuario_id,
     created_at,
-    usuario:profiles!subtarefa_comentario_reacoes_usuario_id_fkey(id, nome_completo, avatar_url)
+    usuario:profiles!subtarefa_comentario_reacoes_usuario_id_fkey(id, nome_completo, avatar_url, ativo)
   )
 `;
 
@@ -998,15 +999,15 @@ const SUBTAREFA_BASE_SELECT = `
   data_inicio, descricao, prioridade, lembretes,
   recorrencia, projeto_id, setor_id, visibilidade, updated_at,
   dia_no_mes, offset_dias, origem_subtarefa_id,
-  criador:profiles!subtarefas_criado_por_fkey(id, nome_completo, avatar_url),
-  concluido_por_usuario:profiles!subtarefas_concluido_por_fkey(id, nome_completo, avatar_url),
+  criador:profiles!subtarefas_criado_por_fkey(id, nome_completo, avatar_url, ativo),
+  concluido_por_usuario:profiles!subtarefas_concluido_por_fkey(id, nome_completo, avatar_url, ativo),
   responsaveis:subtarefa_responsaveis(
     usuario_id,
-    usuario:profiles!subtarefa_responsaveis_usuario_id_fkey(id, nome_completo, avatar_url)
+    usuario:profiles!subtarefa_responsaveis_usuario_id_fkey(id, nome_completo, avatar_url, ativo)
   ),
   observadores:subtarefa_observadores(
     usuario_id,
-    usuario:profiles!subtarefa_observadores_usuario_id_fkey(id, nome_completo, avatar_url)
+    usuario:profiles!subtarefa_observadores_usuario_id_fkey(id, nome_completo, avatar_url, ativo)
   )
 `;
 
@@ -1272,6 +1273,16 @@ async function finalizeSubtarefasAgendaQuery(
     }));
 }
 
+async function listSubtarefaResponsavelIds(subtarefaId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("subtarefa_responsaveis")
+    .select("usuario_id")
+    .eq("subtarefa_id", subtarefaId);
+
+  if (error) throw error;
+  return (data ?? []).map((row) => row.usuario_id);
+}
+
 async function syncSubtarefaResponsaveis(
   subtarefaId: string,
   usuarioIds: string[],
@@ -1293,6 +1304,30 @@ async function syncSubtarefaResponsaveis(
     })),
   );
   if (insertError) throw insertError;
+}
+
+/** Notifica apenas responsáveis recém-atribuídos (RPC já ignora o ator). */
+async function notifyNovosResponsaveisSubtarefa(params: {
+  subtarefaId: string;
+  tarefaId: string;
+  subtarefaTitulo: string;
+  novosResponsavelIds: string[];
+}) {
+  if (params.novosResponsavelIds.length === 0) return;
+
+  const [ator, { data: tarefa }] = await Promise.all([
+    getCurrentActor(),
+    supabase.from("tarefas").select("titulo").eq("id", params.tarefaId).single(),
+  ]);
+
+  await notifySubtarefaAtribuida({
+    usuarioIds: params.novosResponsavelIds,
+    tarefaId: params.tarefaId,
+    subtarefaId: params.subtarefaId,
+    subtarefaTitulo: params.subtarefaTitulo.trim() || "subtarefa",
+    tarefaTitulo: tarefa?.titulo ?? "tarefa",
+    atorNome: ator?.nome ?? "Alguém",
+  }).catch(() => undefined);
 }
 
 async function syncSubtarefaObservadores(
@@ -1684,6 +1719,9 @@ export async function updateSubtarefaMeta(
     assertIdsNoEscopo(meta.observador_ids, escopoPai);
   }
 
+  const anterioresResponsaveis =
+    meta.atribuido_ids !== undefined ? await listSubtarefaResponsavelIds(id) : [];
+
   const patch: {
     data_inicio?: string | null;
     visibilidade?: SubtarefaWithAuthors["visibilidade"];
@@ -1730,6 +1768,16 @@ export async function updateSubtarefaMeta(
   }
 
   const row = await getSubtarefaRow(id);
+
+  if (meta.atribuido_ids !== undefined) {
+    const novos = meta.atribuido_ids.filter((uid) => !anterioresResponsaveis.includes(uid));
+    await notifyNovosResponsaveisSubtarefa({
+      subtarefaId: id,
+      tarefaId: anterior.tarefa_id,
+      subtarefaTitulo: row.titulo || anterior.titulo,
+      novosResponsavelIds: novos,
+    });
+  }
 
   if (
     meta.data_inicio !== undefined &&
@@ -1782,6 +1830,8 @@ export async function updateSubtarefa(
   assertIdsNoEscopo(atribuidoIds, escopoPai);
   assertIdsNoEscopo(observadorIds, escopoPai);
 
+  const anterioresResponsaveis = await listSubtarefaResponsavelIds(id);
+
   const patch = {
     titulo: payload.titulo.trim(),
     descricao: payload.descricao || null,
@@ -1801,6 +1851,14 @@ export async function updateSubtarefa(
 
   await syncSubtarefaResponsaveis(id, atribuidoIds);
   await syncSubtarefaObservadores(id, observadorIds);
+
+  const novos = atribuidoIds.filter((uid) => !anterioresResponsaveis.includes(uid));
+  await notifyNovosResponsaveisSubtarefa({
+    subtarefaId: id,
+    tarefaId: anterior.tarefa_id,
+    subtarefaTitulo: payload.titulo.trim() || anterior.titulo,
+    novosResponsavelIds: novos,
+  });
 
   if (toLocalDateKey(anterior.data_inicio) !== toLocalDateKey(payload.data_inicio)) {
     const [ator, stakeholders, { data: tarefa }] = await Promise.all([

@@ -16,6 +16,7 @@ import {
   useRemoveProjetoMembro,
 } from "@/hooks/use-projetos";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
+import { cn } from "@/lib/utils";
 import { listAtividadesDoMembroNoProjeto, type ProjetoAtividadeTransferivel } from "@/services/projetos";
 import type { ProfileWithSetor, ProjetoMembro } from "@/types";
 import { PAPEL_LABELS } from "@/utils/permissions";
@@ -157,10 +158,18 @@ export function ProjetoEquipeSection({
                 <ProfileAvatar
                   name={membro.nome_completo}
                   avatarUrl={membro.avatar_url}
+                  ativo={membro.ativo}
                   className="h-8 w-8"
                 />
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{membro.nome_completo}</p>
+                  <p
+                    className={cn(
+                      "truncate text-sm font-medium",
+                      membro.ativo === false && "text-muted-foreground/70",
+                    )}
+                  >
+                    {membro.nome_completo}
+                  </p>
                   <p className="truncate text-xs text-muted-foreground">
                     {membro.cargo || PAPEL_LABELS[membro.papel]}
                   </p>

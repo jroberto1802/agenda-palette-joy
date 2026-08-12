@@ -29,7 +29,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import type { Papel, ProfileFormData, ProfileWithSetor, SetorWithGerente } from "@/types";
 import { PAPEL_LABELS, PAPEIS_CADASTRO } from "@/utils/permissions";
 
@@ -319,26 +318,6 @@ export function PessoaFormDialog({
                 </FormItem>
               )}
             />
-
-            {!isCreate && (
-              <FormField
-                control={form.control}
-                name="ativo"
-                render={({ field }) => (
-                  <FormItem className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <FormLabel>Status ativo</FormLabel>
-                      <p className="text-xs text-muted-foreground">
-                        Pessoas inativas não aparecem nas atribuições.
-                      </p>
-                    </div>
-                    <FormControl>
-                      <Switch checked={field.value} onCheckedChange={field.onChange} />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-            )}
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

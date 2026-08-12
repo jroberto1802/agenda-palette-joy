@@ -17,6 +17,7 @@ export type TarefaPeopleMini = {
   id: string;
   nome_completo: string;
   avatar_url?: string | null;
+  ativo?: boolean | null;
 };
 
 function PersonAvatar({
@@ -33,6 +34,7 @@ function PersonAvatar({
           <ProfileAvatar
             name={person.nome_completo}
             avatarUrl={person.avatar_url}
+            ativo={person.ativo}
             className={cn(
               "border border-background",
               compact ? "h-5 w-5" : "h-6 w-6",
@@ -42,7 +44,10 @@ function PersonAvatar({
         </span>
       </TooltipTrigger>
       <TooltipContent side="top" className={OVERLAY_Z}>
-        <p className="text-xs">{person.nome_completo}</p>
+        <p className="text-xs">
+          {person.nome_completo}
+          {person.ativo === false ? " (desativada)" : ""}
+        </p>
       </TooltipContent>
     </Tooltip>
   );

@@ -27,6 +27,7 @@ import { useProfile } from "@/hooks/use-profile";
 import { useSetores } from "@/hooks/use-setores";
 import { useSoftDeleteTarefaComEscopo } from "@/hooks/use-tarefas";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
+import { cn } from "@/lib/utils";
 import {
   isRecorrenciaEntradasSlug,
   RECORRENCIA_ENTRADAS_SLUG,
@@ -191,10 +192,16 @@ function RecorrentesPastaDetailPage() {
                   <ProfileAvatar
                     name={pasta.criador?.nome_completo ?? "Não informado"}
                     avatarUrl={pasta.criador?.avatar_url}
+                    ativo={pasta.criador?.ativo}
                     className="h-8 w-8"
                   />
                   <div>
-                    <p className="text-sm font-medium">
+                    <p
+                      className={cn(
+                        "text-sm font-medium",
+                        pasta.criador?.ativo === false && "text-muted-foreground/70",
+                      )}
+                    >
                       {pasta.criador?.nome_completo ?? "Não informado"}
                     </p>
                     <p className="text-xs text-muted-foreground">

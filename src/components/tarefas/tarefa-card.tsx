@@ -183,6 +183,7 @@ export function TarefaCard({
                           <ProfileAvatar
                             name={pessoa.nome_completo}
                             avatarUrl={pessoa.avatar_url}
+                            ativo={pessoa.ativo}
                             className="h-4 w-4 ring-1 ring-background"
                           />
                         </span>

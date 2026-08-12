@@ -93,6 +93,25 @@ export async function notifyTarefaAtribuida(params: {
   });
 }
 
+/** Atribuição de responsável em subtarefa — mesmo tipo/canal da tarefa, com contexto da pai. */
+export async function notifySubtarefaAtribuida(params: {
+  usuarioIds: string[];
+  tarefaId: string;
+  subtarefaId: string;
+  subtarefaTitulo: string;
+  tarefaTitulo: string;
+  atorNome: string;
+}) {
+  await notifyEvent({
+    usuarioIds: params.usuarioIds,
+    tipo: "tarefa_atribuida",
+    mensagem: `${params.atorNome} atribuiu a subtarefa ${params.subtarefaTitulo} (${params.tarefaTitulo}) para você`,
+    referencia_tipo: "tarefa",
+    referencia_id: params.tarefaId,
+    meta: { subtarefa_id: params.subtarefaId },
+  });
+}
+
 export async function notifyTarefaVisualizador(params: {
   usuarioIds: string[];
   tarefaId: string;
@@ -581,7 +600,7 @@ export async function listTarefaMencionaveis(
 
   const { data: pessoas } = await supabase
     .from("profiles")
-    .select("id, nome_completo, avatar_url")
+    .select("id, nome_completo, avatar_url, ativo")
     .eq("ativo", true)
     .in("id", [...ids]);
 
@@ -625,7 +644,7 @@ export async function listSubtarefaMencionaveis(
 
   const { data: pessoas } = await supabase
     .from("profiles")
-    .select("id, nome_completo, avatar_url")
+    .select("id, nome_completo, avatar_url, ativo")
     .eq("ativo", true)
     .in("id", [...ids]);
 
@@ -680,7 +699,7 @@ export async function listAvisoMencionaveis(
 
   const { data: pessoas } = await supabase
     .from("profiles")
-    .select("id, nome_completo, avatar_url")
+    .select("id, nome_completo, avatar_url, ativo")
     .eq("ativo", true)
     .in("id", [...ids]);
 

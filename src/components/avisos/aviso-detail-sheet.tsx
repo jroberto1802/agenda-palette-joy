@@ -156,10 +156,16 @@ export function AvisoDetailSheet({
                         <ProfileAvatar
                           name={aviso.criador?.nome_completo ?? "Sistema"}
                           avatarUrl={aviso.criador?.avatar_url}
+                          ativo={aviso.criador?.ativo}
                           className="h-8 w-8"
                         />
                         <div>
-                          <p className="text-sm font-medium text-foreground">
+                          <p
+                            className={cn(
+                              "text-sm font-medium text-foreground",
+                              aviso.criador?.ativo === false && "text-muted-foreground/70",
+                            )}
+                          >
                             {aviso.criador?.nome_completo ?? "Sistema"}
                           </p>
                           <p className="text-xs text-muted-foreground">

@@ -4,11 +4,11 @@ import type { ProjetoFormData, ProjetoMembro, ProjetoWithResponsavel } from "@/t
 
 const PROJETO_SELECT = `
   *,
-  criador:profiles!projetos_criado_por_fkey(id, nome_completo, avatar_url),
-  responsavel:profiles!projetos_responsavel_id_fkey(id, nome_completo, avatar_url),
+  criador:profiles!projetos_criado_por_fkey(id, nome_completo, avatar_url, ativo),
+  responsavel:profiles!projetos_responsavel_id_fkey(id, nome_completo, avatar_url, ativo),
   membros:projeto_membros(
     usuario_id,
-    usuario:profiles!projeto_membros_usuario_id_fkey(id, nome_completo, avatar_url, cargo, papel)
+    usuario:profiles!projeto_membros_usuario_id_fkey(id, nome_completo, avatar_url, ativo, cargo, papel)
   )
 `;
 
@@ -69,7 +69,7 @@ export async function listProjetoMembros(projetoId: string): Promise<ProjetoMemb
   const { data, error } = await supabase
     .from("projeto_membros")
     .select(
-      "usuario_id, usuario:profiles!projeto_membros_usuario_id_fkey(id, nome_completo, avatar_url, cargo, papel)",
+      "usuario_id, usuario:profiles!projeto_membros_usuario_id_fkey(id, nome_completo, avatar_url, ativo, cargo, papel)",
     )
     .eq("projeto_id", projetoId);
 
@@ -356,7 +356,7 @@ export async function listAtividadesDoMembroNoProjeto(
   return result.sort((a, b) => a.titulo.localeCompare(b.titulo, "pt-BR"));
 }
 
-async function transferResponsavelTarefa(
+export async function transferResponsavelTarefa(
   tarefaId: string,
   fromUserId: string,
   toUserId: string,
@@ -395,7 +395,7 @@ async function transferResponsavelTarefa(
   if (updateError) throw updateError;
 }
 
-async function transferResponsavelSubtarefa(
+export async function transferResponsavelSubtarefa(
   subtarefaId: string,
   fromUserId: string,
   toUserId: string,
