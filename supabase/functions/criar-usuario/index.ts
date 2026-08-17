@@ -3,7 +3,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-region",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
 type CreateUserBody = {
@@ -15,6 +16,44 @@ type CreateUserBody = {
   gestor_id?: string | null;
 };
 
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+function mapCreateUserError(err: unknown): string {
+  const message = err instanceof Error ? err.message : "Erro desconhecido";
+  const lower = message.toLowerCase();
+
+  if (lower.includes("already") || lower.includes("registered") || lower.includes("exists")) {
+    return "Já existe uma pessoa cadastrada com este e-mail.";
+  }
+  if (
+    lower.includes("leaked") ||
+    lower.includes("pwned") ||
+    lower.includes("have i been") ||
+    lower.includes("easy to guess")
+  ) {
+    return "Esta senha é muito comum ou já apareceu em vazamentos. Escolha outra senha provisória.";
+  }
+  if (
+    lower.includes("password") &&
+    (lower.includes("at least") ||
+      lower.includes("too short") ||
+      lower.includes("characters") ||
+      lower.includes("weak"))
+  ) {
+    return "A senha não atende à política do sistema. Use uma senha mais longa e segura.";
+  }
+  if (lower.includes("database error creating new user")) {
+    return "Não foi possível criar o usuário. Verifique se o e-mail já está em uso.";
+  }
+
+  return message;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -23,16 +62,16 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Não autenticado" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "Não autenticado" }, 401);
     }
 
     const supabaseUser = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      { global: { headers: { Authorization: authHeader } } },
+      {
+        global: { headers: { Authorization: authHeader } },
+        auth: { autoRefreshToken: false, persistSession: false },
+      },
     );
 
     const {
@@ -41,10 +80,7 @@ Deno.serve(async (req) => {
     } = await supabaseUser.auth.getUser();
 
     if (userError || !user) {
-      return new Response(JSON.stringify({ error: "Não autenticado" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "Não autenticado" }, 401);
     }
 
     const { data: profile } = await supabaseUser
@@ -55,12 +91,9 @@ Deno.serve(async (req) => {
 
     const callerPapel = profile?.papel;
     if (callerPapel !== "admin" && callerPapel !== "gerente") {
-      return new Response(
-        JSON.stringify({ error: "Apenas administradores e gestores podem criar usuários" }),
-        {
-          status: 403,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
+      return jsonResponse(
+        { error: "Apenas administradores e gestores podem criar usuários" },
+        403,
       );
     }
 
@@ -75,36 +108,32 @@ Deno.serve(async (req) => {
     } = body;
 
     if (!email || !password || !nome_completo) {
-      return new Response(
-        JSON.stringify({ error: "Campos obrigatórios: email, password, nome_completo" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
+      return jsonResponse(
+        { error: "Campos obrigatórios: email, password, nome_completo" },
+        400,
+      );
+    }
+
+    if (typeof password !== "string" || password.length < 6) {
+      return jsonResponse(
+        { error: "A senha provisória deve ter pelo menos 6 caracteres." },
+        400,
       );
     }
 
     if (!papel) {
-      return new Response(JSON.stringify({ error: "Papel é obrigatório." }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "Papel é obrigatório." }, 400);
     }
 
     // Gestor não pode criar administradores
     if (callerPapel === "gerente" && papel === "admin") {
-      return new Response(
-        JSON.stringify({ error: "Gestores não podem criar administradores." }),
-        {
-          status: 403,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
+      return jsonResponse({ error: "Gestores não podem criar administradores." }, 403);
     }
 
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      { auth: { autoRefreshToken: false, persistSession: false } },
     );
 
     const { data: existingProfile } = await supabaseAdmin
@@ -114,12 +143,9 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (existingProfile) {
-      return new Response(
-        JSON.stringify({ error: "Já existe uma pessoa cadastrada com este e-mail." }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
+      return jsonResponse(
+        { error: "Já existe uma pessoa cadastrada com este e-mail." },
+        400,
       );
     }
 
@@ -131,17 +157,7 @@ Deno.serve(async (req) => {
     });
 
     if (createError) {
-      const msg = createError.message?.toLowerCase() ?? "";
-      if (msg.includes("already") || msg.includes("registered") || msg.includes("exists")) {
-        return new Response(
-          JSON.stringify({ error: "Já existe uma pessoa cadastrada com este e-mail." }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          },
-        );
-      }
-      throw createError;
+      return jsonResponse({ error: mapCreateUserError(createError) }, 400);
     }
 
     const validPapeis = ["admin", "gerente", "usuario", "visualizador"];
@@ -161,14 +177,8 @@ Deno.serve(async (req) => {
 
     if (profileError) throw profileError;
 
-    return new Response(JSON.stringify({ user_id: newUser.user.id }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponse({ user_id: newUser.user.id });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Erro desconhecido";
-    return new Response(JSON.stringify({ error: message }), {
-      status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponse({ error: mapCreateUserError(err) }, 400);
   }
 });

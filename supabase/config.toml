@@ -377,14 +377,16 @@ deno_version = 2
 
 # Edge Functions usadas pelos Cadastros (criar/excluir pessoa).
 # Deploy no projeto da app: aalhlizyiowvrtsmdpkc
+# verify_jwt do gateway é legado e falha com JWT Signing Keys (401 Invalid JWT).
+# A autenticação continua sendo feita dentro de cada function via auth.getUser().
 [functions.criar-usuario]
-verify_jwt = true
+verify_jwt = false
 
 [functions.excluir-usuario]
-verify_jwt = true
+verify_jwt = false
 
 [functions.restaurar-senha]
-verify_jwt = true
+verify_jwt = false
 
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"

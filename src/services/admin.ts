@@ -1,13 +1,10 @@
 import { supabase } from "@/integrations/supabase/client";
-import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
+import { getSupabaseErrorMessage, readFunctionsInvokeMessage } from "@/lib/supabase-errors";
 import type { AdminCreateUserData, AdminRestaurarSenhaData } from "@/types";
 
-function mapFunctionError(error: unknown, data: unknown, action: string): Error {
-  if (data && typeof data === "object" && "error" in data && (data as { error?: unknown }).error) {
-    return new Error(String((data as { error: unknown }).error));
-  }
-
-  const message = getSupabaseErrorMessage(error as Error);
+async function mapFunctionError(error: unknown, data: unknown, action: string): Promise<Error> {
+  const rawMessage = (await readFunctionsInvokeMessage(error, data)) ?? "";
+  const message = getSupabaseErrorMessage(new Error(rawMessage || "Erro ao processar solicitação."));
   const lower = message.toLowerCase();
 
   if (
@@ -23,7 +20,7 @@ function mapFunctionError(error: unknown, data: unknown, action: string): Error 
     );
   }
 
-  return error instanceof Error ? error : new Error(message);
+  return new Error(message);
 }
 
 export async function criarUsuarioAdmin(payload: AdminCreateUserData): Promise<{ user_id: string }> {
@@ -31,8 +28,8 @@ export async function criarUsuarioAdmin(payload: AdminCreateUserData): Promise<{
     body: payload,
   });
 
-  if (error) throw mapFunctionError(error, data, "criar-usuario");
-  if (data?.error) throw new Error(data.error);
+  if (error) throw await mapFunctionError(error, data, "criar-usuario");
+  if (data?.error) throw new Error(getSupabaseErrorMessage(new Error(String(data.error))));
 
   return { user_id: data.user_id as string };
 }
@@ -42,8 +39,8 @@ export async function excluirUsuarioAdmin(userId: string): Promise<void> {
     body: { user_id: userId },
   });
 
-  if (error) throw mapFunctionError(error, data, "excluir-usuario");
-  if (data?.error) throw new Error(data.error);
+  if (error) throw await mapFunctionError(error, data, "excluir-usuario");
+  if (data?.error) throw new Error(getSupabaseErrorMessage(new Error(String(data.error))));
 }
 
 export async function restaurarSenhaUsuario(
@@ -53,8 +50,8 @@ export async function restaurarSenhaUsuario(
     body: payload,
   });
 
-  if (error) throw mapFunctionError(error, data, "restaurar-senha");
-  if (data?.error) throw new Error(data.error);
+  if (error) throw await mapFunctionError(error, data, "restaurar-senha");
+  if (data?.error) throw new Error(getSupabaseErrorMessage(new Error(String(data.error))));
 
   return {
     senha_temporaria_expira_em: String(data.senha_temporaria_expira_em ?? ""),
