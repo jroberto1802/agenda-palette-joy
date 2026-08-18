@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { CommentsThread } from "@/components/common/comments-thread";
 import { EditableOnDoubleClick } from "@/components/common/editable-on-double-click";
+import { ConclusaoBolinha } from "@/components/tarefas/conclusao-bolinha";
 import { SubtarefaAnexosSection } from "@/components/tarefas/subtarefa-anexos-section";
 import { TarefaMetaToolbar } from "@/components/tarefas/tarefa-meta-toolbar";
 import { TarefaPeopleStrip } from "@/components/tarefas/tarefa-people-strip";
@@ -37,6 +38,7 @@ import {
   useCreateSubtarefaComentario,
   useDeleteSubtarefaComentario,
   useSubtarefaDetail,
+  useToggleSubtarefa,
   useToggleSubtarefaComentarioReacao,
   useUpdateSubtarefa,
   useUpdateSubtarefaComentario,
@@ -173,6 +175,7 @@ export function SubtarefaPanelSheet({
   const { data: pessoas } = usePessoas();
   const { data: subtarefa, isLoading } = useSubtarefaDetail(open ? subtarefaId : null);
   const updateSubtarefa = useUpdateSubtarefa();
+  const toggleSubtarefa = useToggleSubtarefa();
   const createComentario = useCreateSubtarefaComentario();
   const deleteComentario = useDeleteSubtarefaComentario();
   const updateComentario = useUpdateSubtarefaComentario();
@@ -218,6 +221,21 @@ export function SubtarefaPanelSheet({
       profile.setor_id,
     );
   }, [readOnly, parentTarefa, profile]);
+
+  const mostrarBolinhaCabecalho = !!subtarefa && !subtarefa.concluida && !readOnly;
+
+  const handleToggleConclusao = async (concluida: boolean) => {
+    if (!subtarefa) return;
+    try {
+      await toggleSubtarefa.mutateAsync({ id: subtarefa.id, concluida });
+      toast.success(concluida ? "Subtarefa concluída" : "Subtarefa reaberta");
+    } catch (error) {
+      toast.error(concluida ? "Erro ao concluir subtarefa" : "Erro ao reabrir subtarefa", {
+        description: getSupabaseErrorMessage(error as Error),
+      });
+      throw error;
+    }
+  };
 
   /** Visualizadores (e quem tem leitura) podem comentar/anexar sem editar campos. */
   const canCommentOrAttach = useMemo(
@@ -474,13 +492,22 @@ export function SubtarefaPanelSheet({
                       <span className="font-medium text-foreground">{parentTitle}</span>
                     </span>
                   </button>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <Badge
                       variant="outline"
                       className={`px-1.5 py-0 text-[10px] ${TAREFA_PRIORIDADE_COLORS[subtarefa.prioridade]}`}
                     >
                       {subtarefa.prioridade}
                     </Badge>
+                    {mostrarBolinhaCabecalho && (
+                      <ConclusaoBolinha
+                        concluida={false}
+                        kind="subtarefa"
+                        size="sm"
+                        disabled={!canEdit}
+                        onToggle={handleToggleConclusao}
+                      />
+                    )}
                     <Badge
                       variant="secondary"
                       className={`px-1.5 py-0 text-[10px] ${getTarefaConclusaoColorClass(subtarefa.concluida)}`}

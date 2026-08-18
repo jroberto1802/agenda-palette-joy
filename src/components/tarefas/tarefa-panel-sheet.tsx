@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { CommentsThread } from "@/components/common/comments-thread";
 import { EditableOnDoubleClick } from "@/components/common/editable-on-double-click";
+import { ConclusaoBolinha } from "@/components/tarefas/conclusao-bolinha";
 import { TarefaRecorrenciaBadge } from "@/components/tarefas/recorrencia-ocorrencia-badge";
 import { SubtarefaPanelSheet } from "@/components/tarefas/subtarefa-panel-sheet";
 import { SubtarefaRow } from "@/components/tarefas/subtarefa-row";
@@ -74,6 +75,7 @@ import {
   useToggleTarefaComentarioReacao,
   useUpdateSubtarefaMeta,
   useUpdateTarefa,
+  useUpdateTarefaConclusao,
   useUpdateTarefaComentario,
 } from "@/hooks/use-tarefas";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
@@ -101,6 +103,7 @@ import {
   canCommentOrAttachTarefa,
   canEditTarefa,
   canEditVisibilidade,
+  canToggleTarefaConclusao,
   getSetoresPermitidos,
   getTarefaConclusaoColorClass,
   getTarefaConclusaoLabel,
@@ -367,6 +370,7 @@ export function TarefaPanelSheet({
 
   const createTarefa = useCreateTarefa();
   const updateTarefa = useUpdateTarefa();
+  const updateConclusao = useUpdateTarefaConclusao();
   const createSubtarefa = useCreateSubtarefa();
   const toggleSubtarefa = useToggleSubtarefa();
   const updateSubtarefaMeta = useUpdateSubtarefaMeta();
@@ -450,6 +454,31 @@ export function TarefaPanelSheet({
       profile.setor_id,
     );
   }, [readOnly, isCreate, tarefa, profile]);
+
+  const mostrarBolinhaCabecalho =
+    !!tarefa && !tarefa.concluida && !ehModeloSerie && !readOnly;
+  const podeAlternarConclusao =
+    !!tarefa &&
+    canToggleTarefaConclusao(
+      tarefa,
+      profile?.id,
+      isAdmin(profile),
+      isGerente(profile),
+      profile?.setor_id,
+    );
+
+  const handleToggleConclusao = async (concluida: boolean) => {
+    if (!tarefa) return;
+    try {
+      await updateConclusao.mutateAsync({ id: tarefa.id, concluida });
+      toast.success(concluida ? "Tarefa concluída" : "Tarefa reaberta");
+    } catch (error) {
+      toast.error(concluida ? "Erro ao concluir tarefa" : "Erro ao reabrir tarefa", {
+        description: getSupabaseErrorMessage(error as Error),
+      });
+      throw error;
+    }
+  };
 
   /** Visualizadores (e quem tem leitura) podem comentar/anexar sem editar campos. */
   const canCommentOrAttach = useMemo(
@@ -849,7 +878,7 @@ export function TarefaPanelSheet({
                         </span>
                       </div>
                       {!readOnly && (
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           {tarefa && (
                             <>
                               <Badge
@@ -858,6 +887,14 @@ export function TarefaPanelSheet({
                               >
                                 {tarefa.prioridade}
                               </Badge>
+                              {mostrarBolinhaCabecalho && (
+                                <ConclusaoBolinha
+                                  concluida={false}
+                                  kind="tarefa"
+                                  disabled={!podeAlternarConclusao}
+                                  onToggle={handleToggleConclusao}
+                                />
+                              )}
                               <TarefaRecorrenciaBadge
                                 tarefa={tarefa}
                                 detalhado

@@ -75,6 +75,9 @@ export function getSupabaseErrorMessage(error: PostgrestError | Error | null): s
   if (message.includes("pessoas vinculadas")) {
     return message;
   }
+  if (lower.includes("subtarefas abertas") && lower.includes("concluir")) {
+    return "Não é possível concluir esta tarefa: existem subtarefas abertas. Conclua-as primeiro.";
+  }
   if (
     message.includes("tamanho máximo permitido de 500 KB") ||
     lower.includes("maximum allowed size") ||
