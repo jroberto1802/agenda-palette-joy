@@ -6,7 +6,12 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { CommentsThread } from "@/components/common/comments-thread";
 import { EditableOnDoubleClick } from "@/components/common/editable-on-double-click";
-import { ConclusaoBolinha } from "@/components/tarefas/conclusao-bolinha";
+import {
+  ConclusaoBolinha,
+  NestedModalLockProvider,
+  isNestedOverlayEventTarget,
+  useNestedModalLock,
+} from "@/components/tarefas/conclusao-bolinha";
 import { SubtarefaAnexosSection } from "@/components/tarefas/subtarefa-anexos-section";
 import { TarefaMetaToolbar } from "@/components/tarefas/tarefa-meta-toolbar";
 import { TarefaPeopleStrip } from "@/components/tarefas/tarefa-people-strip";
@@ -186,6 +191,7 @@ export function SubtarefaPanelSheet({
   );
   const [editingField, setEditingField] = useState<EditableField | null>(null);
   const savingRef = useRef(false);
+  const nestedModalLock = useNestedModalLock();
   /** Visibilidade acompanha Responsáveis até edição manual (primeira configuração). */
   const visibilidadeManualRef = useRef(false);
 
@@ -407,6 +413,7 @@ export function SubtarefaPanelSheet({
   };
 
   const handleOpenChange = async (next: boolean) => {
+    if (!next && nestedModalLock.isLocked()) return;
     if (!next) {
       const ok = await persistChanges();
       if (!ok) return;
@@ -419,13 +426,17 @@ export function SubtarefaPanelSheet({
   } = form;
 
   return (
+    <NestedModalLockProvider value={nestedModalLock}>
     <Sheet open={open} onOpenChange={(next) => void handleOpenChange(next)}>
       <SheetContent
         side="right"
         className={cn(SUBTAREFA_PANEL_CONTENT_CLASS)}
         onInteractOutside={(event) => {
           const target = event.target as HTMLElement | null;
-          // Permite interação com popovers/selects portais (Responsável, Visibilidade, etc.).
+          if (isNestedOverlayEventTarget(target) || nestedModalLock.isLocked()) {
+            event.preventDefault();
+            return;
+          }
           if (
             target?.closest(
               "[data-radix-popper-content-wrapper], [role='listbox'], [data-radix-select-content]",
@@ -437,6 +448,10 @@ export function SubtarefaPanelSheet({
         }}
         onFocusOutside={(event) => {
           const target = event.target as HTMLElement | null;
+          if (isNestedOverlayEventTarget(target) || nestedModalLock.isLocked()) {
+            event.preventDefault();
+            return;
+          }
           if (
             target?.closest(
               "[data-radix-popper-content-wrapper], [role='listbox'], [data-radix-select-content]",
@@ -448,6 +463,10 @@ export function SubtarefaPanelSheet({
         }}
         onPointerDownOutside={(event) => {
           const target = event.target as HTMLElement | null;
+          if (isNestedOverlayEventTarget(target) || nestedModalLock.isLocked()) {
+            event.preventDefault();
+            return;
+          }
           if (
             target?.closest(
               "[data-radix-popper-content-wrapper], [role='listbox'], [data-radix-select-content]",
@@ -456,6 +475,9 @@ export function SubtarefaPanelSheet({
             return;
           }
           event.preventDefault();
+        }}
+        onEscapeKeyDown={(event) => {
+          if (nestedModalLock.isLocked()) event.preventDefault();
         }}
       >
         {isLoading || !subtarefa ? (
@@ -493,21 +515,23 @@ export function SubtarefaPanelSheet({
                     </span>
                   </button>
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <Badge
-                      variant="outline"
-                      className={`px-1.5 py-0 text-[10px] ${TAREFA_PRIORIDADE_COLORS[subtarefa.prioridade]}`}
-                    >
-                      {subtarefa.prioridade}
-                    </Badge>
-                    {mostrarBolinhaCabecalho && (
-                      <ConclusaoBolinha
-                        concluida={false}
-                        kind="subtarefa"
-                        size="sm"
-                        disabled={!canEdit}
-                        onToggle={handleToggleConclusao}
-                      />
-                    )}
+                    <div className="flex items-center gap-1.5">
+                      <Badge
+                        variant="outline"
+                        className={`px-1.5 py-0 text-[10px] ${TAREFA_PRIORIDADE_COLORS[subtarefa.prioridade]}`}
+                      >
+                        {subtarefa.prioridade}
+                      </Badge>
+                      {mostrarBolinhaCabecalho && (
+                        <ConclusaoBolinha
+                          concluida={false}
+                          kind="subtarefa"
+                          size="sm"
+                          disabled={!canEdit}
+                          onToggle={handleToggleConclusao}
+                        />
+                      )}
+                    </div>
                     <Badge
                       variant="secondary"
                       className={`px-1.5 py-0 text-[10px] ${getTarefaConclusaoColorClass(subtarefa.concluida)}`}
@@ -759,5 +783,6 @@ export function SubtarefaPanelSheet({
         )}
       </SheetContent>
     </Sheet>
+    </NestedModalLockProvider>
   );
 }

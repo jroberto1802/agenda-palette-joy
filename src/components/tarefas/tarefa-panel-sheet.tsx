@@ -21,7 +21,12 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { CommentsThread } from "@/components/common/comments-thread";
 import { EditableOnDoubleClick } from "@/components/common/editable-on-double-click";
-import { ConclusaoBolinha } from "@/components/tarefas/conclusao-bolinha";
+import {
+  ConclusaoBolinha,
+  NestedModalLockProvider,
+  isNestedOverlayEventTarget,
+  useNestedModalLock,
+} from "@/components/tarefas/conclusao-bolinha";
 import { TarefaRecorrenciaBadge } from "@/components/tarefas/recorrencia-ocorrencia-badge";
 import { SubtarefaPanelSheet } from "@/components/tarefas/subtarefa-panel-sheet";
 import { SubtarefaRow } from "@/components/tarefas/subtarefa-row";
@@ -395,6 +400,7 @@ export function TarefaPanelSheet({
 
   const ehModeloSerie =
     serieModeloMode || (!!tarefa && isSerieModelo(tarefa));
+  const nestedModalLock = useNestedModalLock();
 
   useEffect(() => {
     if (!open) {
@@ -790,20 +796,33 @@ export function TarefaPanelSheet({
 
   return (
     <>
+    <NestedModalLockProvider value={nestedModalLock}>
     <Dialog
       open={open}
       onOpenChange={(next) => {
-        if (!next && subtarefaDrawerId) return;
+        if (!next && (subtarefaDrawerId || nestedModalLock.isLocked())) return;
         onOpenChange(next);
       }}
     >
       <DialogContent
         className={LARGE_MODAL_CONTENT_CLASS}
         onInteractOutside={(event) => {
-          if (subtarefaDrawerId) event.preventDefault();
+          if (subtarefaDrawerId || nestedModalLock.isLocked() || isNestedOverlayEventTarget(event.target)) {
+            event.preventDefault();
+          }
+        }}
+        onFocusOutside={(event) => {
+          if (subtarefaDrawerId || nestedModalLock.isLocked() || isNestedOverlayEventTarget(event.target)) {
+            event.preventDefault();
+          }
+        }}
+        onPointerDownOutside={(event) => {
+          if (subtarefaDrawerId || nestedModalLock.isLocked() || isNestedOverlayEventTarget(event.target)) {
+            event.preventDefault();
+          }
         }}
         onEscapeKeyDown={(event) => {
-          if (subtarefaDrawerId) event.preventDefault();
+          if (subtarefaDrawerId || nestedModalLock.isLocked()) event.preventDefault();
         }}
       >
         {isLoading && !isCreate ? (
@@ -881,20 +900,22 @@ export function TarefaPanelSheet({
                         <div className="flex flex-wrap items-center gap-2">
                           {tarefa && (
                             <>
-                              <Badge
-                                variant="outline"
-                                className={TAREFA_PRIORIDADE_COLORS[tarefa.prioridade]}
-                              >
-                                {tarefa.prioridade}
-                              </Badge>
-                              {mostrarBolinhaCabecalho && (
-                                <ConclusaoBolinha
-                                  concluida={false}
-                                  kind="tarefa"
-                                  disabled={!podeAlternarConclusao}
-                                  onToggle={handleToggleConclusao}
-                                />
-                              )}
+                              <div className="flex items-center gap-1.5">
+                                <Badge
+                                  variant="outline"
+                                  className={TAREFA_PRIORIDADE_COLORS[tarefa.prioridade]}
+                                >
+                                  {tarefa.prioridade}
+                                </Badge>
+                                {mostrarBolinhaCabecalho && (
+                                  <ConclusaoBolinha
+                                    concluida={false}
+                                    kind="tarefa"
+                                    disabled={!podeAlternarConclusao}
+                                    onToggle={handleToggleConclusao}
+                                  />
+                                )}
+                              </div>
                               <TarefaRecorrenciaBadge
                                 tarefa={tarefa}
                                 detalhado
@@ -1290,6 +1311,7 @@ export function TarefaPanelSheet({
         )}
       </DialogContent>
     </Dialog>
+    </NestedModalLockProvider>
 
     <SubtarefaPanelSheet
       subtarefaId={subtarefaDrawerId}
