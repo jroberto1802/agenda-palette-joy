@@ -199,7 +199,7 @@ export function TarefaAgendaBoard({
       writeAgendaClassificarPreference(
         preferenceUserId,
         classificarScope,
-        normalizeTarefaClassificar(next.classificar),
+        normalizeTarefaClassificar(next.classificar, classificarScope),
       );
     }
 
@@ -251,8 +251,10 @@ export function TarefaAgendaBoard({
 
   const { data: tarefas, isLoading } = useTarefas(queryFilters);
 
+  const classificarScopeForMode = toClassificarScope(preferenceScope);
   const classificarMode: TarefaClassificar = normalizeTarefaClassificar(
     filters.classificar,
+    classificarScopeForMode ?? undefined,
   );
   const sortedTarefas = useMemo(
     () => (tarefas ? sortByClassificar(tarefas, classificarMode) : []),

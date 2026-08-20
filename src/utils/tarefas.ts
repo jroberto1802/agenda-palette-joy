@@ -8,7 +8,7 @@ import type {
   TarefaWithRelations,
 } from "@/types";
 import type { TarefaClassificar } from "@/utils/agenda-classificar-preference";
-import { toLocalDateKey } from "@/utils/agenda-datas";
+import { hasExplicitTime, toLocalDateKey } from "@/utils/agenda-datas";
 
 /** Campos mínimos para ordenar a lista de subtarefas (pendentes acima). */
 export type SubtarefaListOrderable = Pick<
@@ -44,27 +44,90 @@ export type ClassificavelPorAgenda = {
   prioridade: TarefaPrioridade;
   data_inicio: string | null;
   titulo: string;
+  /** Desempate estável quando prioridade/hora empatam (ex.: created_at). */
+  created_at?: string | null;
 };
+
+/** Minutos desde meia-noite se houver hora explícita; null se só a data (12:00). */
+function explicitTimeMinutes(dataInicio: string | null | undefined): number | null {
+  if (!dataInicio) return null;
+  const date = new Date(dataInicio);
+  if (Number.isNaN(date.getTime()) || !hasExplicitTime(date)) return null;
+  return date.getHours() * 60 + date.getMinutes();
+}
+
+function compareTituloOuCriacao(a: ClassificavelPorAgenda, b: ClassificavelPorAgenda): number {
+  const createdA = a.created_at ?? "";
+  const createdB = b.created_at ?? "";
+  if (createdA && createdB && createdA !== createdB) {
+    return createdA.localeCompare(createdB);
+  }
+  return a.titulo.localeCompare(b.titulo, "pt-BR");
+}
+
+function compareByPriorityThenTime(a: ClassificavelPorAgenda, b: ClassificavelPorAgenda): number {
+  const byPriority =
+    TAREFA_PRIORIDADE_RANK[a.prioridade] - TAREFA_PRIORIDADE_RANK[b.prioridade];
+  if (byPriority !== 0) return byPriority;
+
+  const timeA = explicitTimeMinutes(a.data_inicio);
+  const timeB = explicitTimeMinutes(b.data_inicio);
+  if (timeA == null && timeB == null) return compareTituloOuCriacao(a, b);
+  if (timeA == null) return 1;
+  if (timeB == null) return -1;
+  if (timeA !== timeB) return timeA - timeB;
+  return compareTituloOuCriacao(a, b);
+}
+
+function compareByTimeThenPriority(a: ClassificavelPorAgenda, b: ClassificavelPorAgenda): number {
+  const timeA = explicitTimeMinutes(a.data_inicio);
+  const timeB = explicitTimeMinutes(b.data_inicio);
+
+  // Sem hora explícita → sempre ao final; entre elas, por prioridade.
+  if (timeA == null && timeB == null) {
+    const byPriority =
+      TAREFA_PRIORIDADE_RANK[a.prioridade] - TAREFA_PRIORIDADE_RANK[b.prioridade];
+    if (byPriority !== 0) return byPriority;
+    return compareTituloOuCriacao(a, b);
+  }
+  if (timeA == null) return 1;
+  if (timeB == null) return -1;
+  if (timeA !== timeB) return timeA - timeB;
+
+  const byPriority =
+    TAREFA_PRIORIDADE_RANK[a.prioridade] - TAREFA_PRIORIDADE_RANK[b.prioridade];
+  if (byPriority !== 0) return byPriority;
+  return compareTituloOuCriacao(a, b);
+}
 
 export function compareByClassificar(
   a: ClassificavelPorAgenda,
   b: ClassificavelPorAgenda,
   mode: TarefaClassificar,
 ): number {
+  if (mode === "prioridade_hora") {
+    return compareByPriorityThenTime(a, b);
+  }
+
+  if (mode === "hora") {
+    return compareByTimeThenPriority(a, b);
+  }
+
   if (mode === "prioridade") {
     const byPriority =
       TAREFA_PRIORIDADE_RANK[a.prioridade] - TAREFA_PRIORIDADE_RANK[b.prioridade];
     if (byPriority !== 0) return byPriority;
-    return a.titulo.localeCompare(b.titulo, "pt-BR");
+    return compareTituloOuCriacao(a, b);
   }
 
+  // data_asc
   const dateA = toLocalDateKey(a.data_inicio);
   const dateB = toLocalDateKey(b.data_inicio);
-  if (!dateA && !dateB) return a.titulo.localeCompare(b.titulo, "pt-BR");
+  if (!dateA && !dateB) return compareTituloOuCriacao(a, b);
   if (!dateA) return 1;
   if (!dateB) return -1;
   if (dateA !== dateB) return dateA.localeCompare(dateB);
-  return a.titulo.localeCompare(b.titulo, "pt-BR");
+  return compareTituloOuCriacao(a, b);
 }
 
 export function sortByClassificar<T extends ClassificavelPorAgenda>(

@@ -16,10 +16,17 @@ import type {
   TarefaFilters,
 } from "@/types";
 import {
+  TAREFA_CLASSIFICAR_HINTS,
   TAREFA_CLASSIFICAR_LABELS,
   type TarefaClassificar,
 } from "@/utils/agenda-classificar-preference";
 import { TAREFA_PRIORIDADE_LABELS } from "@/utils/tarefas";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const filterControlClass = "h-9 w-[168px] shrink-0";
 const SEARCH_DEBOUNCE_MS = 400;
@@ -33,7 +40,7 @@ export function TarefaFiltersBar({
   hideResponsavel = false,
   hideProjeto = false,
   /** Menu Finalizados: período por data de finalização; sem prioridade/tag/classificar */
-  /** Menu Hoje: busca + prioridade + setor + projeto + classificar (só prioridade) */
+  /** Menu Hoje: busca + prioridade + setor + projeto + classificar (prioridade+hora / hora) */
   /** Menu Visualizando: busca + prioridade + setor + responsáveis + classificar */
   variant = "default",
   /** Opções do filtro Classificar. Vazio = oculto. */
@@ -57,7 +64,11 @@ export function TarefaFiltersBar({
   const showResponsavel = !hideResponsavel && !isHoje;
   const showPrioridade = !isFinalizados;
   const showClassificar = !isFinalizados && classificarOptions.length > 0;
-  const classificarValue = filters.classificar ?? "prioridade";
+  const classificarValue =
+    filters.classificar && classificarOptions.includes(filters.classificar)
+      ? filters.classificar
+      : (classificarOptions[0] ?? "prioridade");
+  const classificarHint = TAREFA_CLASSIFICAR_HINTS[classificarValue];
 
   const filtersRef = useRef(filters);
   filtersRef.current = filters;
@@ -111,23 +122,36 @@ export function TarefaFiltersBar({
       </div>
 
       {showClassificar && (
-        <Select
-          value={classificarValue}
-          onValueChange={(v) =>
-            patchFilters({ classificar: v as TarefaClassificar })
-          }
-        >
-          <SelectTrigger className={filterControlClass} aria-label="Classificar">
-            <SelectValue placeholder="Classificar" />
-          </SelectTrigger>
-          <SelectContent>
-            {classificarOptions.map((option) => (
-              <SelectItem key={option} value={option}>
-                {TAREFA_CLASSIFICAR_LABELS[option]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <TooltipProvider delayDuration={400}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div>
+                <Select
+                  value={classificarValue}
+                  onValueChange={(v) =>
+                    patchFilters({ classificar: v as TarefaClassificar })
+                  }
+                >
+                  <SelectTrigger className={filterControlClass} aria-label="Classificar">
+                    <SelectValue placeholder="Classificar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {classificarOptions.map((option) => (
+                      <SelectItem key={option} value={option} title={TAREFA_CLASSIFICAR_HINTS[option]}>
+                        {TAREFA_CLASSIFICAR_LABELS[option]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </TooltipTrigger>
+            {classificarHint && (
+              <TooltipContent side="bottom" className="max-w-xs text-xs">
+                {classificarHint}
+              </TooltipContent>
+            )}
+          </Tooltip>
+        </TooltipProvider>
       )}
 
       {showPrioridade && (

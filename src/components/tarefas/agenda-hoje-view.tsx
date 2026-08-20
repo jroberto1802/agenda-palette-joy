@@ -22,6 +22,7 @@ import type {
   TarefaWithRelations,
 } from "@/types";
 import {
+  CLASSIFICAR_OPTIONS_HOJE_EM_BREVE,
   normalizeTarefaClassificar,
   readAgendaClassificarPreference,
   writeAgendaClassificarPreference,
@@ -35,7 +36,9 @@ type AgendaHojeItem =
   | { kind: "tarefa"; tarefa: TarefaWithRelations }
   | { kind: "subtarefa"; subtarefa: SubtarefaAgendaItem };
 
-function createEmptyHojeFilters(classificar: TarefaClassificar = "prioridade"): TarefaFilters {
+function createEmptyHojeFilters(
+  classificar: TarefaClassificar = "prioridade_hora",
+): TarefaFilters {
   return {
     prioridade: "all",
     setor_id: "all",
@@ -113,7 +116,7 @@ export function AgendaHojeView({
       writeAgendaClassificarPreference(
         usuarioId,
         "agenda-hoje",
-        normalizeTarefaClassificar(next.classificar),
+        normalizeTarefaClassificar(next.classificar, "agenda-hoje"),
       );
     }
     setFilters(next);
@@ -196,6 +199,7 @@ export function AgendaHojeView({
 
   const classificarMode: TarefaClassificar = normalizeTarefaClassificar(
     debouncedFilters.classificar,
+    "agenda-hoje",
   );
 
   const itemsHoje = useMemo((): AgendaHojeItem[] => {
@@ -254,7 +258,7 @@ export function AgendaHojeView({
         pessoas={[]}
         hideResponsavel
         variant="hoje"
-        classificarOptions={["prioridade"]}
+        classificarOptions={CLASSIFICAR_OPTIONS_HOJE_EM_BREVE}
       />
 
       {!usuarioId || isLoading ? (

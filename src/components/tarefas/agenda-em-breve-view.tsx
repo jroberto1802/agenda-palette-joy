@@ -19,12 +19,20 @@ import { useSubtarefasAgenda, useTarefas } from "@/hooks/use-tarefas";
 import { cn } from "@/lib/utils";
 import type { SubtarefaAgendaItem, TarefaWithRelations } from "@/types";
 import {
+  CLASSIFICAR_OPTIONS_HOJE_EM_BREVE,
   normalizeTarefaClassificar,
   readAgendaClassificarPreference,
+  TAREFA_CLASSIFICAR_HINTS,
   TAREFA_CLASSIFICAR_LABELS,
   writeAgendaClassificarPreference,
   type TarefaClassificar,
 } from "@/utils/agenda-classificar-preference";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   AGENDA_EM_BREVE_PAGE_SIZE,
   getEmBreveDays,
@@ -163,7 +171,7 @@ export function AgendaEmBreveView({
 }) {
   const queryClient = useQueryClient();
   const [windowStart, setWindowStart] = useState(() => startOfTodayLocal());
-  const [classificar, setClassificar] = useState<TarefaClassificar>("prioridade");
+  const [classificar, setClassificar] = useState<TarefaClassificar>("prioridade_hora");
 
   useEffect(() => {
     if (!usuarioId) return;
@@ -171,7 +179,7 @@ export function AgendaEmBreveView({
   }, [usuarioId]);
 
   const handleClassificarChange = (value: TarefaClassificar) => {
-    const next = normalizeTarefaClassificar(value);
+    const next = normalizeTarefaClassificar(value, "agenda-em-breve");
     setClassificar(next);
     writeAgendaClassificarPreference(usuarioId, "agenda-em-breve", next);
   };
@@ -361,21 +369,40 @@ export function AgendaEmBreveView({
             </SelectContent>
           </Select>
 
-          <Select
-            value={classificar}
-            onValueChange={(value) =>
-              handleClassificarChange(value as TarefaClassificar)
-            }
-          >
-            <SelectTrigger className="h-8 w-[168px]" aria-label="Classificar">
-              <SelectValue placeholder="Classificar" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="prioridade">
-                {TAREFA_CLASSIFICAR_LABELS.prioridade}
-              </SelectItem>
-            </SelectContent>
-          </Select>
+          <TooltipProvider delayDuration={400}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div>
+                  <Select
+                    value={classificar}
+                    onValueChange={(value) =>
+                      handleClassificarChange(value as TarefaClassificar)
+                    }
+                  >
+                    <SelectTrigger className="h-8 w-[168px]" aria-label="Classificar">
+                      <SelectValue placeholder="Classificar" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CLASSIFICAR_OPTIONS_HOJE_EM_BREVE.map((option) => (
+                        <SelectItem
+                          key={option}
+                          value={option}
+                          title={TAREFA_CLASSIFICAR_HINTS[option]}
+                        >
+                          {TAREFA_CLASSIFICAR_LABELS[option]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </TooltipTrigger>
+              {TAREFA_CLASSIFICAR_HINTS[classificar] && (
+                <TooltipContent side="bottom" className="max-w-xs text-xs">
+                  {TAREFA_CLASSIFICAR_HINTS[classificar]}
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
         </div>
 
         <div className="flex items-center gap-1">
