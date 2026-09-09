@@ -199,6 +199,7 @@ export function AgendaEmBreveView({
       atribuido_ids: usuarioId ? [usuarioId] : [],
       data_inicio_de: rangeDe,
       data_inicio_ate: rangeAte,
+      lite: true,
     },
     { enabled: !!usuarioId },
   );
@@ -208,6 +209,7 @@ export function AgendaEmBreveView({
       usuario_id: usuarioId ?? "",
       data_inicio_de: rangeDe,
       data_inicio_ate: rangeAte,
+      lite: true,
     },
     { enabled: !!usuarioId },
   );

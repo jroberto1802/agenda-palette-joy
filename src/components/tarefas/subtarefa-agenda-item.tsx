@@ -11,9 +11,9 @@ import {
   TAREFA_PRIORIDADE_LABELS,
 } from "@/utils/tarefas";
 import { AlertTriangle, CalendarIcon, ChevronRight, ListTodo } from "lucide-react";
-import type { ReactNode } from "react";
+import { memo, type ReactNode } from "react";
 
-export function SubtarefaAgendaListRow({
+export const SubtarefaAgendaListRow = memo(function SubtarefaAgendaListRow({
   subtarefa,
   onOpen,
   onToggleConcluida,
@@ -91,7 +91,7 @@ export function SubtarefaAgendaListRow({
       <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
     </div>
   );
-}
+});
 
 export function SubtarefaAgendaCard({
   subtarefa,

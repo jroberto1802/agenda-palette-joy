@@ -41,11 +41,13 @@ import {
 } from "@/services/tarefa-recorrencia";
 import type {
   SubtarefaAgendaFilters,
+  SubtarefaAgendaItem,
   SubtarefaDetail,
   SubtarefaFormData,
   TarefaDetail,
   TarefaFilters,
   TarefaFormData,
+  TarefaWithRelations,
 } from "@/types";
 import { sortSubtarefasList } from "@/utils/tarefas";
 
@@ -54,9 +56,49 @@ function invalidateTarefas(queryClient: ReturnType<typeof useQueryClient>) {
   queryClient.invalidateQueries({ queryKey: subtarefaKeys.all });
 }
 
+/** Invalidação estreita: listas da Agenda + KPIs (sem refetch de detalhes). */
+function invalidateAgendaLists(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.invalidateQueries({ queryKey: [...tarefaKeys.all, "list"] });
+  queryClient.invalidateQueries({ queryKey: [...subtarefaKeys.all, "agenda"] });
+  queryClient.invalidateQueries({ queryKey: tarefaKeys.kpis() });
+  queryClient.invalidateQueries({ queryKey: tarefaKeys.recent() });
+}
+
+function patchTarefaListsOnConclusao(
+  queryClient: ReturnType<typeof useQueryClient>,
+  id: string,
+  concluida: boolean,
+) {
+  queryClient.setQueriesData<TarefaWithRelations[]>(
+    { queryKey: [...tarefaKeys.all, "list"] },
+    (old) => {
+      if (!old) return old;
+      if (concluida) return old.filter((t) => t.id !== id);
+      return old.map((t) => (t.id === id ? { ...t, concluida: false } : t));
+    },
+  );
+}
+
+function patchSubtarefaAgendaOnConclusao(
+  queryClient: ReturnType<typeof useQueryClient>,
+  id: string,
+  concluida: boolean,
+) {
+  queryClient.setQueriesData<SubtarefaAgendaItem[]>(
+    { queryKey: [...subtarefaKeys.all, "agenda"] },
+    (old) => {
+      if (!old) return old;
+      if (concluida) return old.filter((s) => s.id !== id);
+      return old.map((s) => (s.id === id ? { ...s, concluida: false } : s));
+    },
+  );
+}
+
+const AGENDA_STALE_MS = 30_000;
+
 export function useTarefas(
   filters: TarefaFilters = {},
-  options?: { enabled?: boolean },
+  options?: { enabled?: boolean; staleTime?: number },
 ) {
   const filterKey = {
     search: filters.search ?? "",
@@ -77,6 +119,8 @@ export function useTarefas(
     somente_modelos: filters.somente_modelos ? "1" : "0",
     incluir_modelos: filters.incluir_modelos ? "1" : "0",
     recorrencia_pasta_id: filters.recorrencia_pasta_id ?? "all",
+    lite: filters.lite ? "1" : "0",
+    limit: filters.limit != null ? String(filters.limit) : "",
   };
 
   return useQuery({
@@ -84,6 +128,7 @@ export function useTarefas(
     queryFn: () => listTarefas(filters),
     enabled: options?.enabled ?? true,
     placeholderData: keepPreviousData,
+    staleTime: options?.staleTime ?? (filters.lite ? AGENDA_STALE_MS : 0),
   });
 }
 
@@ -97,7 +142,7 @@ export function useSeriesModelos(options?: { enabled?: boolean }) {
 
 export function useSubtarefasAgenda(
   filters: SubtarefaAgendaFilters,
-  options?: { enabled?: boolean },
+  options?: { enabled?: boolean; staleTime?: number },
 ) {
   const filterKey = {
     usuario_id: filters.usuario_id,
@@ -110,6 +155,8 @@ export function useSubtarefasAgenda(
     setor_id: filters.setor_id ?? "all",
     projeto_id: filters.projeto_id ?? "all",
     atribuido_ids: [...(filters.atribuido_ids ?? [])].sort().join(","),
+    lite: filters.lite ? "1" : "0",
+    limit: filters.limit != null ? String(filters.limit) : "",
   };
 
   return useQuery({
@@ -117,6 +164,7 @@ export function useSubtarefasAgenda(
     queryFn: () => listSubtarefasAgenda(filters),
     enabled: (options?.enabled ?? true) && !!filters.usuario_id,
     placeholderData: keepPreviousData,
+    staleTime: options?.staleTime ?? (filters.lite ? AGENDA_STALE_MS : 0),
   });
 }
 
@@ -170,7 +218,25 @@ export function useUpdateTarefaConclusao() {
   return useMutation({
     mutationFn: ({ id, concluida }: { id: string; concluida: boolean }) =>
       updateTarefaConclusao(id, concluida),
-    onSuccess: () => invalidateTarefas(queryClient),
+    onMutate: async ({ id, concluida }) => {
+      await queryClient.cancelQueries({ queryKey: [...tarefaKeys.all, "list"] });
+      const previousLists = queryClient.getQueriesData<TarefaWithRelations[]>({
+        queryKey: [...tarefaKeys.all, "list"],
+      });
+      patchTarefaListsOnConclusao(queryClient, id, concluida);
+      return { previousLists };
+    },
+    onError: (_error, _vars, context) => {
+      for (const [key, data] of context?.previousLists ?? []) {
+        queryClient.setQueryData(key, data);
+      }
+    },
+    onSettled: (_data, _error, vars) => {
+      invalidateAgendaLists(queryClient);
+      if (vars?.id) {
+        queryClient.invalidateQueries({ queryKey: tarefaKeys.detail(vars.id) });
+      }
+    },
   });
 }
 
@@ -287,10 +353,14 @@ export function useToggleSubtarefa() {
       toggleSubtarefa(id, concluida),
     onMutate: async ({ id, concluida }) => {
       await queryClient.cancelQueries({ queryKey: tarefaKeys.all });
+      await queryClient.cancelQueries({ queryKey: [...subtarefaKeys.all, "agenda"] });
       await queryClient.cancelQueries({ queryKey: subtarefaKeys.detail(id) });
 
       const previousTarefas = queryClient.getQueriesData<TarefaDetail>({
         queryKey: [...tarefaKeys.all, "detail"],
+      });
+      const previousAgenda = queryClient.getQueriesData<SubtarefaAgendaItem[]>({
+        queryKey: [...subtarefaKeys.all, "agenda"],
       });
       const previousSubtarefa = queryClient.getQueryData<SubtarefaDetail>(
         subtarefaKeys.detail(id),
@@ -307,15 +377,20 @@ export function useToggleSubtarefa() {
         },
       );
 
+      patchSubtarefaAgendaOnConclusao(queryClient, id, concluida);
+
       queryClient.setQueryData<SubtarefaDetail>(subtarefaKeys.detail(id), (old) => {
         if (!old) return old;
         return { ...old, concluida };
       });
 
-      return { previousTarefas, previousSubtarefa, id };
+      return { previousTarefas, previousAgenda, previousSubtarefa, id };
     },
     onError: (_error, _vars, context) => {
       for (const [key, data] of context?.previousTarefas ?? []) {
+        queryClient.setQueryData(key, data);
+      }
+      for (const [key, data] of context?.previousAgenda ?? []) {
         queryClient.setQueryData(key, data);
       }
       if (context?.id) {
@@ -325,7 +400,13 @@ export function useToggleSubtarefa() {
         );
       }
     },
-    onSettled: () => invalidateTarefas(queryClient),
+    onSettled: (_data, _error, vars) => {
+      invalidateAgendaLists(queryClient);
+      if (vars?.id) {
+        queryClient.invalidateQueries({ queryKey: subtarefaKeys.detail(vars.id) });
+      }
+      queryClient.invalidateQueries({ queryKey: [...tarefaKeys.all, "detail"] });
+    },
   });
 }
 

@@ -50,10 +50,15 @@ export function AgendaAtrasadasSection({
   items,
   onOpenTarefa,
   onOpenSubtarefa,
+  truncated = false,
+  limit,
 }: {
   items: AgendaAtrasadaItem[];
   onOpenTarefa: (tarefa: TarefaWithRelations) => void;
   onOpenSubtarefa: (subtarefa: SubtarefaAgendaItem) => void;
+  /** True quando a API atingiu o teto (pode haver mais atrasadas). */
+  truncated?: boolean;
+  limit?: number;
 }) {
   const { data: profile } = useProfile();
   const updateConclusao = useUpdateTarefaConclusao();
@@ -208,12 +213,17 @@ export function AgendaAtrasadasSection({
 
   return (
     <section className="space-y-2">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <AlertTriangle className="h-4 w-4 text-destructive" />
         <h3 className="text-sm font-semibold text-destructive">Atrasadas</h3>
         <span className="text-xs text-muted-foreground">({items.length})</span>
         <AgendaAtrasadasBulkReagendarMenu onReagendarTodas={handleReagendarTodas} />
       </div>
+      {truncated && limit != null && (
+        <p className="text-xs text-muted-foreground">
+          Exibindo as {limit} atrasadas mais recentes.
+        </p>
+      )}
       <ul className="space-y-2">
         {items.map((item) =>
           item.kind === "tarefa" ? (

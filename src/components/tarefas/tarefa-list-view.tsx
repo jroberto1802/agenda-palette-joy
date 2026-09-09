@@ -19,7 +19,7 @@ import {
   GripVertical,
   RefreshCw,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, memo, type ReactNode } from "react";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
 import { ConclusaoBolinha } from "@/components/tarefas/conclusao-bolinha";
 import { DescricaoPreview } from "@/components/tarefas/descricao-preview";
@@ -50,7 +50,7 @@ import {
   getTarefaPessoasCard,
 } from "@/utils/tarefas";
 
-export function TarefaListRowContent({
+export const TarefaListRowContent = memo(function TarefaListRowContent({
   tarefa,
   onOpen,
   onToggleConcluida,
@@ -132,25 +132,23 @@ export function TarefaListRowContent({
           <MinhaAgendaBadge tarefa={tarefa} className="px-1.5 py-0 text-[10px]" />
           {pessoas.length > 0 && (
             <span className="inline-flex items-center gap-1">
-              <TooltipProvider delayDuration={200}>
-                <div className="flex -space-x-1">
-                  {pessoas.slice(0, 3).map((pessoa) => (
-                    <Tooltip key={pessoa.id}>
-                      <TooltipTrigger asChild>
-                        <span className="inline-flex">
-                          <ProfileAvatar
-                            name={pessoa.nome_completo}
-                            avatarUrl={pessoa.avatar_url}
-                            ativo={pessoa.ativo}
-                            className="h-4 w-4 ring-1 ring-background"
-                          />
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent side="top">{pessoa.nome_completo}</TooltipContent>
-                    </Tooltip>
-                  ))}
-                </div>
-              </TooltipProvider>
+              <div className="flex -space-x-1">
+                {pessoas.slice(0, 3).map((pessoa) => (
+                  <Tooltip key={pessoa.id}>
+                    <TooltipTrigger asChild>
+                      <span className="inline-flex">
+                        <ProfileAvatar
+                          name={pessoa.nome_completo}
+                          avatarUrl={pessoa.avatar_url}
+                          ativo={pessoa.ativo}
+                          className="h-4 w-4 ring-1 ring-background"
+                        />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">{pessoa.nome_completo}</TooltipContent>
+                  </Tooltip>
+                ))}
+              </div>
               <span className="truncate">{formatResponsaveisLabel(tarefa)}</span>
             </span>
           )}
@@ -167,7 +165,7 @@ export function TarefaListRowContent({
       <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
     </div>
   );
-}
+});
 
 function SortableListRow({
   tarefa,
@@ -300,50 +298,54 @@ export function TarefaListView({
 
   if (!enableReorder) {
     return (
-      <div className="max-h-[min(70vh,720px)] space-y-2 overflow-y-auto pr-1">
-        <ul className="space-y-2">
-          {tarefas.map((tarefa) => (
-            <li key={tarefa.id}>
-              <TarefaListRowContent
-                tarefa={tarefa}
-                onOpen={() => onOpenTarefa(tarefa)}
-                onToggleConcluida={
-                  onToggleConcluida
-                    ? (concluida) => onToggleConcluida(tarefa, concluida)
-                    : undefined
-                }
-                canToggleConcluida={canToggleConcluida ? canToggleConcluida(tarefa) : undefined}
-                actions={renderActions(tarefa)}
-              />
-            </li>
-          ))}
-        </ul>
-      </div>
+      <TooltipProvider delayDuration={200}>
+        <div className="max-h-[min(70vh,720px)] space-y-2 overflow-y-auto pr-1">
+          <ul className="space-y-2">
+            {tarefas.map((tarefa) => (
+              <li key={tarefa.id}>
+                <TarefaListRowContent
+                  tarefa={tarefa}
+                  onOpen={() => onOpenTarefa(tarefa)}
+                  onToggleConcluida={
+                    onToggleConcluida
+                      ? (concluida) => onToggleConcluida(tarefa, concluida)
+                      : undefined
+                  }
+                  canToggleConcluida={canToggleConcluida ? canToggleConcluida(tarefa) : undefined}
+                  actions={renderActions(tarefa)}
+                />
+              </li>
+            ))}
+          </ul>
+        </div>
+      </TooltipProvider>
     );
   }
 
   return (
-    <div className="max-h-[min(70vh,720px)] space-y-2 overflow-y-auto pr-1">
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext items={order} strategy={verticalListSortingStrategy}>
-          <ul className="space-y-2">
-            {ordered.map((tarefa) => (
-              <SortableListRow
-                key={tarefa.id}
-                tarefa={tarefa}
-                onOpen={() => onOpenTarefa(tarefa)}
-                onToggleConcluida={
-                  onToggleConcluida
-                    ? (concluida) => onToggleConcluida(tarefa, concluida)
-                    : undefined
-                }
-                canToggleConcluida={canToggleConcluida ? canToggleConcluida(tarefa) : undefined}
-                actions={renderActions(tarefa)}
-              />
-            ))}
-          </ul>
-        </SortableContext>
-      </DndContext>
-    </div>
+    <TooltipProvider delayDuration={200}>
+      <div className="max-h-[min(70vh,720px)] space-y-2 overflow-y-auto pr-1">
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={order} strategy={verticalListSortingStrategy}>
+            <ul className="space-y-2">
+              {ordered.map((tarefa) => (
+                <SortableListRow
+                  key={tarefa.id}
+                  tarefa={tarefa}
+                  onOpen={() => onOpenTarefa(tarefa)}
+                  onToggleConcluida={
+                    onToggleConcluida
+                      ? (concluida) => onToggleConcluida(tarefa, concluida)
+                      : undefined
+                  }
+                  canToggleConcluida={canToggleConcluida ? canToggleConcluida(tarefa) : undefined}
+                  actions={renderActions(tarefa)}
+                />
+              ))}
+            </ul>
+          </SortableContext>
+        </DndContext>
+      </div>
+    </TooltipProvider>
   );
 }

@@ -66,15 +66,44 @@ const TAREFA_SELECT = `
   )
 `;
 
-/** Embeds leves para indicadores do card — aliases evitam conflito com getTarefaDetail. */
+/** Embeds leves para indicadores do card — counts agregados (não embute linhas). */
 const TAREFA_INDICADORES_SELECT = `
-  subtarefas_resumo:subtarefas(concluida),
+  subtarefas_total:subtarefas(count),
+  subtarefas_concluidas:subtarefas(count).eq(concluida,true),
   comentarios_count:tarefa_comentarios(count),
   anexos_count:tarefa_anexos(count)
 `;
 
 const TAREFA_SELECT_WITH_INDICADORES = `${TAREFA_SELECT},
   ${TAREFA_INDICADORES_SELECT}`;
+
+/**
+ * Listagem da Agenda: campos do card + responsáveis + indicadores.
+ * Sem `*`, sem observadores/criador (não usados na linha da Agenda).
+ */
+const TAREFA_AGENDA_SELECT = `
+  id, titulo, descricao, prioridade, concluida, data_inicio, data_conclusao,
+  projeto_id, setor_id, criado_por, atribuido_a, visibilidade, tags,
+  lembretes, recorrencia, serie_raiz_id, recorrencia_data_origem, recorrencia_pasta_id,
+  created_at, updated_at, deleted_at,
+  setor:setores(id, nome, cor),
+  projeto:projetos(id, nome),
+  responsavel:profiles!atribuido_a(id, nome_completo, avatar_url, ativo),
+  responsaveis:tarefa_responsaveis(
+    usuario_id,
+    usuario:profiles!tarefa_responsaveis_usuario_id_fkey(id, nome_completo, avatar_url, ativo)
+  ),
+  ${TAREFA_INDICADORES_SELECT}
+`;
+
+/**
+ * Cast para bypass do parser de tipos do supabase-js (não entende
+ * `embed(count).eq(...)` nem selects montados dinamicamente).
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function asSelect(clause: string): any {
+  return clause;
+}
 
 const TAREFA_SELECT_LITE = `
   *,
@@ -88,6 +117,9 @@ const TAREFA_SELECT_LITE = `
   )
 `;
 
+/** Teto padrão de atrasadas na Agenda (evita carregar histórico inteiro). */
+export const AGENDA_ATRASADAS_LIMIT = 100;
+
 type CountEmbed = { count: number }[] | null | undefined;
 type SubtarefaResumoEmbed = { concluida: boolean }[] | null | undefined;
 
@@ -98,19 +130,28 @@ function parseCountEmbed(embed: CountEmbed): number {
 }
 
 function attachTarefaIndicadores(row: Record<string, unknown>): TarefaWithRelations {
-  const subtarefas = (row.subtarefas_resumo as SubtarefaResumoEmbed) ?? [];
+  const subtarefasLegacy = row.subtarefas_resumo as SubtarefaResumoEmbed | undefined;
   const {
     subtarefas_resumo: _sub,
+    subtarefas_total: totalRaw,
+    subtarefas_concluidas: concluidasRaw,
     comentarios_count: comentariosRaw,
     anexos_count: anexosRaw,
     ...rest
   } = row;
 
+  const subtarefas_total = subtarefasLegacy
+    ? subtarefasLegacy.length
+    : parseCountEmbed(totalRaw as CountEmbed);
+  const subtarefas_concluidas = subtarefasLegacy
+    ? subtarefasLegacy.filter((s) => s.concluida).length
+    : parseCountEmbed(concluidasRaw as CountEmbed);
+
   return {
     ...(rest as TarefaWithRelations),
     indicadores: {
-      subtarefas_total: subtarefas.length,
-      subtarefas_concluidas: subtarefas.filter((s) => s.concluida).length,
+      subtarefas_total,
+      subtarefas_concluidas,
       comentarios_count: parseCountEmbed(comentariosRaw as CountEmbed),
       anexos_count: parseCountEmbed(anexosRaw as CountEmbed),
     },
@@ -376,14 +417,22 @@ export async function listTarefas(filters: TarefaFilters = {}): Promise<TarefaWi
     data: { user },
   } = await supabase.auth.getUser();
 
+  const selectClause = filters.lite ? TAREFA_AGENDA_SELECT : TAREFA_SELECT_WITH_INDICADORES;
+
   let query = supabase
     .from("tarefas")
-    .select(TAREFA_SELECT_WITH_INDICADORES)
+    .select(asSelect(selectClause))
     .is("deleted_at", null);
 
   if (filters.somente_finalizadas) {
     query = query.eq("concluida", true);
     query = query.order("data_conclusao", { ascending: false, nullsFirst: false });
+  } else if (filters.somente_atrasadas) {
+    if (filters.excluir_finalizadas) {
+      query = query.eq("concluida", false);
+    }
+    // Atrasadas: mais recentes primeiro (teto abaixo).
+    query = query.order("data_inicio", { ascending: false });
   } else {
     if (filters.excluir_finalizadas) {
       query = query.eq("concluida", false);
@@ -501,6 +550,13 @@ export async function listTarefas(filters: TarefaFilters = {}): Promise<TarefaWi
     }
   }
 
+  const limit =
+    filters.limit ??
+    (filters.somente_atrasadas && filters.lite ? AGENDA_ATRASADAS_LIMIT : undefined);
+  if (limit != null && limit > 0) {
+    query = query.limit(limit);
+  }
+
   const { data, error } = await query;
   if (error) throw error;
 
@@ -537,19 +593,19 @@ export async function listSeriesModelos(): Promise<TarefaWithRelations[]> {
 export async function getTarefa(id: string): Promise<TarefaWithRelations> {
   const { data, error } = await supabase
     .from("tarefas")
-    .select(TAREFA_SELECT_WITH_INDICADORES)
+    .select(asSelect(TAREFA_SELECT_WITH_INDICADORES))
     .eq("id", id)
     .is("deleted_at", null)
     .single();
 
   if (error) throw error;
-  return attachTarefaIndicadores(data as Record<string, unknown>);
+  return attachTarefaIndicadores(data as unknown as Record<string, unknown>);
 }
 
 export async function listRecentTarefas(limit = 5): Promise<TarefaWithRelations[]> {
   const { data, error } = await supabase
     .from("tarefas")
-    .select(TAREFA_SELECT_WITH_INDICADORES)
+    .select(asSelect(TAREFA_SELECT_WITH_INDICADORES))
     .is("deleted_at", null)
     .eq("concluida", false)
     .order("data_inicio", { ascending: true, nullsFirst: false })
@@ -565,7 +621,7 @@ export async function listTarefasCalendario(
 ): Promise<TarefaWithRelations[]> {
   const { data, error } = await supabase
     .from("tarefas")
-    .select(TAREFA_SELECT_WITH_INDICADORES)
+    .select(asSelect(TAREFA_SELECT_WITH_INDICADORES))
     .is("deleted_at", null)
     .eq("concluida", false)
     .not("data_inicio", "is", null)
@@ -1018,6 +1074,21 @@ const SUBTAREFA_SELECT = `
 `;
 
 /**
+ * Agenda (Hoje / Em breve): só o necessário para o card da lista.
+ * Sem observadores, counts de comentário/anexo nem concluido_por.
+ */
+const SUBTAREFA_AGENDA_SELECT = `
+  id, tarefa_id, titulo, concluida, posicao, created_at, criado_por,
+  data_inicio, descricao, prioridade, projeto_id, setor_id, visibilidade, updated_at,
+  origem_subtarefa_id,
+  criador:profiles!subtarefas_criado_por_fkey(id, nome_completo, avatar_url, ativo),
+  responsaveis:subtarefa_responsaveis(
+    usuario_id,
+    usuario:profiles!subtarefa_responsaveis_usuario_id_fkey(id, nome_completo, avatar_url, ativo)
+  )
+`;
+
+/**
  * Detalhe: base + linhas completas de comentários/anexos.
  * Sem (count) — PostgREST quebra com GROUP BY se misturar aggregate + order no mesmo recurso.
  */
@@ -1091,22 +1162,26 @@ export async function listSubtarefasAgenda(
 
   if (subtarefaIds.length === 0) return [];
 
+  const subtarefaSelect = filters.lite ? SUBTAREFA_AGENDA_SELECT : SUBTAREFA_SELECT;
+
   let query = supabase
     .from("subtarefas")
     .select(
-      `
-      ${SUBTAREFA_SELECT},
+      asSelect(`
+      ${subtarefaSelect},
       setor:setores(id, nome, cor),
       projeto:projetos(id, nome),
       tarefa:tarefas!inner(id, titulo, concluida, deleted_at, setor_id, projeto_id, serie_raiz_id)
-    `,
+    `),
     )
     .in("id", subtarefaIds)
     .eq("concluida", false)
     .not("data_inicio", "is", null)
     .eq("tarefa.concluida", false)
     .is("tarefa.deleted_at", null)
-    .order("data_inicio", { ascending: true });
+    .order("data_inicio", {
+      ascending: filters.somente_atrasadas ? false : true,
+    });
 
   const rows = await finalizeSubtarefasAgendaQuery(query, filters);
 
@@ -1225,6 +1300,13 @@ async function finalizeSubtarefasAgendaQuery(
     const to = ate || de;
     const { startIso, endIso } = localDateRangeToIsoBounds(from, to);
     query = query.gte("data_inicio", startIso).lte("data_inicio", endIso);
+  }
+
+  const limit =
+    filters.limit ??
+    (filters.somente_atrasadas && filters.lite ? AGENDA_ATRASADAS_LIMIT : undefined);
+  if (limit != null && limit > 0) {
+    query = query.limit(limit);
   }
 
   const { data, error } = await query;

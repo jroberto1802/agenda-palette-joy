@@ -203,6 +203,12 @@ export type TarefaFilters = {
    * Use `"entradas"` (ou o slug) para séries sem pasta (`recorrencia_pasta_id` null).
    */
   recorrencia_pasta_id?: string | "entradas" | "all";
+  /**
+   * Listagens da Agenda: SELECT enxuto (sem observadores/`*`) e indicadores via count.
+   */
+  lite?: boolean;
+  /** Teto de linhas (ex.: atrasadas). */
+  limit?: number;
 };
 
 export type Subtarefa = Tables<"subtarefas">;
@@ -253,6 +259,10 @@ export type SubtarefaAgendaFilters = {
   projeto_id?: string;
   /** Filtro multi: subtarefa aparece se qualquer um destes for responsável */
   atribuido_ids?: string[];
+  /** SELECT enxuto para cards da Agenda (sem observadores/counts não usados). */
+  lite?: boolean;
+  /** Teto de linhas (ex.: atrasadas). */
+  limit?: number;
 };
 
 export type SubtarefaMetaUpdate = {
