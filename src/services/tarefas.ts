@@ -129,6 +129,11 @@ function parseCountEmbed(embed: CountEmbed): number {
   return typeof value === "number" ? value : 0;
 }
 
+/** Alias só para filtrar por responsável via JOIN (não vai para a UI). */
+const RESPONSAVEL_FILTER_EMBED = "filter_resp:tarefa_responsaveis!inner(usuario_id)";
+const SUB_RESPONSAVEL_FILTER_EMBED =
+  "filter_resp:subtarefa_responsaveis!inner(usuario_id)";
+
 function attachTarefaIndicadores(row: Record<string, unknown>): TarefaWithRelations {
   const subtarefasLegacy = row.subtarefas_resumo as SubtarefaResumoEmbed | undefined;
   const {
@@ -137,6 +142,7 @@ function attachTarefaIndicadores(row: Record<string, unknown>): TarefaWithRelati
     subtarefas_concluidas: concluidasRaw,
     comentarios_count: comentariosRaw,
     anexos_count: anexosRaw,
+    filter_resp: _filterResp,
     ...rest
   } = row;
 
@@ -168,6 +174,7 @@ function attachSubtarefaIndicadores(row: Record<string, unknown>): SubtarefaWith
   const {
     comentarios_count: comentariosRaw,
     anexos_count: anexosRaw,
+    filter_resp: _filterResp,
     ...rest
   } = row;
 
@@ -413,11 +420,17 @@ async function notifyNovosVisualizadores(params: {
 }
 
 export async function listTarefas(filters: TarefaFilters = {}): Promise<TarefaWithRelations[]> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const atribuidoIds = [
+    ...(filters.atribuido_ids ?? []),
+    ...(filters.atribuido_a && filters.atribuido_a !== "all" ? [filters.atribuido_a] : []),
+  ].filter(Boolean);
 
-  const selectClause = filters.lite ? TAREFA_AGENDA_SELECT : TAREFA_SELECT_WITH_INDICADORES;
+  let selectClause = filters.lite ? TAREFA_AGENDA_SELECT : TAREFA_SELECT_WITH_INDICADORES;
+  // JOIN interno evita o waterfall "busca TODOS os IDs do responsável → .in(id, …)"
+  // que estoura URL/timeout em usuários com centenas de vínculos (ex.: Agenda/Hoje).
+  if (atribuidoIds.length > 0) {
+    selectClause = `${selectClause},\n  ${RESPONSAVEL_FILTER_EMBED}`;
+  }
 
   let query = supabase
     .from("tarefas")
@@ -463,7 +476,7 @@ export async function listTarefas(filters: TarefaFilters = {}): Promise<TarefaWi
     }
   }
 
-  /** Interseção de IDs (busca local + responsáveis) — evita dois `.in("id")` conflitantes. */
+  /** IDs da busca textual (intersectados com JOIN de responsável no PostgREST). */
   let allowedIds: string[] | null = null;
 
   const searchTerm = filters.search?.trim() ?? "";
@@ -473,33 +486,17 @@ export async function listTarefas(filters: TarefaFilters = {}): Promise<TarefaWi
     allowedIds = searchIds;
   }
 
-  const atribuidoIds = [
-    ...(filters.atribuido_ids ?? []),
-    ...(filters.atribuido_a && filters.atribuido_a !== "all" ? [filters.atribuido_a] : []),
-  ].filter(Boolean);
-
   if (atribuidoIds.length > 0) {
-    const { data: links, error: linksError } = await supabase
-      .from("tarefa_responsaveis")
-      .select("tarefa_id")
-      .in("usuario_id", atribuidoIds);
-
-    if (linksError) throw linksError;
-
-    const tarefaIds = [...new Set((links ?? []).map((row) => row.tarefa_id))];
-    if (tarefaIds.length === 0) return [];
-
-    if (allowedIds) {
-      const atribuidoSet = new Set(tarefaIds);
-      allowedIds = allowedIds.filter((id) => atribuidoSet.has(id));
-      if (allowedIds.length === 0) return [];
-    } else {
-      allowedIds = tarefaIds;
-    }
+    query = query.in("filter_resp.usuario_id", atribuidoIds);
   }
 
   let excludeIds = new Set<string>();
+  let user: { id: string } | null = null;
   if (filters.somente_visualizando) {
+    const {
+      data: { user: authUser },
+    } = await supabase.auth.getUser();
+    user = authUser;
     if (!user) return [];
     query = query
       .neq("criado_por", user.id)
@@ -1147,21 +1144,6 @@ export async function listSubtarefasAgenda(
     return listSubtarefasVisualizando(filters);
   }
 
-  const [
-    { data: subLinks, error: subLinksError },
-  ] = await Promise.all([
-    supabase
-      .from("subtarefa_responsaveis")
-      .select("subtarefa_id")
-      .eq("usuario_id", usuarioId),
-  ]);
-
-  if (subLinksError) throw subLinksError;
-
-  const subtarefaIds = [...new Set((subLinks ?? []).map((row) => row.subtarefa_id))];
-
-  if (subtarefaIds.length === 0) return [];
-
   const subtarefaSelect = filters.lite ? SUBTAREFA_AGENDA_SELECT : SUBTAREFA_SELECT;
 
   let query = supabase
@@ -1169,12 +1151,13 @@ export async function listSubtarefasAgenda(
     .select(
       asSelect(`
       ${subtarefaSelect},
+      ${SUB_RESPONSAVEL_FILTER_EMBED},
       setor:setores(id, nome, cor),
       projeto:projetos(id, nome),
       tarefa:tarefas!inner(id, titulo, concluida, deleted_at, setor_id, projeto_id, serie_raiz_id)
     `),
     )
-    .in("id", subtarefaIds)
+    .eq("filter_resp.usuario_id", usuarioId)
     .eq("concluida", false)
     .not("data_inicio", "is", null)
     .eq("tarefa.concluida", false)
@@ -1349,10 +1332,24 @@ async function finalizeSubtarefasAgendaQuery(
       }
       return true;
     })
-    .map((row) => ({
-      ...row,
-      tarefa: row.tarefa ? { id: row.tarefa.id, titulo: row.tarefa.titulo } : null,
-    }));
+    .map((row) => {
+      const { filter_resp: _filterResp, ...rest } = row as SubtarefaAgendaItem & {
+        filter_resp?: unknown;
+        tarefa: {
+          id: string;
+          titulo: string;
+          concluida: boolean;
+          deleted_at: string | null;
+          setor_id: string | null;
+          projeto_id: string | null;
+          serie_raiz_id?: string | null;
+        } | null;
+      };
+      return {
+        ...rest,
+        tarefa: rest.tarefa ? { id: rest.tarefa.id, titulo: rest.tarefa.titulo } : null,
+      };
+    });
 }
 
 async function listSubtarefaResponsavelIds(subtarefaId: string): Promise<string[]> {
