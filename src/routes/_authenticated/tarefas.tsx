@@ -65,9 +65,12 @@ function AgendaPage() {
   const { data: profile } = useProfile();
   const { data: setores } = useSetores();
   const { data: projetos } = useProjetos();
-  const { data: pessoas } = usePessoas();
 
   const [agendaTab, setAgendaTab] = useState<AgendaTab>("hoje");
+  // Pessoas só nas abas que filtram por responsável (Hoje não usa).
+  const { data: pessoas } = usePessoas(undefined, {
+    enabled: agendaTab === "geral" || agendaTab === "visualizando",
+  });
   const [boardState, setBoardState] = useState<AgendaBoardState>(() =>
     createAgendaBoardState(undefined, { scope: "agenda-geral" }),
   );

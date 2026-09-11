@@ -78,8 +78,10 @@ const TAREFA_SELECT_WITH_INDICADORES = `${TAREFA_SELECT},
   ${TAREFA_INDICADORES_SELECT}`;
 
 /**
- * Listagem da Agenda: campos do card + responsáveis + indicadores.
- * Sem `*`, sem observadores/criador (não usados na linha da Agenda).
+ * Listagem da Agenda: campos do card + responsáveis.
+ * Sem `*`, sem observadores/criador e sem counts (subtarefas/comentários/anexos):
+ * cada `(count)` multiplica o custo no PostgREST e era o maior custo residual
+ * da aba Hoje (~2–3× mais lento que o select sem aggregates).
  */
 const TAREFA_AGENDA_SELECT = `
   id, titulo, descricao, prioridade, concluida, data_inicio, data_conclusao,
@@ -92,8 +94,7 @@ const TAREFA_AGENDA_SELECT = `
   responsaveis:tarefa_responsaveis(
     usuario_id,
     usuario:profiles!tarefa_responsaveis_usuario_id_fkey(id, nome_completo, avatar_url, ativo)
-  ),
-  ${TAREFA_INDICADORES_SELECT}
+  )
 `;
 
 /**
@@ -419,6 +420,18 @@ async function notifyNovosVisualizadores(params: {
   }).catch(() => undefined);
 }
 
+/** Limite seguro para `id=in.(…)` na URL do PostgREST (UUIDs ~36 chars). */
+const TAREFA_ID_IN_CHUNK = 80;
+
+function chunkIds(ids: string[], size: number): string[][] {
+  if (ids.length === 0) return [];
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += size) {
+    chunks.push(ids.slice(i, i + size));
+  }
+  return chunks;
+}
+
 export async function listTarefas(filters: TarefaFilters = {}): Promise<TarefaWithRelations[]> {
   const atribuidoIds = [
     ...(filters.atribuido_ids ?? []),
@@ -426,57 +439,101 @@ export async function listTarefas(filters: TarefaFilters = {}): Promise<TarefaWi
   ].filter(Boolean);
 
   let selectClause = filters.lite ? TAREFA_AGENDA_SELECT : TAREFA_SELECT_WITH_INDICADORES;
-  // JOIN interno evita o waterfall "busca TODOS os IDs do responsável → .in(id, …)"
-  // que estoura URL/timeout em usuários com centenas de vínculos (ex.: Agenda/Hoje).
-  if (atribuidoIds.length > 0) {
+  // JOIN só no caminho `lite` (Hoje / Em breve, com janela de datas):
+  // na Agenda geral o select completo + ~400 linhas com aggregates estoura/timeout
+  // no browser e a aba aparece vazia. Lá usamos IDs em chunks.
+  const useResponsavelJoin = atribuidoIds.length > 0 && !!filters.lite;
+  if (useResponsavelJoin) {
     selectClause = `${selectClause},\n  ${RESPONSAVEL_FILTER_EMBED}`;
   }
 
-  let query = supabase
-    .from("tarefas")
-    .select(asSelect(selectClause))
-    .is("deleted_at", null);
+  const buildQuery = () => {
+    let query = supabase
+      .from("tarefas")
+      .select(asSelect(selectClause))
+      .is("deleted_at", null);
 
-  if (filters.somente_finalizadas) {
-    query = query.eq("concluida", true);
-    query = query.order("data_conclusao", { ascending: false, nullsFirst: false });
-  } else if (filters.somente_atrasadas) {
-    if (filters.excluir_finalizadas) {
-      query = query.eq("concluida", false);
-    }
-    // Atrasadas: mais recentes primeiro (teto abaixo).
-    query = query.order("data_inicio", { ascending: false });
-  } else {
-    if (filters.excluir_finalizadas) {
-      query = query.eq("concluida", false);
-    }
-    query = query.order("created_at", { ascending: false });
-  }
-
-  if (filters.prioridade && filters.prioridade !== "all") {
-    query = query.eq("prioridade", filters.prioridade);
-  }
-
-  if (filters.setor_id && filters.setor_id !== "all") {
-    query = query.eq("setor_id", filters.setor_id);
-  }
-
-  if (filters.projeto_id && filters.projeto_id !== "all") {
-    query = query.eq("projeto_id", filters.projeto_id);
-  }
-
-  if (filters.recorrencia_pasta_id && filters.recorrencia_pasta_id !== "all") {
-    if (
-      filters.recorrencia_pasta_id === "entradas" ||
-      filters.recorrencia_pasta_id === "null"
-    ) {
-      query = query.is("recorrencia_pasta_id", null);
+    if (filters.somente_finalizadas) {
+      query = query.eq("concluida", true);
+      query = query.order("data_conclusao", { ascending: false, nullsFirst: false });
+    } else if (filters.somente_atrasadas) {
+      if (filters.excluir_finalizadas) {
+        query = query.eq("concluida", false);
+      }
+      query = query.order("data_inicio", { ascending: false });
     } else {
-      query = query.eq("recorrencia_pasta_id", filters.recorrencia_pasta_id);
+      if (filters.excluir_finalizadas) {
+        query = query.eq("concluida", false);
+      }
+      query = query.order("created_at", { ascending: false });
     }
-  }
 
-  /** IDs da busca textual (intersectados com JOIN de responsável no PostgREST). */
+    if (filters.prioridade && filters.prioridade !== "all") {
+      query = query.eq("prioridade", filters.prioridade);
+    }
+
+    if (filters.setor_id && filters.setor_id !== "all") {
+      query = query.eq("setor_id", filters.setor_id);
+    }
+
+    if (filters.projeto_id && filters.projeto_id !== "all") {
+      query = query.eq("projeto_id", filters.projeto_id);
+    }
+
+    if (filters.recorrencia_pasta_id && filters.recorrencia_pasta_id !== "all") {
+      if (
+        filters.recorrencia_pasta_id === "entradas" ||
+        filters.recorrencia_pasta_id === "null"
+      ) {
+        query = query.is("recorrencia_pasta_id", null);
+      } else {
+        query = query.eq("recorrencia_pasta_id", filters.recorrencia_pasta_id);
+      }
+    }
+
+    if (useResponsavelJoin) {
+      query = query.in("filter_resp.usuario_id", atribuidoIds);
+    }
+
+    if (filters.tag?.trim()) {
+      query = query.contains("tags", [filters.tag.trim()]);
+    }
+
+    if (filters.periodo_inicio?.trim()) {
+      query = query.gte("data_conclusao", `${filters.periodo_inicio.trim()}T00:00:00.000Z`);
+    }
+
+    if (filters.periodo_fim?.trim()) {
+      query = query.lte("data_conclusao", `${filters.periodo_fim.trim()}T23:59:59.999Z`);
+    }
+
+    if (filters.somente_atrasadas) {
+      query = query
+        .not("data_inicio", "is", null)
+        .lt("data_inicio", startOfTodayLocal().toISOString());
+    } else {
+      const dataInicioDe = filters.data_inicio_de?.trim();
+      const dataInicioAte = filters.data_inicio_ate?.trim();
+      if (dataInicioDe || dataInicioAte) {
+        query = query.not("data_inicio", "is", null);
+        const de = dataInicioDe || dataInicioAte!;
+        const ate = dataInicioAte || dataInicioDe!;
+        const { startIso, endIso } = localDateRangeToIsoBounds(de, ate);
+        query = query.gte("data_inicio", startIso).lte("data_inicio", endIso);
+      }
+    }
+
+    const limit =
+      filters.limit ??
+      (filters.somente_atrasadas && filters.lite ? AGENDA_ATRASADAS_LIMIT : undefined);
+    if (limit != null && limit > 0) {
+      query = query.limit(limit);
+    }
+
+    return query;
+  };
+
+  /** IDs da busca textual e/ou responsáveis (Agenda geral). */
   let allowedIds: string[] | null = null;
 
   const searchTerm = filters.search?.trim() ?? "";
@@ -486,8 +543,23 @@ export async function listTarefas(filters: TarefaFilters = {}): Promise<TarefaWi
     allowedIds = searchIds;
   }
 
-  if (atribuidoIds.length > 0) {
-    query = query.in("filter_resp.usuario_id", atribuidoIds);
+  if (atribuidoIds.length > 0 && !useResponsavelJoin) {
+    const { data: links, error: linksError } = await supabase
+      .from("tarefa_responsaveis")
+      .select("tarefa_id")
+      .in("usuario_id", atribuidoIds);
+    if (linksError) throw linksError;
+
+    const tarefaIds = [...new Set((links ?? []).map((row) => row.tarefa_id))];
+    if (tarefaIds.length === 0) return [];
+
+    if (allowedIds) {
+      const atribuidoSet = new Set(tarefaIds);
+      allowedIds = allowedIds.filter((id) => atribuidoSet.has(id));
+      if (allowedIds.length === 0) return [];
+    } else {
+      allowedIds = tarefaIds;
+    }
   }
 
   let excludeIds = new Set<string>();
@@ -498,9 +570,6 @@ export async function listTarefas(filters: TarefaFilters = {}): Promise<TarefaWi
     } = await supabase.auth.getUser();
     user = authUser;
     if (!user) return [];
-    query = query
-      .neq("criado_por", user.id)
-      .neq("visibilidade", "somente_para_mim");
 
     const { data: myLinks, error: myLinksError } = await supabase
       .from("tarefa_responsaveis")
@@ -515,49 +584,41 @@ export async function listTarefas(filters: TarefaFilters = {}): Promise<TarefaWi
     }
   }
 
-  if (allowedIds) {
-    query = query.in("id", allowedIds);
-  }
+  const applyVisualizandoConstraints = (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    query: any,
+  ) => {
+    if (!filters.somente_visualizando || !user) return query;
+    return query
+      .neq("criado_por", user.id)
+      .neq("visibilidade", "somente_para_mim");
+  };
 
-  if (filters.tag?.trim()) {
-    query = query.contains("tags", [filters.tag.trim()]);
-  }
+  let rawRows: unknown[] = [];
 
-  if (filters.periodo_inicio?.trim()) {
-    query = query.gte("data_conclusao", `${filters.periodo_inicio.trim()}T00:00:00.000Z`);
-  }
-
-  if (filters.periodo_fim?.trim()) {
-    query = query.lte("data_conclusao", `${filters.periodo_fim.trim()}T23:59:59.999Z`);
-  }
-
-  if (filters.somente_atrasadas) {
-    query = query
-      .not("data_inicio", "is", null)
-      .lt("data_inicio", startOfTodayLocal().toISOString());
+  if (allowedIds && allowedIds.length > TAREFA_ID_IN_CHUNK) {
+    const chunkResults = await Promise.all(
+      chunkIds(allowedIds, TAREFA_ID_IN_CHUNK).map(async (ids) => {
+        const { data, error } = await applyVisualizandoConstraints(buildQuery()).in(
+          "id",
+          ids,
+        );
+        if (error) throw error;
+        return data ?? [];
+      }),
+    );
+    rawRows = chunkResults.flat();
   } else {
-    const dataInicioDe = filters.data_inicio_de?.trim();
-    const dataInicioAte = filters.data_inicio_ate?.trim();
-    if (dataInicioDe || dataInicioAte) {
-      query = query.not("data_inicio", "is", null);
-      const de = dataInicioDe || dataInicioAte!;
-      const ate = dataInicioAte || dataInicioDe!;
-      const { startIso, endIso } = localDateRangeToIsoBounds(de, ate);
-      query = query.gte("data_inicio", startIso).lte("data_inicio", endIso);
+    let query = applyVisualizandoConstraints(buildQuery());
+    if (allowedIds) {
+      query = query.in("id", allowedIds);
     }
+    const { data, error } = await query;
+    if (error) throw error;
+    rawRows = data ?? [];
   }
 
-  const limit =
-    filters.limit ??
-    (filters.somente_atrasadas && filters.lite ? AGENDA_ATRASADAS_LIMIT : undefined);
-  if (limit != null && limit > 0) {
-    query = query.limit(limit);
-  }
-
-  const { data, error } = await query;
-  if (error) throw error;
-
-  let rows = mapTarefasWithIndicadores(data as unknown[] | null);
+  let rows = mapTarefasWithIndicadores(rawRows);
 
   if (filters.somente_visualizando && user) {
     rows = rows.filter((tarefa) => {

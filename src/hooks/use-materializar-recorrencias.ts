@@ -1,6 +1,6 @@
 import { useAuth } from "@/hooks/use-auth";
 import { materializarOcorrenciasDevidas } from "@/services/tarefa-recorrencia";
-import { tarefaKeys } from "@/lib/query-keys";
+import { subtarefaKeys, tarefaKeys } from "@/lib/query-keys";
 import { startOfTodayLocal, toLocalDateKey } from "@/utils/agenda-datas";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef } from "react";
@@ -31,7 +31,10 @@ export function useMaterializarRecorrencias() {
       const criadas = await materializarOcorrenciasDevidas();
       lastRunKey.current = runKey;
       if (criadas > 0) {
-        queryClient.invalidateQueries({ queryKey: tarefaKeys.all });
+        // Só listas da Agenda — evita refetch em cascata (detail/kpis/board).
+        queryClient.invalidateQueries({ queryKey: [...tarefaKeys.all, "list"] });
+        queryClient.invalidateQueries({ queryKey: [...tarefaKeys.all, "calendario"] });
+        queryClient.invalidateQueries({ queryKey: [...subtarefaKeys.all, "agenda"] });
       }
     } catch {
       // Falha transitória: permite nova tentativa no próximo foco/tick
@@ -42,7 +45,18 @@ export function useMaterializarRecorrencias() {
   }, [user?.id, queryClient]);
 
   useEffect(() => {
-    void run();
+    // Adia o catch-up para depois da primeira pintura da Agenda/Hoje.
+    const idle =
+      typeof window !== "undefined" && "requestIdleCallback" in window
+        ? window.requestIdleCallback(() => void run(), { timeout: 2500 })
+        : window.setTimeout(() => void run(), 800);
+    return () => {
+      if (typeof window !== "undefined" && "cancelIdleCallback" in window) {
+        window.cancelIdleCallback(idle as number);
+      } else {
+        window.clearTimeout(idle as number);
+      }
+    };
   }, [run]);
 
   useEffect(() => {

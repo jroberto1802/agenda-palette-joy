@@ -11,10 +11,14 @@ import {
 } from "@/services/pessoas";
 import type { ProfileFormData } from "@/types";
 
-export function usePessoas(search?: string) {
+export function usePessoas(
+  search?: string,
+  options?: { enabled?: boolean },
+) {
   return useQuery({
     queryKey: profileKeys.list(search),
     queryFn: () => listPessoas(search),
+    enabled: options?.enabled ?? true,
   });
 }
 

@@ -159,7 +159,7 @@ export function AgendaHojeView({
     lite: true as const,
   };
 
-  const { data: tarefas, isLoading: loadingTarefas } = useTarefas(
+  const { data: tarefas, isLoading: loadingTarefas, isFetched: fetchedTarefas } = useTarefas(
     {
       ...sharedFilter,
       data_inicio_de: hojeKey,
@@ -168,7 +168,11 @@ export function AgendaHojeView({
     { enabled: !!usuarioId },
   );
 
-  const { data: subtarefas, isLoading: loadingSubtarefas } = useSubtarefasAgenda(
+  const {
+    data: subtarefas,
+    isLoading: loadingSubtarefas,
+    isFetched: fetchedSubtarefas,
+  } = useSubtarefasAgenda(
     {
       usuario_id: usuarioId ?? "",
       data_inicio_de: hojeKey,
@@ -182,13 +186,17 @@ export function AgendaHojeView({
     { enabled: !!usuarioId },
   );
 
+  // Atrasadas só depois do dia: no Free tier, 4 queries pesadas em paralelo
+  // competem pela mesma CPU compartilhada e atrasam o "Hoje".
+  const atrasadasEnabled = !!usuarioId && fetchedTarefas && fetchedSubtarefas;
+
   const { data: tarefasAtrasadas, isLoading: loadingTarefasAtrasadas } = useTarefas(
     {
       ...sharedFilter,
       somente_atrasadas: true,
       limit: AGENDA_ATRASADAS_LIMIT,
     },
-    { enabled: !!usuarioId },
+    { enabled: atrasadasEnabled },
   );
 
   const { data: subtarefasAtrasadas, isLoading: loadingSubtarefasAtrasadas } =
@@ -203,7 +211,7 @@ export function AgendaHojeView({
         lite: true,
         limit: AGENDA_ATRASADAS_LIMIT,
       },
-      { enabled: !!usuarioId },
+      { enabled: atrasadasEnabled },
     );
 
   const classificarMode: TarefaClassificar = normalizeTarefaClassificar(
@@ -247,7 +255,8 @@ export function AgendaHojeView({
 
   // Progressive: lista do dia não espera atrasadas.
   const isLoadingHoje = !usuarioId || loadingTarefas || loadingSubtarefas;
-  const isLoadingAtrasadas = loadingTarefasAtrasadas || loadingSubtarefasAtrasadas;
+  const isLoadingAtrasadas =
+    !atrasadasEnabled || loadingTarefasAtrasadas || loadingSubtarefasAtrasadas;
   const hasActiveFilters =
     !!(debouncedFilters.search?.trim()) ||
     (debouncedFilters.prioridade && debouncedFilters.prioridade !== "all") ||
