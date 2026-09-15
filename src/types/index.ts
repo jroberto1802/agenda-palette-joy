@@ -204,7 +204,8 @@ export type TarefaFilters = {
    */
   recorrencia_pasta_id?: string | "entradas" | "all";
   /**
-   * Listagens da Agenda: SELECT enxuto (sem observadores/`*`) e indicadores via count.
+   * Listagens da Agenda: SELECT enxuto (sem observadores/`*`) + progresso de
+   * subtarefas via `subtarefas(concluida)` (formato concluídas/total no card).
    */
   lite?: boolean;
   /** Teto de linhas (ex.: atrasadas). */

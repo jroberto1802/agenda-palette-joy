@@ -94,6 +94,118 @@ function patchSubtarefaAgendaOnConclusao(
   );
 }
 
+/** Atualiza concluídas/total nos cards da lista ao concluir/reabrir subtarefa. */
+function patchTarefaListIndicadoresOnSubtarefaToggle(
+  queryClient: ReturnType<typeof useQueryClient>,
+  tarefaId: string,
+  concluida: boolean,
+) {
+  const delta = concluida ? 1 : -1;
+  queryClient.setQueriesData<TarefaWithRelations[]>(
+    { queryKey: [...tarefaKeys.all, "list"] },
+    (old) => {
+      if (!old) return old;
+      return old.map((t) => {
+        if (t.id !== tarefaId) return t;
+        const ind = t.indicadores;
+        if (!ind || ind.subtarefas_total <= 0) return t;
+        const nextConcluidas = Math.max(
+          0,
+          Math.min(ind.subtarefas_total, ind.subtarefas_concluidas + delta),
+        );
+        return {
+          ...t,
+          indicadores: { ...ind, subtarefas_concluidas: nextConcluidas },
+        };
+      });
+    },
+  );
+}
+
+function patchTarefaListIndicadoresOnSubtarefaCreate(
+  queryClient: ReturnType<typeof useQueryClient>,
+  tarefaId: string,
+) {
+  queryClient.setQueriesData<TarefaWithRelations[]>(
+    { queryKey: [...tarefaKeys.all, "list"] },
+    (old) => {
+      if (!old) return old;
+      return old.map((t) => {
+        if (t.id !== tarefaId) return t;
+        const ind = t.indicadores ?? {
+          subtarefas_total: 0,
+          subtarefas_concluidas: 0,
+          comentarios_count: 0,
+          anexos_count: 0,
+        };
+        return {
+          ...t,
+          indicadores: {
+            ...ind,
+            subtarefas_total: ind.subtarefas_total + 1,
+          },
+        };
+      });
+    },
+  );
+}
+
+function patchTarefaListIndicadoresOnSubtarefaDelete(
+  queryClient: ReturnType<typeof useQueryClient>,
+  tarefaId: string,
+  wasConcluida: boolean,
+) {
+  queryClient.setQueriesData<TarefaWithRelations[]>(
+    { queryKey: [...tarefaKeys.all, "list"] },
+    (old) => {
+      if (!old) return old;
+      return old.map((t) => {
+        if (t.id !== tarefaId) return t;
+        const ind = t.indicadores;
+        if (!ind) return t;
+        return {
+          ...t,
+          indicadores: {
+            ...ind,
+            subtarefas_total: Math.max(0, ind.subtarefas_total - 1),
+            subtarefas_concluidas: Math.max(
+              0,
+              ind.subtarefas_concluidas - (wasConcluida ? 1 : 0),
+            ),
+          },
+        };
+      });
+    },
+  );
+}
+
+function findTarefaIdForSubtarefa(
+  queryClient: ReturnType<typeof useQueryClient>,
+  subtarefaId: string,
+): string | null {
+  const detail = queryClient.getQueryData<SubtarefaDetail>(
+    subtarefaKeys.detail(subtarefaId),
+  );
+  if (detail?.tarefa_id) return detail.tarefa_id;
+
+  for (const [, data] of queryClient.getQueriesData<TarefaDetail>({
+    queryKey: [...tarefaKeys.all, "detail"],
+  })) {
+    if (data?.subtarefas?.some((s) => s.id === subtarefaId)) {
+      return data.id;
+    }
+  }
+
+  for (const [, data] of queryClient.getQueriesData<SubtarefaAgendaItem[]>({
+    queryKey: [...subtarefaKeys.all, "agenda"],
+  })) {
+    const hit = data?.find((s) => s.id === subtarefaId);
+    if (hit?.tarefa_id) return hit.tarefa_id;
+  }
+
+  return null;
+}
+
 const AGENDA_STALE_MS = 30_000;
 
 export function useTarefas(
@@ -328,6 +440,10 @@ export function useCreateSubtarefa() {
   return useMutation({
     mutationFn: ({ tarefaId, titulo }: { tarefaId: string; titulo: string }) =>
       createSubtarefa(tarefaId, titulo),
+    onMutate: async ({ tarefaId }) => {
+      await queryClient.cancelQueries({ queryKey: [...tarefaKeys.all, "list"] });
+      patchTarefaListIndicadoresOnSubtarefaCreate(queryClient, tarefaId);
+    },
     onSuccess: () => invalidateTarefas(queryClient),
   });
 }
@@ -362,9 +478,14 @@ export function useToggleSubtarefa() {
       const previousAgenda = queryClient.getQueriesData<SubtarefaAgendaItem[]>({
         queryKey: [...subtarefaKeys.all, "agenda"],
       });
+      const previousLists = queryClient.getQueriesData<TarefaWithRelations[]>({
+        queryKey: [...tarefaKeys.all, "list"],
+      });
       const previousSubtarefa = queryClient.getQueryData<SubtarefaDetail>(
         subtarefaKeys.detail(id),
       );
+
+      const tarefaId = findTarefaIdForSubtarefa(queryClient, id);
 
       queryClient.setQueriesData<TarefaDetail>(
         { queryKey: [...tarefaKeys.all, "detail"] },
@@ -373,24 +494,47 @@ export function useToggleSubtarefa() {
           const subtarefas = sortSubtarefasList(
             old.subtarefas.map((s) => (s.id !== id ? s : { ...s, concluida })),
           );
-          return { ...old, subtarefas };
+          const total = subtarefas.length;
+          const concluidas = subtarefas.filter((s) => s.concluida).length;
+          return {
+            ...old,
+            subtarefas,
+            indicadores: {
+              subtarefas_total: total,
+              subtarefas_concluidas: concluidas,
+              comentarios_count: old.indicadores?.comentarios_count ?? 0,
+              anexos_count: old.indicadores?.anexos_count ?? 0,
+            },
+          };
         },
       );
 
       patchSubtarefaAgendaOnConclusao(queryClient, id, concluida);
+      if (tarefaId) {
+        patchTarefaListIndicadoresOnSubtarefaToggle(queryClient, tarefaId, concluida);
+      }
 
       queryClient.setQueryData<SubtarefaDetail>(subtarefaKeys.detail(id), (old) => {
         if (!old) return old;
         return { ...old, concluida };
       });
 
-      return { previousTarefas, previousAgenda, previousSubtarefa, id };
+      return {
+        previousTarefas,
+        previousAgenda,
+        previousLists,
+        previousSubtarefa,
+        id,
+      };
     },
     onError: (_error, _vars, context) => {
       for (const [key, data] of context?.previousTarefas ?? []) {
         queryClient.setQueryData(key, data);
       }
       for (const [key, data] of context?.previousAgenda ?? []) {
+        queryClient.setQueryData(key, data);
+      }
+      for (const [key, data] of context?.previousLists ?? []) {
         queryClient.setQueryData(key, data);
       }
       if (context?.id) {
@@ -437,6 +581,28 @@ export function useDeleteSubtarefa() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => deleteSubtarefa(id),
+    onMutate: async (id) => {
+      const tarefaId = findTarefaIdForSubtarefa(queryClient, id);
+      let wasConcluida = false;
+      if (tarefaId) {
+        for (const [, data] of queryClient.getQueriesData<TarefaDetail>({
+          queryKey: [...tarefaKeys.all, "detail"],
+        })) {
+          const sub = data?.subtarefas?.find((s) => s.id === id);
+          if (sub) {
+            wasConcluida = !!sub.concluida;
+            break;
+          }
+        }
+        if (!wasConcluida) {
+          const detail = queryClient.getQueryData<SubtarefaDetail>(
+            subtarefaKeys.detail(id),
+          );
+          wasConcluida = !!detail?.concluida;
+        }
+        patchTarefaListIndicadoresOnSubtarefaDelete(queryClient, tarefaId, wasConcluida);
+      }
+    },
     onSuccess: () => invalidateTarefas(queryClient),
   });
 }

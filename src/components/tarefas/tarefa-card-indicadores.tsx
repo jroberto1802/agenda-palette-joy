@@ -5,7 +5,9 @@ import type { TarefaWithRelations } from "@/types";
 import { hasExplicitTime } from "@/utils/agenda-datas";
 import { formatDate, getVencimentoVariant } from "@/utils/formatters";
 
-/** Ícones de subtarefas / comentários / anexos no card da tarefa. */
+/** Ícones de subtarefas / comentários / anexos no card da tarefa.
+ * Formato de subtarefas: sempre `concluídas/total` (ex.: 5/10, 0/3).
+ */
 export function TarefaCardIndicadores({
   tarefa,
   className,
@@ -15,7 +17,10 @@ export function TarefaCardIndicadores({
 }) {
   const ind = tarefa.indicadores;
   const subtarefasTotal = ind?.subtarefas_total ?? 0;
-  const subtarefasConcluidas = ind?.subtarefas_concluidas ?? 0;
+  const subtarefasConcluidas = Math.min(
+    ind?.subtarefas_concluidas ?? 0,
+    subtarefasTotal,
+  );
   const comentarios = ind?.comentarios_count ?? 0;
   const anexos = ind?.anexos_count ?? 0;
 
@@ -36,6 +41,7 @@ export function TarefaCardIndicadores({
         <span
           className="inline-flex items-center gap-0.5"
           title={`Subtarefas: ${subtarefasConcluidas} de ${subtarefasTotal}`}
+          aria-label={`${subtarefasConcluidas} de ${subtarefasTotal} subtarefas concluídas`}
         >
           <ListTodo className="h-3 w-3 shrink-0" aria-hidden />
           <span className="tabular-nums">

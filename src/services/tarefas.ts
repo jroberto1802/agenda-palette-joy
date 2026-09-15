@@ -66,10 +66,13 @@ const TAREFA_SELECT = `
   )
 `;
 
-/** Embeds leves para indicadores do card — counts agregados (não embute linhas). */
+/** Embeds leves para indicadores do card.
+ * Subtarefas: só o booleano `concluida` (contagem no client) — evita o bug do
+ * PostgREST com dois `(count)` na mesma relação, que invertia/confundia
+ * total vs concluídas. Comentários/anexos seguem como count.
+ */
 const TAREFA_INDICADORES_SELECT = `
-  subtarefas_total:subtarefas(count),
-  subtarefas_concluidas:subtarefas(count).eq(concluida,true),
+  subtarefas_resumo:subtarefas(concluida),
   comentarios_count:tarefa_comentarios(count),
   anexos_count:tarefa_anexos(count)
 `;
@@ -77,11 +80,12 @@ const TAREFA_INDICADORES_SELECT = `
 const TAREFA_SELECT_WITH_INDICADORES = `${TAREFA_SELECT},
   ${TAREFA_INDICADORES_SELECT}`;
 
+/** Só progresso de subtarefas — Agenda Hoje/Em breve (sem counts de comentário/anexo). */
+const TAREFA_AGENDA_SUBTAREFAS_INDICADOR = `subtarefas_resumo:subtarefas(concluida)`;
+
 /**
- * Listagem da Agenda: campos do card + responsáveis.
- * Sem `*`, sem observadores/criador e sem counts (subtarefas/comentários/anexos):
- * cada `(count)` multiplica o custo no PostgREST e era o maior custo residual
- * da aba Hoje (~2–3× mais lento que o select sem aggregates).
+ * Listagem da Agenda: campos do card + responsáveis + progresso de subtarefas.
+ * Sem `*`, sem observadores/criador e sem counts de comentário/anexo.
  */
 const TAREFA_AGENDA_SELECT = `
   id, titulo, descricao, prioridade, concluida, data_inicio, data_conclusao,
@@ -94,7 +98,8 @@ const TAREFA_AGENDA_SELECT = `
   responsaveis:tarefa_responsaveis(
     usuario_id,
     usuario:profiles!tarefa_responsaveis_usuario_id_fkey(id, nome_completo, avatar_url, ativo)
-  )
+  ),
+  ${TAREFA_AGENDA_SUBTAREFAS_INDICADOR}
 `;
 
 /**
@@ -147,12 +152,20 @@ function attachTarefaIndicadores(row: Record<string, unknown>): TarefaWithRelati
     ...rest
   } = row;
 
-  const subtarefas_total = subtarefasLegacy
+  // Preferir resumo (ordem correta: concluídas/total). Fallback aos counts legados.
+  let subtarefas_total = subtarefasLegacy
     ? subtarefasLegacy.length
     : parseCountEmbed(totalRaw as CountEmbed);
-  const subtarefas_concluidas = subtarefasLegacy
+  let subtarefas_concluidas = subtarefasLegacy
     ? subtarefasLegacy.filter((s) => s.concluida).length
     : parseCountEmbed(concluidasRaw as CountEmbed);
+
+  // Dual `(count)` na mesma relação às vezes vinha invertido (total < concluídas).
+  if (subtarefas_concluidas > subtarefas_total) {
+    const swappedTotal = subtarefas_concluidas;
+    subtarefas_concluidas = subtarefas_total;
+    subtarefas_total = swappedTotal;
+  }
 
   return {
     ...(rest as TarefaWithRelations),
