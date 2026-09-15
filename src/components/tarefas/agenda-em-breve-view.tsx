@@ -219,7 +219,7 @@ export function AgendaEmBreveView({
     isLoading: loadingPrevisoes,
     isFetching: fetchingPrevisoes,
   } = useQuery({
-    queryKey: ["recorrencia-previsoes", rangeDe, rangeAte],
+    queryKey: ["recorrencia-previsoes", usuarioId, rangeDe, rangeAte],
     queryFn: () => listPrevisoesOcorrencia(rangeDe, rangeAte),
     enabled: !!usuarioId,
     placeholderData: keepPreviousData,
@@ -237,7 +237,7 @@ export function AgendaEmBreveView({
 
     for (const { de, ate } of neighbors) {
       void queryClient.prefetchQuery({
-        queryKey: ["recorrencia-previsoes", de, ate],
+        queryKey: ["recorrencia-previsoes", usuarioId, de, ate],
         queryFn: () => listPrevisoesOcorrencia(de, ate),
         staleTime: 60_000,
       });

@@ -9,6 +9,9 @@ export type BuscaTarefaResult = {
   id: string;
   titulo: string;
   trecho: string | null;
+  /** Modelo de série recorrente (receita) — deve aparecer na Busca também para Visualizador. */
+  serie_modelo?: boolean;
+  recorrencia_pasta_id?: string | null;
 };
 
 export type BuscaSubtarefaResult = {
@@ -82,14 +85,27 @@ export async function buscarConteudo(termo: string): Promise<BuscaResultados> {
   if (tarefaIds.length > 0) {
     const { data: meta } = await supabase
       .from("tarefas")
-      .select("id, serie_raiz_id")
+      .select("id, serie_raiz_id, recorrencia_pasta_id")
       .in("id", tarefaIds);
-    const modelos = new Set(
-      (meta ?? [])
-        .filter((r) => r.serie_raiz_id && r.serie_raiz_id === r.id)
-        .map((r) => r.id),
+    const metaById = new Map(
+      (meta ?? []).map((r) => [
+        r.id,
+        {
+          serie_modelo: !!(r.serie_raiz_id && r.serie_raiz_id === r.id),
+          recorrencia_pasta_id: r.recorrencia_pasta_id ?? null,
+        },
+      ]),
     );
-    tarefas = tarefasRaw.filter((t) => !modelos.has(t.id));
+    // Mantém modelos de série na Busca (Visualizador precisa achar a série pelo nome).
+    // Filtros locais de Agenda (buscarTarefaIds) continuam excluindo modelos.
+    tarefas = tarefasRaw.map((t) => {
+      const info = metaById.get(t.id);
+      return {
+        ...t,
+        serie_modelo: info?.serie_modelo ?? false,
+        recorrencia_pasta_id: info?.recorrencia_pasta_id ?? null,
+      };
+    });
   }
 
   return {
@@ -114,7 +130,8 @@ export async function buscarTarefaIds(termo: string): Promise<string[]> {
   const ids = Array.isArray(data) ? (data as string[]) : [];
   if (ids.length === 0) return [];
 
-  // Exclui modelos de série (aparecem só em Recorrentes).
+  // Exclui modelos de série dos filtros locais de Agenda (Hoje / Em breve / Geral).
+  // A Busca global (buscarConteudo) mantém os modelos para Visualizador achar a série.
   const { data: rows, error: metaError } = await supabase
     .from("tarefas")
     .select("id, serie_raiz_id")

@@ -584,16 +584,38 @@ export async function listTarefas(filters: TarefaFilters = {}): Promise<TarefaWi
     user = authUser;
     if (!user) return [];
 
-    const { data: myLinks, error: myLinksError } = await supabase
-      .from("tarefa_responsaveis")
-      .select("tarefa_id")
-      .eq("usuario_id", user.id);
+    const [
+      { data: myLinks, error: myLinksError },
+      { data: myObsLinks, error: myObsError },
+    ] = await Promise.all([
+      supabase
+        .from("tarefa_responsaveis")
+        .select("tarefa_id")
+        .eq("usuario_id", user.id),
+      supabase
+        .from("tarefa_observadores")
+        .select("tarefa_id")
+        .eq("usuario_id", user.id),
+    ]);
     if (myLinksError) throw myLinksError;
+    if (myObsError) throw myObsError;
+
     excludeIds = new Set((myLinks ?? []).map((row) => row.tarefa_id));
+    const obsIds = [
+      ...new Set(
+        (myObsLinks ?? [])
+          .map((row) => row.tarefa_id)
+          .filter((id) => !excludeIds.has(id)),
+      ),
+    ];
+    if (obsIds.length === 0) return [];
 
     if (allowedIds) {
-      allowedIds = allowedIds.filter((id) => !excludeIds.has(id));
+      const obsSet = new Set(obsIds);
+      allowedIds = allowedIds.filter((id) => obsSet.has(id));
       if (allowedIds.length === 0) return [];
+    } else {
+      allowedIds = obsIds;
     }
   }
 
@@ -690,18 +712,40 @@ export async function listTarefasCalendario(
   inicio: string,
   fim: string,
 ): Promise<TarefaWithRelations[]> {
-  const { data, error } = await supabase
-    .from("tarefas")
-    .select(asSelect(TAREFA_SELECT_WITH_INDICADORES))
-    .is("deleted_at", null)
-    .eq("concluida", false)
-    .not("data_inicio", "is", null)
-    .gte("data_inicio", inicio)
-    .lte("data_inicio", fim)
-    .order("data_inicio", { ascending: true });
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
 
-  if (error) throw error;
-  return mapTarefasWithIndicadores(data as unknown[] | null).filter((t) => !isSerieModelo(t));
+  // Calendário operacional: só responsável (Visualizador não vê série/ocorrências aqui).
+  const { data: links, error: linksError } = await supabase
+    .from("tarefa_responsaveis")
+    .select("tarefa_id")
+    .eq("usuario_id", user.id);
+  if (linksError) throw linksError;
+
+  const ids = [...new Set((links ?? []).map((r) => r.tarefa_id))];
+  if (ids.length === 0) return [];
+
+  const chunks = chunkIds(ids, TAREFA_ID_IN_CHUNK);
+  const chunkResults = await Promise.all(
+    chunks.map(async (part) => {
+      const { data, error } = await supabase
+        .from("tarefas")
+        .select(asSelect(TAREFA_SELECT_WITH_INDICADORES))
+        .is("deleted_at", null)
+        .eq("concluida", false)
+        .not("data_inicio", "is", null)
+        .gte("data_inicio", inicio)
+        .lte("data_inicio", fim)
+        .in("id", part)
+        .order("data_inicio", { ascending: true });
+      if (error) throw error;
+      return data ?? [];
+    }),
+  );
+
+  return mapTarefasWithIndicadores(chunkResults.flat()).filter((t) => !isSerieModelo(t));
 }
 
 export async function createTarefa(payload: TarefaFormData): Promise<TarefaWithRelations> {

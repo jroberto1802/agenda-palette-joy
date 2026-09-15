@@ -139,6 +139,11 @@ export async function listPrevisoesOcorrencia(
   const ate =
     ateSolicitado.getTime() > limitePrevisao.getTime() ? limitePrevisao : ateSolicitado;
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { tarefas: [], subtarefas: [] };
+
   // Select leve: só o necessário para montar o card de previsão.
   const { data: candidatas, error } = await supabase
     .from("tarefas")
@@ -155,7 +160,22 @@ export async function listPrevisoesOcorrencia(
 
   if (error) throw error;
 
-  const modelos = ((candidatas ?? []) as TarefaWithRelations[]).filter((t) => isSerieModelo(t));
+  let modelos = ((candidatas ?? []) as TarefaWithRelations[]).filter((t) => isSerieModelo(t));
+  if (modelos.length === 0) return { tarefas: [], subtarefas: [] };
+
+  // Agendas operacionais (Em breve / Calendário): previsões só para quem é
+  // responsável da série. Visualizador vê ocorrências em Visualizando / Busca /
+  // Recorrentes — não cards “fantasma” da série em Em breve.
+  const modeloIdsAll = modelos.map((m) => m.id);
+  const { data: respLinks, error: respError } = await supabase
+    .from("tarefa_responsaveis")
+    .select("tarefa_id")
+    .eq("usuario_id", user.id)
+    .in("tarefa_id", modeloIdsAll);
+  if (respError) throw respError;
+
+  const responsavelModeloIds = new Set((respLinks ?? []).map((r) => r.tarefa_id));
+  modelos = modelos.filter((m) => responsavelModeloIds.has(m.id));
   if (modelos.length === 0) return { tarefas: [], subtarefas: [] };
 
   const modeloIds = modelos.map((m) => m.id);

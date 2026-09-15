@@ -71,8 +71,9 @@ export function TarefaCalendarioView({
   );
 
   const { data: previsoesBundle, isLoading: loadingPrevisoes } = useQuery({
-    queryKey: ["recorrencia-previsoes", rangeDe, rangeAte],
+    queryKey: ["recorrencia-previsoes", profile?.id, rangeDe, rangeAte],
     queryFn: () => listPrevisoesOcorrencia(rangeDe, rangeAte),
+    enabled: !!profile?.id,
   });
 
   const diasComTarefas = useMemo(() => {

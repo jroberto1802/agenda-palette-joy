@@ -135,7 +135,13 @@ export function BuscaDialog({
                   <ResultButton
                     key={item.id}
                     title={item.titulo}
-                    subtitle={item.trecho}
+                    subtitle={
+                      item.serie_modelo
+                        ? item.trecho
+                          ? `Série recorrente · ${item.trecho}`
+                          : "Série recorrente"
+                        : item.trecho
+                    }
                     onClick={() =>
                       goTo(() =>
                         navigate({
