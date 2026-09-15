@@ -39,6 +39,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useReorderTarefasLista, useSyncTarefaBoardItens, useTarefaBoardItens } from "@/hooks/use-tarefa-board";
+import { ITEM_CONCLUIDO_CLASS } from "@/lib/layout";
 import { cn } from "@/lib/utils";
 import type { TarefaWithRelations } from "@/types";
 import { isSerieModelo } from "@/utils/recorrencia";
@@ -77,6 +78,7 @@ export const TarefaListRowContent = memo(function TarefaListRowContent({
       className={cn(
         "relative flex w-full items-center gap-2 rounded-xl border border-l-4 bg-card px-2 py-3 text-left shadow-sm transition-colors hover:bg-muted/40 sm:gap-3 sm:px-4",
         TAREFA_PRIORIDADE_BAND_CLASS[tarefa.prioridade],
+        tarefa.concluida && ITEM_CONCLUIDO_CLASS,
         isDragging && "opacity-60 ring-2 ring-primary",
       )}
     >
@@ -99,14 +101,7 @@ export const TarefaListRowContent = memo(function TarefaListRowContent({
         />
       )}
       <button type="button" onClick={onOpen} className="min-w-0 flex-1 space-y-1 text-left">
-        <p
-          className={cn(
-            "truncate text-sm font-medium",
-            tarefa.concluida && "text-muted-foreground line-through",
-          )}
-        >
-          {tarefa.titulo}
-        </p>
+        <p className="truncate text-sm font-medium">{tarefa.titulo}</p>
         {ehModelo ? (
           <SerieModeloBadge tarefa={tarefa} />
         ) : (

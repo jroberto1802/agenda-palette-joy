@@ -18,7 +18,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { TAREFA_CARD_FIXED_CLASS } from "@/lib/layout";
+import { TAREFA_CARD_FIXED_CLASS, ITEM_CONCLUIDO_CLASS } from "@/lib/layout";
 import type { TarefaWithRelations } from "@/types";
 import { isSerieModelo } from "@/utils/recorrencia";
 import {
@@ -64,7 +64,7 @@ export function TarefaCard({
         TAREFA_CARD_FIXED_CLASS,
         "relative flex flex-col border-l-4",
         TAREFA_PRIORIDADE_BAND_CLASS[tarefa.prioridade],
-        tarefa.concluida && "opacity-75",
+        tarefa.concluida && ITEM_CONCLUIDO_CLASS,
         onOpen && "cursor-pointer transition-colors hover:bg-muted/40",
       )}
       onClick={onOpen}
@@ -137,12 +137,7 @@ export function TarefaCard({
                   </Badge>
                 )}
               </div>
-              <CardTitle
-                className={cn(
-                  "line-clamp-2 text-sm font-semibold leading-snug",
-                  tarefa.concluida && "line-through text-muted-foreground",
-                )}
-              >
+              <CardTitle className="line-clamp-2 text-sm font-semibold leading-snug">
                 {tarefa.titulo}
               </CardTitle>
             </div>

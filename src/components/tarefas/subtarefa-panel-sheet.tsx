@@ -48,7 +48,7 @@ import {
   useUpdateSubtarefa,
   useUpdateSubtarefaComentario,
 } from "@/hooks/use-tarefas";
-import { SUBTAREFA_PANEL_CONTENT_CLASS } from "@/lib/layout";
+import { SUBTAREFA_PANEL_CONTENT_CLASS, ITEM_CONCLUIDO_CLASS } from "@/lib/layout";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
 import { cn } from "@/lib/utils";
 import type {
@@ -489,7 +489,10 @@ export function SubtarefaPanelSheet({
         ) : (
           <Form {...form}>
             <form
-              className="flex min-h-0 flex-1 flex-col"
+              className={cn(
+                "flex min-h-0 flex-1 flex-col",
+                subtarefa.concluida && ITEM_CONCLUIDO_CLASS,
+              )}
               onSubmit={(event) => {
                 event.preventDefault();
                 void handleOpenChange(false);

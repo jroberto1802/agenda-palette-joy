@@ -18,7 +18,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBuscaConteudo } from "@/hooks/use-busca";
+import { ITEM_CONCLUIDO_CLASS } from "@/lib/layout";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
+import { cn } from "@/lib/utils";
 import {
   countBuscaResultados,
   type BuscaAvisoResult,
@@ -135,6 +137,7 @@ export function BuscaDialog({
                   <ResultButton
                     key={item.id}
                     title={item.titulo}
+                    concluida={!!item.concluida}
                     subtitle={
                       item.serie_modelo
                         ? item.trecho
@@ -164,6 +167,7 @@ export function BuscaDialog({
                     key={item.id}
                     title={item.titulo}
                     subtitle={item.trecho}
+                    concluida={!!item.concluida}
                     onClick={() =>
                       goTo(() =>
                         navigate({
@@ -274,10 +278,12 @@ function ResultButton({
   title,
   subtitle,
   onClick,
+  concluida = false,
 }: {
   title: string;
   subtitle?: string | null;
   onClick: () => void;
+  concluida?: boolean;
 }) {
   const preview = useMemo(() => {
     if (!subtitle?.trim()) return null;
@@ -289,7 +295,10 @@ function ResultButton({
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full flex-col gap-0.5 px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className={cn(
+        "flex w-full flex-col gap-0.5 px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        concluida && ITEM_CONCLUIDO_CLASS,
+      )}
     >
       <span className="truncate text-sm font-medium">{title}</span>
       {preview && (

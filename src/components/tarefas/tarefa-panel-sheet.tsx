@@ -63,7 +63,8 @@ import { DescricaoField } from "@/components/tarefas/descricao-field";
 import { usePessoas } from "@/hooks/use-pessoas";
 import { useProjetos } from "@/hooks/use-projetos";
 import { useProfile } from "@/hooks/use-profile";
-import { LARGE_MODAL_CONTENT_CLASS } from "@/lib/layout";
+import { LARGE_MODAL_CONTENT_CLASS, ITEM_CONCLUIDO_CLASS } from "@/lib/layout";
+import { cn } from "@/lib/utils";
 import { useSetores } from "@/hooks/use-setores";
 import { listProjetoMembros } from "@/services/projetos";
 import { useQuery } from "@tanstack/react-query";
@@ -833,7 +834,13 @@ export function TarefaPanelSheet({
           </div>
         ) : (
           <Form {...form}>
-            <form onSubmit={handleSave} className="flex min-h-0 flex-1 flex-col">
+            <form
+              onSubmit={handleSave}
+              className={cn(
+                "flex min-h-0 flex-1 flex-col",
+                !isCreate && tarefa?.concluida && ITEM_CONCLUIDO_CLASS,
+              )}
+            >
               <DialogHeader className="shrink-0 space-y-0 border-b px-6 py-4 pr-12 text-left">
                 {isCreate ? (
                   <>

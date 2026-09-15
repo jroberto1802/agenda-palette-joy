@@ -230,7 +230,7 @@ export function TarefaAgendaBoard({
       ? { ...debouncedFilters, somente_finalizadas: true as const }
       : somenteModelos
         ? { ...debouncedFilters, somente_modelos: true as const }
-        : { ...debouncedFilters, excluir_finalizadas: true as const };
+        : { ...debouncedFilters };
 
     if (forceProjetoId) {
       return { ...base, projeto_id: forceProjetoId };

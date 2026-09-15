@@ -14,6 +14,13 @@ export const DENSE_CARD_GRID_CLASS =
  */
 export const TAREFA_CARD_FIXED_CLASS = "h-36 w-full overflow-hidden";
 
+/**
+ * Baixo contraste para tarefa/subtarefa concluída.
+ * Aplicar no container do card/linha inteira (título, ícones, badges, avatares, indicadores).
+ */
+export const ITEM_CONCLUIDO_CLASS =
+  "opacity-[0.45] saturate-[0.5] transition-opacity";
+
 /** @deprecated Prefira `DENSE_CARD_GRID_CLASS`. */
 export const TAREFA_CARD_GRID_CLASS = DENSE_CARD_GRID_CLASS;
 

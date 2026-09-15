@@ -195,7 +195,6 @@ export function AgendaEmBreveView({
 
   const { data: tarefas, isLoading: loadingTarefas } = useTarefas(
     {
-      excluir_finalizadas: true,
       atribuido_ids: usuarioId ? [usuarioId] : [],
       data_inicio_de: rangeDe,
       data_inicio_ate: rangeAte,

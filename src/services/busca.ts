@@ -9,6 +9,7 @@ export type BuscaTarefaResult = {
   id: string;
   titulo: string;
   trecho: string | null;
+  concluida?: boolean;
   /** Modelo de série recorrente (receita) — deve aparecer na Busca também para Visualizador. */
   serie_modelo?: boolean;
   recorrencia_pasta_id?: string | null;
@@ -19,6 +20,7 @@ export type BuscaSubtarefaResult = {
   titulo: string;
   tarefa_id: string;
   trecho: string | null;
+  concluida?: boolean;
 };
 
 export type BuscaAvisoResult = {

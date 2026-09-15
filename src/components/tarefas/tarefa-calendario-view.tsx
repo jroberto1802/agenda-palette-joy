@@ -31,6 +31,7 @@ import type { SubtarefaAgendaItem, TarefaWithRelations } from "@/types";
 import { toLocalDateKey, hasExplicitTime } from "@/utils/agenda-datas";
 import { isSerieModelo } from "@/utils/recorrencia";
 import { TAREFA_PRIORIDADE_COLORS, formatResponsaveisLabel } from "@/utils/tarefas";
+import { ITEM_CONCLUIDO_CLASS } from "@/lib/layout";
 import { cn } from "@/lib/utils";
 
 type TimelineEntry =
@@ -249,7 +250,10 @@ function TimelineItem({
     <button
       type="button"
       onClick={onClick}
-      className="w-full rounded-lg border p-4 text-left transition-colors hover:bg-accent/50"
+      className={cn(
+        "w-full rounded-lg border p-4 text-left transition-colors hover:bg-accent/50",
+        tarefa.concluida && ITEM_CONCLUIDO_CLASS,
+      )}
     >
       <div className="mb-2 flex flex-wrap gap-2">
         <Badge variant="outline" className={TAREFA_PRIORIDADE_COLORS[tarefa.prioridade]}>
@@ -294,6 +298,7 @@ function SubtarefaTimelineItem({
         "w-full rounded-lg border border-l-4 p-4 text-left transition-colors",
         onClick && "hover:bg-accent/50",
         !onClick && "cursor-default",
+        subtarefa.concluida && ITEM_CONCLUIDO_CLASS,
       )}
     >
       <div className="mb-2 flex flex-wrap gap-2">

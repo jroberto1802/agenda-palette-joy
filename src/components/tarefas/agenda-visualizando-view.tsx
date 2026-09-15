@@ -179,7 +179,6 @@ export function AgendaVisualizandoView({
   const { data: tarefas, isLoading: loadingTarefas } = useTarefas(
     {
       ...debouncedFilters,
-      excluir_finalizadas: true,
       somente_visualizando: true,
       projeto_id: "all",
       tag: "",

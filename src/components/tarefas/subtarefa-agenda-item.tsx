@@ -2,6 +2,7 @@ import { DescricaoPreview } from "@/components/tarefas/descricao-preview";
 import { ConclusaoBolinha } from "@/components/tarefas/conclusao-bolinha";
 import { SubtarefaRecorrenciaBadge } from "@/components/tarefas/recorrencia-ocorrencia-badge";
 import { Badge } from "@/components/ui/badge";
+import { ITEM_CONCLUIDO_CLASS } from "@/lib/layout";
 import { cn } from "@/lib/utils";
 import type { SubtarefaAgendaItem } from "@/types";
 import { formatDate, getVencimentoVariant } from "@/utils/formatters";
@@ -34,6 +35,7 @@ export const SubtarefaAgendaListRow = memo(function SubtarefaAgendaListRow({
       className={cn(
         "flex w-full items-center gap-2 rounded-xl border border-l-4 bg-card px-2 py-3 text-left shadow-sm transition-colors hover:bg-muted/40 sm:gap-3 sm:px-4",
         TAREFA_PRIORIDADE_BAND_CLASS[subtarefa.prioridade],
+        subtarefa.concluida && ITEM_CONCLUIDO_CLASS,
       )}
     >
       {onToggleConcluida && (
@@ -44,14 +46,7 @@ export const SubtarefaAgendaListRow = memo(function SubtarefaAgendaListRow({
         />
       )}
       <button type="button" onClick={onOpen} className="min-w-0 flex-1 space-y-1 text-left">
-        <p
-          className={cn(
-            "truncate text-sm font-medium",
-            subtarefa.concluida && "text-muted-foreground line-through",
-          )}
-        >
-          {subtarefa.titulo}
-        </p>
+        <p className="truncate text-sm font-medium">{subtarefa.titulo}</p>
         <DescricaoPreview descricao={subtarefa.descricao} />
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           {showAtrasadaBadge && (

@@ -61,6 +61,7 @@ import {
   useTarefaBoardItens,
 } from "@/hooks/use-tarefa-board";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
+import { ITEM_CONCLUIDO_CLASS } from "@/lib/layout";
 import { cn } from "@/lib/utils";
 import type { TarefaBoardColuna } from "@/services/tarefa-board";
 import type { TarefaWithRelations } from "@/types";
@@ -147,6 +148,7 @@ function ColunaCardContent({
       className={cn(
         "space-y-2 cursor-pointer rounded-lg border border-l-4 bg-card p-3 shadow-sm transition-colors hover:border-primary/40",
         TAREFA_PRIORIDADE_BAND_CLASS[tarefa.prioridade],
+        tarefa.concluida && ITEM_CONCLUIDO_CLASS,
         isDragging && "opacity-50 ring-2 ring-primary",
       )}
     >

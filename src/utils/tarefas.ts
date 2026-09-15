@@ -44,6 +44,7 @@ export type ClassificavelPorAgenda = {
   prioridade: TarefaPrioridade;
   data_inicio: string | null;
   titulo: string;
+  concluida?: boolean;
   /** Desempate estável quando prioridade/hora empatam (ex.: created_at). */
   created_at?: string | null;
 };
@@ -105,6 +106,10 @@ export function compareByClassificar(
   b: ClassificavelPorAgenda,
   mode: TarefaClassificar,
 ): number {
+  // Concluídas depois das abertas (baixo contraste no fim da lista).
+  const concluidaDiff = Number(!!a.concluida) - Number(!!b.concluida);
+  if (concluidaDiff !== 0) return concluidaDiff;
+
   if (mode === "prioridade_hora") {
     return compareByPriorityThenTime(a, b);
   }

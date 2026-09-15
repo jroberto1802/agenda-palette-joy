@@ -32,6 +32,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { ITEM_CONCLUIDO_CLASS } from "@/lib/layout";
 import type {
   ProfileWithSetor,
   SubtarefaMetaUpdate,
@@ -335,6 +336,7 @@ export function SubtarefaRow({
       className={cn(
         "group flex items-center gap-2.5 overflow-hidden rounded-xl border border-l-4 bg-card px-3 py-3.5 shadow-sm",
         TAREFA_PRIORIDADE_BAND_CLASS[subtarefa.prioridade],
+        subtarefa.concluida && ITEM_CONCLUIDO_CLASS,
         isDragging && "opacity-60 ring-2 ring-primary",
       )}
     >
@@ -352,10 +354,7 @@ export function SubtarefaRow({
 
       <button
         type="button"
-        className={cn(
-          "min-w-0 flex-1 rounded-md px-1 py-0.5 text-left text-sm leading-snug outline-none transition-colors hover:bg-muted/40 focus-visible:ring-1 focus-visible:ring-ring",
-          subtarefa.concluida && "text-muted-foreground line-through",
-        )}
+        className="min-w-0 flex-1 rounded-md px-1 py-0.5 text-left text-sm leading-snug outline-none transition-colors hover:bg-muted/40 focus-visible:ring-1 focus-visible:ring-ring"
         onClick={onOpen}
         title="Abrir detalhes da subtarefa"
       >
