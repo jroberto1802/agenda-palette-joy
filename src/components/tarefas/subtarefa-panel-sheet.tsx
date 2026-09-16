@@ -506,17 +506,22 @@ export function SubtarefaPanelSheet({
                   Detalhes, anexos e comentários da subtarefa.
                 </SheetDescription>
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <button
-                    type="button"
-                    className="flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
-                    onClick={() => void handleOpenChange(false)}
-                  >
-                    <ArrowLeft className="h-3 w-3 shrink-0" />
-                    <span className="truncate">
-                      Subtarefa de:{" "}
-                      <span className="font-medium text-foreground">{parentTitle}</span>
-                    </span>
-                  </button>
+                  <nav aria-label="Breadcrumb" className="min-w-0">
+                    <button
+                      type="button"
+                      className="group flex min-w-0 max-w-full items-center gap-1 rounded-sm text-[11px] text-muted-foreground outline-none transition-colors focus-visible:ring-1 focus-visible:ring-ring"
+                      title={`Voltar para ${parentTitle}`}
+                      onClick={() => void handleOpenChange(false)}
+                    >
+                      <ArrowLeft className="h-3 w-3 shrink-0 transition-colors group-hover:text-foreground" />
+                      <span className="truncate">
+                        Subtarefa de:{" "}
+                        <span className="cursor-pointer font-medium text-primary underline-offset-2 group-hover:underline">
+                          {parentTitle}
+                        </span>
+                      </span>
+                    </button>
+                  </nav>
                   <div className="flex flex-wrap items-center gap-1.5">
                     <div className="flex items-center gap-1.5">
                       <Badge
