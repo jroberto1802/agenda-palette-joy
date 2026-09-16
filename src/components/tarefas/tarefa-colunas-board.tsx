@@ -386,13 +386,13 @@ function DroppableColuna({
                   onToggleConcluida={(concluida) => onToggleConcluida(tarefa, concluida)}
                   canToggleConcluida={canToggleConcluida(tarefa)}
                   actions={
-                    canEdit && onDuplicate && onMove && onDeleteTarefa ? (
+                    canEdit && onDeleteTarefa ? (
                       <TarefaActionsMenu
                         canEdit={canEdit(tarefa)}
                         canDelete={canDeleteTarefa ? canDeleteTarefa(tarefa) : false}
                         onEdit={() => onOpenTarefa(tarefa)}
-                        onDuplicate={() => onDuplicate(tarefa)}
-                        onMove={() => onMove(tarefa)}
+                        onDuplicate={onDuplicate ? () => onDuplicate(tarefa) : undefined}
+                        onMove={onMove ? () => onMove(tarefa) : undefined}
                         onDelete={() => onDeleteTarefa(tarefa)}
                       />
                     ) : undefined

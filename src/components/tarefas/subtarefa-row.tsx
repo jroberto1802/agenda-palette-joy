@@ -600,8 +600,8 @@ export function SubtarefaRow({
               canDelete={canEdit}
               label="Ações da subtarefa"
               onEdit={onOpen}
-              onDuplicate={() => onDuplicate?.()}
-              onMove={() => onMove?.()}
+              onDuplicate={onDuplicate}
+              onMove={onMove}
               onDelete={() => setConfirmDeleteOpen(true)}
             />
           )}

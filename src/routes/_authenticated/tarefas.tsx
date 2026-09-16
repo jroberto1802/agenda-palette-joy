@@ -298,6 +298,9 @@ function AgendaPage() {
             onOpenTarefa={openTarefa}
             onOpenSubtarefa={openSubtarefa}
             onCreate={() => openCreate(startOfTodayLocal())}
+            canEdit={canEdit}
+            canDeleteTarefa={canDeleteTarefa}
+            onDelete={setDeleting}
           />
         </TabsContent>
 

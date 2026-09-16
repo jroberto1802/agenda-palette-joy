@@ -278,14 +278,14 @@ export function TarefaListView({
   };
 
   const renderActions = (tarefa: TarefaWithRelations) => {
-    if (!canEdit || !onDuplicate || !onMove || !onDelete) return undefined;
+    if (!canEdit || !onDelete) return undefined;
     return (
       <TarefaActionsMenu
         canEdit={canEdit(tarefa)}
         canDelete={canDeleteTarefa ? canDeleteTarefa(tarefa) : false}
         onEdit={() => onOpenTarefa(tarefa)}
-        onDuplicate={() => onDuplicate(tarefa)}
-        onMove={() => onMove(tarefa)}
+        onDuplicate={onDuplicate ? () => onDuplicate(tarefa) : undefined}
+        onMove={onMove ? () => onMove(tarefa) : undefined}
         onDelete={() => onDelete(tarefa)}
       />
     );

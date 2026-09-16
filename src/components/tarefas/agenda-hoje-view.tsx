@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AgendaAtrasadasSection } from "@/components/tarefas/agenda-atrasadas-section";
 import { SubtarefaAgendaListRow } from "@/components/tarefas/subtarefa-agenda-item";
+import { TarefaActionsMenu } from "@/components/tarefas/tarefa-actions-menu";
 import { TarefaFiltersBar } from "@/components/tarefas/tarefa-filters";
 import { TarefaListRowContent } from "@/components/tarefas/tarefa-list-view";
 import { Button } from "@/components/ui/button";
@@ -78,6 +79,9 @@ export function AgendaHojeView({
   onOpenTarefa,
   onOpenSubtarefa,
   onCreate,
+  canEdit,
+  canDeleteTarefa,
+  onDelete,
 }: {
   usuarioId: string | undefined;
   setores: SetorWithGerente[];
@@ -85,6 +89,9 @@ export function AgendaHojeView({
   onOpenTarefa: (tarefa: TarefaWithRelations) => void;
   onOpenSubtarefa: (subtarefa: SubtarefaAgendaItem) => void;
   onCreate: () => void;
+  canEdit?: (tarefa: TarefaWithRelations) => boolean;
+  canDeleteTarefa?: (tarefa: TarefaWithRelations) => boolean;
+  onDelete?: (tarefa: TarefaWithRelations) => void;
 }) {
   const hojeKey = toLocalDateKey(startOfTodayLocal())!;
   const updateConclusao = useUpdateTarefaConclusao();
@@ -334,6 +341,20 @@ export function AgendaHojeView({
                           onOpen={() => onOpenTarefa(item.tarefa)}
                           onToggleConcluida={(concluida) =>
                             handleToggleConcluida(item.tarefa, concluida)
+                          }
+                          actions={
+                            canEdit && onDelete ? (
+                              <TarefaActionsMenu
+                                canEdit={canEdit(item.tarefa)}
+                                canDelete={
+                                  canDeleteTarefa
+                                    ? canDeleteTarefa(item.tarefa)
+                                    : false
+                                }
+                                onEdit={() => onOpenTarefa(item.tarefa)}
+                                onDelete={() => onDelete(item.tarefa)}
+                              />
+                            ) : undefined
                           }
                         />
                       </li>

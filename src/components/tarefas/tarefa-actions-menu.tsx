@@ -19,8 +19,8 @@ export function TarefaActionsMenu({
   canEdit: boolean;
   canDelete: boolean;
   onEdit: () => void;
-  onDuplicate: () => void;
-  onMove: () => void;
+  onDuplicate?: () => void;
+  onMove?: () => void;
   onDelete: () => void;
   label?: string;
 }) {
@@ -46,14 +46,18 @@ export function TarefaActionsMenu({
               <Pencil className="mr-2 h-4 w-4" />
               Editar
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={onDuplicate}>
-              <Copy className="mr-2 h-4 w-4" />
-              Duplicar
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onMove}>
-              <FolderInput className="mr-2 h-4 w-4" />
-              Mover
-            </DropdownMenuItem>
+            {onDuplicate && (
+              <DropdownMenuItem onClick={onDuplicate}>
+                <Copy className="mr-2 h-4 w-4" />
+                Duplicar
+              </DropdownMenuItem>
+            )}
+            {onMove && (
+              <DropdownMenuItem onClick={onMove}>
+                <FolderInput className="mr-2 h-4 w-4" />
+                Mover
+              </DropdownMenuItem>
+            )}
           </>
         )}
         {canDelete && (
