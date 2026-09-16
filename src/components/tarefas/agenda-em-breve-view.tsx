@@ -1,6 +1,6 @@
 import { addDays, format, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, Plus } from "lucide-react";
 import { startTransition, useEffect, useMemo, useState } from "react";
 import { DescricaoPreview } from "@/components/tarefas/descricao-preview";
 import { TarefaRecorrenciaBadge } from "@/components/tarefas/recorrencia-ocorrencia-badge";
@@ -36,6 +36,7 @@ import {
 import {
   AGENDA_EM_BREVE_PAGE_SIZE,
   getEmBreveDays,
+  getTimeInputValue,
   resolveWindowStartForMonth,
   startOfTodayLocal,
   toLocalDateKey,
@@ -49,6 +50,31 @@ const MONTH_OPTIONS = Array.from({ length: 12 }, (_, monthIndex) => ({
   value: String(monthIndex),
   label: format(new Date(2020, monthIndex, 1), "MMMM", { locale: ptBR }),
 }));
+
+/** Hora HH:mm só quando há horário explícito; sem espaço reservado se vazio. */
+function EmBreveHoraLabel({
+  dataInicio,
+  className,
+}: {
+  dataInicio: string | null | undefined;
+  className?: string;
+}) {
+  const hora = getTimeInputValue(dataInicio ? new Date(dataInicio) : null);
+  if (!hora) return null;
+
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center gap-0.5 tabular-nums text-muted-foreground",
+        className,
+      )}
+      title="Horário"
+    >
+      <Clock className="h-3 w-3 shrink-0" aria-hidden />
+      <span>{hora}</span>
+    </span>
+  );
+}
 
 const YEAR_OPTIONS_START = 2026;
 const YEAR_OPTIONS_FORWARD = 6;
@@ -82,9 +108,12 @@ function EmBrevePrevisaoCard({ previsao }: { previsao: PrevisaoOcorrencia }) {
         TAREFA_PRIORIDADE_BAND_CLASS[previsao.prioridade],
       )}
     >
-      <p className="line-clamp-2 text-sm font-medium leading-snug text-muted-foreground">
-        {previsao.titulo}
-      </p>
+      <div className="flex items-start justify-between gap-2">
+        <p className="line-clamp-2 text-sm font-medium leading-snug text-muted-foreground">
+          {previsao.titulo}
+        </p>
+        <EmBreveHoraLabel dataInicio={previsao.data_inicio} className="text-[11px]" />
+      </div>
       <p className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground">
         Previsão · recorrência
       </p>
@@ -100,9 +129,12 @@ function EmBrevePrevisaoSubtarefaCard({ previsao }: { previsao: PrevisaoSubtaref
         TAREFA_PRIORIDADE_BAND_CLASS[previsao.prioridade],
       )}
     >
-      <p className="line-clamp-2 text-xs font-medium leading-snug text-muted-foreground">
-        {previsao.titulo}
-      </p>
+      <div className="flex items-start justify-between gap-2">
+        <p className="line-clamp-2 text-xs font-medium leading-snug text-muted-foreground">
+          {previsao.titulo}
+        </p>
+        <EmBreveHoraLabel dataInicio={previsao.data_inicio} className="text-[10px] [&_svg]:h-2.5 [&_svg]:w-2.5" />
+      </div>
       <p className="mt-0.5 truncate text-[10px] text-muted-foreground">
         de: {previsao.tarefa_titulo}
       </p>
@@ -129,7 +161,10 @@ function EmBreveTaskCard({
         TAREFA_PRIORIDADE_BAND_CLASS[tarefa.prioridade],
       )}
     >
-      <p className="line-clamp-2 text-sm font-medium leading-snug">{tarefa.titulo}</p>
+      <div className="flex items-start justify-between gap-2">
+        <p className="line-clamp-2 text-sm font-medium leading-snug">{tarefa.titulo}</p>
+        <EmBreveHoraLabel dataInicio={tarefa.data_inicio} className="text-[11px]" />
+      </div>
       <DescricaoPreview
         descricao={tarefa.descricao}
         className="mt-0.5 line-clamp-1 text-xs leading-snug text-muted-foreground"

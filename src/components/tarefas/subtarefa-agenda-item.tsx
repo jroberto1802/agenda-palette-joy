@@ -5,13 +5,14 @@ import { Badge } from "@/components/ui/badge";
 import { ITEM_CONCLUIDO_CLASS } from "@/lib/layout";
 import { cn } from "@/lib/utils";
 import type { SubtarefaAgendaItem } from "@/types";
+import { getTimeInputValue } from "@/utils/agenda-datas";
 import { formatDate, getVencimentoVariant } from "@/utils/formatters";
 import {
   TAREFA_PRIORIDADE_BAND_CLASS,
   TAREFA_PRIORIDADE_COLORS,
   TAREFA_PRIORIDADE_LABELS,
 } from "@/utils/tarefas";
-import { AlertTriangle, CalendarIcon, ChevronRight, ListTodo } from "lucide-react";
+import { AlertTriangle, CalendarIcon, ChevronRight, Clock, ListTodo } from "lucide-react";
 import { memo, type ReactNode } from "react";
 
 export const SubtarefaAgendaListRow = memo(function SubtarefaAgendaListRow({
@@ -101,6 +102,9 @@ export function SubtarefaAgendaCard({
   const parentTitle = subtarefa.tarefa?.titulo?.trim() || "Tarefa principal";
   const badgeClass = compact ? "gap-0.5 px-1 py-0 text-[9px]" : "gap-1 px-1.5 py-0 text-[10px]";
   const iconClass = compact ? "h-2.5 w-2.5" : "h-3 w-3";
+  const hora = getTimeInputValue(
+    subtarefa.data_inicio ? new Date(subtarefa.data_inicio) : null,
+  );
 
   return (
     <button
@@ -112,14 +116,31 @@ export function SubtarefaAgendaCard({
         TAREFA_PRIORIDADE_BAND_CLASS[subtarefa.prioridade],
       )}
     >
-      <p
-        className={cn(
-          "line-clamp-2 font-medium leading-snug",
-          compact ? "text-xs" : "text-sm",
+      <div className="flex items-start justify-between gap-2">
+        <p
+          className={cn(
+            "line-clamp-2 font-medium leading-snug",
+            compact ? "text-xs" : "text-sm",
+          )}
+        >
+          {subtarefa.titulo}
+        </p>
+        {hora && (
+          <span
+            className={cn(
+              "inline-flex shrink-0 items-center gap-0.5 tabular-nums text-muted-foreground",
+              compact ? "text-[10px]" : "text-[11px]",
+            )}
+            title="Horário"
+          >
+            <Clock
+              className={cn("shrink-0", compact ? "h-2.5 w-2.5" : "h-3 w-3")}
+              aria-hidden
+            />
+            <span>{hora}</span>
+          </span>
         )}
-      >
-        {subtarefa.titulo}
-      </p>
+      </div>
       <DescricaoPreview
         descricao={subtarefa.descricao}
         className={cn(
