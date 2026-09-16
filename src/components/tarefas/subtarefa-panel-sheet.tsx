@@ -228,7 +228,7 @@ export function SubtarefaPanelSheet({
     );
   }, [readOnly, parentTarefa, profile]);
 
-  const mostrarBolinhaCabecalho = !!subtarefa && !subtarefa.concluida && !readOnly;
+  const mostrarBolinhaCabecalho = !!subtarefa && !readOnly;
 
   const handleToggleConclusao = async (concluida: boolean) => {
     if (!subtarefa) return;
@@ -527,7 +527,7 @@ export function SubtarefaPanelSheet({
                       </Badge>
                       {mostrarBolinhaCabecalho && (
                         <ConclusaoBolinha
-                          concluida={false}
+                          concluida={subtarefa.concluida}
                           kind="subtarefa"
                           size="sm"
                           disabled={!canEdit}

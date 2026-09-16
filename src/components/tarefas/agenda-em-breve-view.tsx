@@ -198,6 +198,7 @@ export function AgendaEmBreveView({
       atribuido_ids: usuarioId ? [usuarioId] : [],
       data_inicio_de: rangeDe,
       data_inicio_ate: rangeAte,
+      excluir_finalizadas: true,
       lite: true,
     },
     { enabled: !!usuarioId },

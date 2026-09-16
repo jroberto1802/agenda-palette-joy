@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -98,6 +99,16 @@ export function ConclusaoBolinha({
     nestedLock?.unlock();
   };
 
+  // Se a bolinha desmontar com o AlertDialog ainda aberto (ex.: conclusão
+  // otimista esconde o cabeçalho), libera o lock para o sheet pai não travar.
+  useEffect(() => {
+    return () => {
+      if (!guardHeldRef.current) return;
+      guardHeldRef.current = false;
+      nestedLock?.unlock();
+    };
+  }, [nestedLock]);
+
   const handleClick = (event: MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
@@ -118,6 +129,8 @@ export function ConclusaoBolinha({
       await onToggle(true);
       setConfirmOpen(false);
       releaseGuard();
+    } catch {
+      // Mantém o diálogo aberto; onToggle deve ter lançado o erro.
     } finally {
       setPending(false);
     }

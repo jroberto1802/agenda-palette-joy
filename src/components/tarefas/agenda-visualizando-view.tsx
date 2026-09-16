@@ -180,6 +180,7 @@ export function AgendaVisualizandoView({
     {
       ...debouncedFilters,
       somente_visualizando: true,
+      excluir_finalizadas: true,
       projeto_id: "all",
       tag: "",
     },

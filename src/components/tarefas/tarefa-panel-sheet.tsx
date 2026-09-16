@@ -462,8 +462,7 @@ export function TarefaPanelSheet({
     );
   }, [readOnly, isCreate, tarefa, profile]);
 
-  const mostrarBolinhaCabecalho =
-    !!tarefa && !tarefa.concluida && !ehModeloSerie && !readOnly;
+  const mostrarBolinhaCabecalho = !!tarefa && !ehModeloSerie && !readOnly;
   const podeAlternarConclusao =
     !!tarefa &&
     canToggleTarefaConclusao(
@@ -916,7 +915,7 @@ export function TarefaPanelSheet({
                                 </Badge>
                                 {mostrarBolinhaCabecalho && (
                                   <ConclusaoBolinha
-                                    concluida={false}
+                                    concluida={tarefa.concluida}
                                     kind="tarefa"
                                     disabled={!podeAlternarConclusao}
                                     onToggle={handleToggleConclusao}

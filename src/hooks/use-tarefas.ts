@@ -73,8 +73,9 @@ function patchTarefaListsOnConclusao(
     { queryKey: [...tarefaKeys.all, "list"] },
     (old) => {
       if (!old) return old;
-      // Mantém na listagem com baixo contraste (não remove ao concluir).
-      return old.map((t) => (t.id === id ? { ...t, concluida } : t));
+      // Agendas operacionais excluem finalizadas; Finalizados refetch via invalidate.
+      if (concluida) return old.filter((t) => t.id !== id);
+      return old.map((t) => (t.id === id ? { ...t, concluida: false } : t));
     },
   );
 }
@@ -88,8 +89,9 @@ function patchSubtarefaAgendaOnConclusao(
     { queryKey: [...subtarefaKeys.all, "agenda"] },
     (old) => {
       if (!old) return old;
-      // Mantém na listagem com baixo contraste (não remove ao concluir).
-      return old.map((s) => (s.id === id ? { ...s, concluida } : s));
+      // Agendas operacionais excluem finalizadas; Finalizados refetch via invalidate.
+      if (concluida) return old.filter((s) => s.id !== id);
+      return old.map((s) => (s.id === id ? { ...s, concluida: false } : s));
     },
   );
 }

@@ -734,6 +734,7 @@ export async function listTarefasCalendario(
         .from("tarefas")
         .select(asSelect(TAREFA_SELECT_WITH_INDICADORES))
         .is("deleted_at", null)
+        .eq("concluida", false)
         .not("data_inicio", "is", null)
         .gte("data_inicio", inicio)
         .lte("data_inicio", fim)
@@ -1275,16 +1276,13 @@ export async function listSubtarefasAgenda(
     `),
     )
     .eq("filter_resp.usuario_id", usuarioId)
+    .eq("concluida", false)
     .not("data_inicio", "is", null)
+    .eq("tarefa.concluida", false)
     .is("tarefa.deleted_at", null)
     .order("data_inicio", {
       ascending: filters.somente_atrasadas ? false : true,
     });
-
-  // Atrasadas = ainda em aberto (concluída deixa de ser "atrasada").
-  if (filters.somente_atrasadas) {
-    query = query.eq("concluida", false).eq("tarefa.concluida", false);
-  }
 
   const rows = await finalizeSubtarefasAgendaQuery(query, filters);
 
@@ -1345,13 +1343,10 @@ async function listSubtarefasVisualizando(
     `,
     )
     .in("id", obsSubIds)
+    .eq("concluida", false)
+    .eq("tarefa.concluida", false)
     .is("tarefa.deleted_at", null)
     .order("created_at", { ascending: false });
-
-  // Atrasadas = ainda em aberto.
-  if (filters.somente_atrasadas) {
-    query = query.eq("concluida", false).eq("tarefa.concluida", false);
-  }
 
   if (filters.atribuido_ids && filters.atribuido_ids.length > 0) {
     const { data: respLinks, error: respError } = await supabase

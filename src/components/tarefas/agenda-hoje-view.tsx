@@ -153,6 +153,7 @@ export function AgendaHojeView({
 
   const sharedFilter = {
     ...debouncedFilters,
+    excluir_finalizadas: true as const,
     atribuido_ids: usuarioId ? [usuarioId] : [],
     tag: "",
     lite: true as const,
