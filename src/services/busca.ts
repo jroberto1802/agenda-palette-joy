@@ -81,14 +81,17 @@ export async function buscarConteudo(termo: string): Promise<BuscaResultados> {
   if (error) throw error;
 
   const payload = (data ?? {}) as Record<string, unknown>;
-  const tarefasRaw = asArray<BuscaTarefaResult>(payload.tarefas);
+  const tarefasRaw = asArray<BuscaTarefaResult>(payload.tarefas)
+    // Defesa: Buscar global só itens ativos (Aberta).
+    .filter((t) => !t.concluida);
   const tarefaIds = tarefasRaw.map((t) => t.id);
   let tarefas = tarefasRaw;
   if (tarefaIds.length > 0) {
     const { data: meta } = await supabase
       .from("tarefas")
       .select("id, serie_raiz_id, recorrencia_pasta_id")
-      .in("id", tarefaIds);
+      .in("id", tarefaIds)
+      .eq("concluida", false);
     const metaById = new Map(
       (meta ?? []).map((r) => [
         r.id,
@@ -100,22 +103,74 @@ export async function buscarConteudo(termo: string): Promise<BuscaResultados> {
     );
     // Mantém modelos de série na Busca (Visualizador precisa achar a série pelo nome).
     // Filtros locais de Agenda (buscarTarefaIds) continuam excluindo modelos.
-    tarefas = tarefasRaw.map((t) => {
-      const info = metaById.get(t.id);
-      return {
-        ...t,
-        serie_modelo: info?.serie_modelo ?? false,
-        recorrencia_pasta_id: info?.recorrencia_pasta_id ?? null,
-      };
-    });
+    tarefas = tarefasRaw
+      .filter((t) => metaById.has(t.id))
+      .map((t) => {
+        const info = metaById.get(t.id);
+        return {
+          ...t,
+          serie_modelo: info?.serie_modelo ?? false,
+          recorrencia_pasta_id: info?.recorrencia_pasta_id ?? null,
+        };
+      });
   }
+
+  const subtarefasRaw = asArray<BuscaSubtarefaResult>(payload.subtarefas).filter(
+    (s) => !s.concluida,
+  );
+  const comentariosRaw = asArray<BuscaComentarioResult>(payload.comentarios);
+
+  const parentIdsForOpenCheck = [
+    ...new Set([
+      ...subtarefasRaw.map((s) => s.tarefa_id),
+      ...comentariosRaw.map((c) => c.tarefa_id),
+    ]),
+  ];
+  let openParentIds = new Set<string>();
+  if (parentIdsForOpenCheck.length > 0) {
+    const { data: parents } = await supabase
+      .from("tarefas")
+      .select("id")
+      .in("id", parentIdsForOpenCheck)
+      .eq("concluida", false)
+      .is("deleted_at", null);
+    openParentIds = new Set((parents ?? []).map((p) => p.id));
+  }
+
+  // Só subtarefas ativas cuja tarefa-mãe também está Aberta.
+  const subtarefas = subtarefasRaw.filter((s) => openParentIds.has(s.tarefa_id));
+
+  const subtarefaCommentIds = [
+    ...new Set(
+      comentariosRaw
+        .filter((c) => c.origem === "subtarefa" && c.subtarefa_id)
+        .map((c) => c.subtarefa_id as string),
+    ),
+  ];
+  let openSubtarefaIds = new Set<string>();
+  if (subtarefaCommentIds.length > 0) {
+    const { data: openSubs } = await supabase
+      .from("subtarefas")
+      .select("id")
+      .in("id", subtarefaCommentIds)
+      .eq("concluida", false);
+    openSubtarefaIds = new Set((openSubs ?? []).map((s) => s.id));
+  }
+
+  const comentarios = comentariosRaw.filter((c) => {
+    if (!openParentIds.has(c.tarefa_id)) return false;
+    if (c.origem === "subtarefa" && c.subtarefa_id) {
+      return openSubtarefaIds.has(c.subtarefa_id);
+    }
+    return true;
+  });
 
   return {
     projetos: asArray<BuscaProjetoResult>(payload.projetos),
     tarefas,
-    subtarefas: asArray<BuscaSubtarefaResult>(payload.subtarefas),
+    subtarefas,
     avisos: asArray<BuscaAvisoResult>(payload.avisos),
-    comentarios: asArray<BuscaComentarioResult>(payload.comentarios),
+    comentarios,
   };
 }
 
