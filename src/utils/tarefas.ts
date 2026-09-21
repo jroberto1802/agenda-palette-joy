@@ -335,6 +335,33 @@ export function formatResponsaveisLabel(tarefa: TarefaWithRelations): string {
   return `${nomes[0]} +${nomes.length - 1}`;
 }
 
+/** Junta nomes para frases de aviso (A / A e B / A, B e C). */
+function formatNomesLista(nomes: string[]): string {
+  if (nomes.length === 0) return "";
+  if (nomes.length === 1) return nomes[0];
+  if (nomes.length === 2) return `${nomes[0]} e ${nomes[1]}`;
+  return `${nomes.slice(0, -1).join(", ")} e ${nomes[nomes.length - 1]}`;
+}
+
+/**
+ * Aviso quando responsável(is) não pertence(m) ao projeto selecionado.
+ * Não bloqueia o save — a tarefa mantém o responsável e o projeto.
+ */
+export function formatAvisoResponsavelForaDoProjeto(
+  responsaveisNomes: string[],
+  projetoNome: string,
+): string | null {
+  const nomes = responsaveisNomes.map((n) => n.trim()).filter(Boolean);
+  const projeto = projetoNome.trim();
+  if (nomes.length === 0 || !projeto) return null;
+
+  if (nomes.length === 1) {
+    return `O responsável ${nomes[0]} não faz parte do projeto ${projeto}. Será necessário adicioná-lo ao projeto para confirmar esta tarefa.`;
+  }
+
+  return `Os responsáveis ${formatNomesLista(nomes)} não fazem parte do projeto ${projeto}. Será necessário adicioná-los ao projeto para confirmar esta tarefa.`;
+}
+
 export function canEditVisibilidade(
   tarefa: TarefaWithRelations | null | undefined,
   userId: string | undefined,

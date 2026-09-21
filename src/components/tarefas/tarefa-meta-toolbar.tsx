@@ -262,7 +262,8 @@ export function TarefaMetaToolbar({
                     onValueChange={(v) => {
                       const next = v === "none" ? null : v;
                       field.onChange(next);
-                      if (next) form.setValue("atribuido_ids", []);
+                      // Responsáveis persistem ao mudar Projeto — validação de
+                      // compatibilidade fica no painel (aviso, sem limpar).
                     }}
                     disabled={!canEdit || lockProjeto}
                   >

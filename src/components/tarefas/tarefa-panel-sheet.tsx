@@ -14,7 +14,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ChevronRight, GripVertical, MessageSquare, Paperclip, Plus, Save } from "lucide-react";
+import { ChevronRight, GripVertical, MessageSquare, Paperclip, Plus, Save, AlertTriangle } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -41,6 +41,7 @@ import {
 } from "@/utils/escopo-tarefa";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Form,
   FormControl,
@@ -110,6 +111,7 @@ import {
   canEditTarefa,
   canEditVisibilidade,
   canToggleTarefaConclusao,
+  formatAvisoResponsavelForaDoProjeto,
   getSetoresPermitidos,
   getTarefaConclusaoColorClass,
   getTarefaConclusaoLabel,
@@ -532,10 +534,38 @@ export function TarefaPanelSheet({
     // Administrador ignora escopo de projeto ao atribuir responsáveis.
     if (isAdmin(profile) || !projetoId) return pessoasAtivas;
     const memberIds = new Set((projetoMembros ?? []).map((m) => m.id));
+    if (selectedProjeto?.criado_por) memberIds.add(selectedProjeto.criado_por);
     const selected = new Set(atribuidoIds ?? []);
-    // Equipe do projeto + já atribuídos (mesmo se removidos da equipe)
+    // Equipe do projeto + já atribuídos (mesmo se removidos da equipe / fora do projeto)
     return pessoasAtivas.filter((p) => memberIds.has(p.id) || selected.has(p.id));
-  }, [projetoId, projetoMembros, pessoasAtivas, atribuidoIds, profile]);
+  }, [
+    projetoId,
+    projetoMembros,
+    pessoasAtivas,
+    atribuidoIds,
+    profile,
+    selectedProjeto?.criado_por,
+  ]);
+
+  const avisoResponsavelForaDoProjeto = useMemo(() => {
+    if (!projetoId || !selectedProjeto?.nome) return null;
+    const memberIds = new Set((projetoMembros ?? []).map((m) => m.id));
+    if (selectedProjeto.criado_por) memberIds.add(selectedProjeto.criado_por);
+    // Enquanto membros não carregaram, não alerta (evita falso positivo).
+    if (projetoMembros === undefined) return null;
+    const fora = (atribuidoIds ?? [])
+      .filter((id) => id && !memberIds.has(id))
+      .map((id) => pessoasAtivas.find((p) => p.id === id)?.nome_completo ?? "Responsável")
+      .filter(Boolean);
+    return formatAvisoResponsavelForaDoProjeto(fora, selectedProjeto.nome);
+  }, [
+    projetoId,
+    selectedProjeto?.nome,
+    selectedProjeto?.criado_por,
+    projetoMembros,
+    atribuidoIds,
+    pessoasAtivas,
+  ]);
 
   const defaultAtribuidoIdsKey = (defaultAtribuidoIds ?? []).join(",");
   const defaultDataInicioKey = defaultDataInicio
@@ -734,6 +764,9 @@ export function TarefaPanelSheet({
                 : localDateAtNoon(first);
             payload.data_inicio = timed.toISOString();
           }
+        }
+        if (avisoResponsavelForaDoProjeto) {
+          toast.warning(avisoResponsavelForaDoProjeto);
         }
         await applySave(payload);
       } catch (error) {
@@ -983,6 +1016,13 @@ export function TarefaPanelSheet({
                       }
                       emptyVisibilidadeLabel="Nenhuma pessoa disponível"
                     />
+
+                    {avisoResponsavelForaDoProjeto && (
+                      <Alert className="border-amber-500/40 bg-amber-500/5 text-foreground">
+                        <AlertTriangle className="h-4 w-4 text-amber-600" />
+                        <AlertDescription>{avisoResponsavelForaDoProjeto}</AlertDescription>
+                      </Alert>
+                    )}
 
                     <TarefaPeopleStrip
                       criador={criadorDisplay}
