@@ -18,7 +18,7 @@ import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
 import type { EscopoExclusaoSerie } from "@/services/tarefa-recorrencia";
 import type { TarefaWithRelations } from "@/types";
 import { readAgendaViewPreference } from "@/utils/agenda-view-preference";
-import { isAdmin, isGerente } from "@/utils/permissions";
+import { canDeleteTarefa as podeExcluirTarefa, isAdmin, isGerente } from "@/utils/permissions";
 import { pertenceASerie } from "@/utils/recorrencia";
 import { canEditTarefa, canToggleTarefaConclusao } from "@/utils/tarefas";
 
@@ -78,10 +78,8 @@ function FinalizadosPage() {
     [pessoas],
   );
 
-  const canDeleteTarefa = (tarefa: TarefaWithRelations) => {
-    if (isAdmin(profile)) return true;
-    return tarefa.criado_por === profile?.id;
-  };
+  const canDeleteTarefa = (tarefa: TarefaWithRelations) =>
+    podeExcluirTarefa(profile, tarefa);
 
   const canEdit = (tarefa: TarefaWithRelations) =>
     canEditTarefa(tarefa, profile?.id, isAdmin(profile), isGerente(profile), profile?.setor_id);
@@ -132,7 +130,9 @@ function FinalizadosPage() {
 
   usePageHeader({
     title: "Finalizados",
-    subtitle: "Tarefas concluídas dos projetos e setores aos quais você tem acesso.",
+    subtitle: isAdmin(profile)
+      ? "Todas as tarefas concluídas do sistema (acesso de Administrador)."
+      : "Tarefas concluídas dos projetos e setores aos quais você tem acesso.",
   });
 
   return (

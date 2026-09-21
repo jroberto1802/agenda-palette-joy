@@ -529,12 +529,13 @@ export function TarefaPanelSheet({
   });
 
   const pessoasParaResponsavel = useMemo(() => {
-    if (!projetoId) return pessoasAtivas;
+    // Administrador ignora escopo de projeto ao atribuir responsáveis.
+    if (isAdmin(profile) || !projetoId) return pessoasAtivas;
     const memberIds = new Set((projetoMembros ?? []).map((m) => m.id));
     const selected = new Set(atribuidoIds ?? []);
     // Equipe do projeto + já atribuídos (mesmo se removidos da equipe)
     return pessoasAtivas.filter((p) => memberIds.has(p.id) || selected.has(p.id));
-  }, [projetoId, projetoMembros, pessoasAtivas, atribuidoIds]);
+  }, [projetoId, projetoMembros, pessoasAtivas, atribuidoIds, profile]);
 
   const defaultAtribuidoIdsKey = (defaultAtribuidoIds ?? []).join(",");
   const defaultDataInicioKey = defaultDataInicio

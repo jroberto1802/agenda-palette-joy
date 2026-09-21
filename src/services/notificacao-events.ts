@@ -7,7 +7,11 @@ import { formatDate } from "@/utils/formatters";
 import { TAREFA_PRIORIDADE_LABELS } from "@/utils/tarefas";
 import type { TarefaPrioridade, TarefaVisibilidade } from "@/types";
 
-export async function getCurrentActor(): Promise<{ id: string; nome: string } | null> {
+export async function getCurrentActor(): Promise<{
+  id: string;
+  nome: string;
+  papel: string | null;
+} | null> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -15,12 +19,22 @@ export async function getCurrentActor(): Promise<{ id: string; nome: string } | 
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, nome_completo")
+    .select("id, nome_completo, papel")
     .eq("id", user.id)
     .single();
 
-  if (!profile) return { id: user.id, nome: "Alguém" };
-  return { id: profile.id, nome: profile.nome_completo || "Alguém" };
+  if (!profile) return { id: user.id, nome: "Alguém", papel: null };
+  return {
+    id: profile.id,
+    nome: profile.nome_completo || "Alguém",
+    papel: profile.papel ?? null,
+  };
+}
+
+/** Admin em ações de tarefa não deve notificar (correção de atribuição). */
+async function shouldSkipTarefaNotifications(): Promise<boolean> {
+  const actor = await getCurrentActor();
+  return actor?.papel === "admin";
 }
 
 export async function getTarefaStakeholderIds(tarefaId: string): Promise<string[]> {
@@ -70,6 +84,13 @@ async function notifyEvent(params: {
   referencia_id: string;
   meta?: NotificacaoMeta;
 }) {
+  if (
+    params.referencia_tipo === "tarefa" &&
+    (await shouldSkipTarefaNotifications())
+  ) {
+    return;
+  }
+
   await notifyUsers(params.usuarioIds, {
     tipo: params.tipo,
     mensagem: params.mensagem,

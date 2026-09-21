@@ -21,7 +21,7 @@ import type { EscopoExclusaoSerie } from "@/services/tarefa-recorrencia";
 import type { TarefaWithRelations } from "@/types";
 import { readAgendaClassificarPreference } from "@/utils/agenda-classificar-preference";
 import { readAgendaViewPreference } from "@/utils/agenda-view-preference";
-import { isAdmin, isAdminOrGerente, isGerente } from "@/utils/permissions";
+import { canDeleteTarefa as podeExcluirTarefa, canViewAgendaOutraPessoa, isAdmin, isGerente } from "@/utils/permissions";
 import { pertenceASerie } from "@/utils/recorrencia";
 import { canEditTarefa, canToggleTarefaConclusao } from "@/utils/tarefas";
 
@@ -71,7 +71,7 @@ function EquipePessoaAgendaPage() {
     });
   }, [profile?.id]);
 
-  const canManage = isAdminOrGerente(profile);
+  const canManage = canViewAgendaOutraPessoa(profile);
 
   const pessoa = useMemo(
     () => (pessoas ?? []).find((p) => p.id === pessoaId) ?? null,
@@ -83,10 +83,8 @@ function EquipePessoaAgendaPage() {
     [pessoas],
   );
 
-  const canDeleteTarefa = (tarefa: TarefaWithRelations) => {
-    if (isAdmin(profile)) return true;
-    return tarefa.criado_por === profile?.id;
-  };
+  const canDeleteTarefa = (tarefa: TarefaWithRelations) =>
+    podeExcluirTarefa(profile, tarefa);
 
   const canEdit = (tarefa: TarefaWithRelations) =>
     canEditTarefa(tarefa, profile?.id, isAdmin(profile), isGerente(profile), profile?.setor_id);
@@ -261,7 +259,7 @@ function EquipePessoaAgendaPage() {
         hideColunas
         preferenceScope="equipe"
         preferenceUserId={profile?.id}
-        emptyMessage="Nenhuma tarefa atribuída a você."
+        emptyMessage="Nenhuma tarefa atribuída a esta pessoa."
         canEdit={canEdit}
         canDeleteTarefa={canDeleteTarefa}
         canToggleConcluida={canToggleConcluida}

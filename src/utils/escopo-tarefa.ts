@@ -62,7 +62,8 @@ export function filterPessoasPorEscopo<T extends Pick<Profile, "id">>(
 
 /**
  * Usuário pode ver a subtarefa (agenda / lista) se estiver no escopo dela.
- * Admin deve ser tratado à parte na chamada.
+ * Administrador: bypass via RLS (`can_read_tarefa`) e `canEditTarefa` — não
+ * usar este helper para negar acesso ao Admin.
  */
 export function usuarioNoEscopoSubtarefa(
   usuarioId: string,

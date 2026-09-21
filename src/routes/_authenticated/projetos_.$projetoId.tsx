@@ -27,7 +27,12 @@ import type { EscopoExclusaoSerie } from "@/services/tarefa-recorrencia";
 import type { TarefaWithRelations } from "@/types";
 import { readAgendaClassificarPreference } from "@/utils/agenda-classificar-preference";
 import { readAgendaViewPreference } from "@/utils/agenda-view-preference";
-import { canManageProjetoMembros, isAdmin, isGerente } from "@/utils/permissions";
+import {
+  canDeleteTarefa as podeExcluirTarefa,
+  canManageProjetoMembros,
+  isAdmin,
+  isGerente,
+} from "@/utils/permissions";
 import { pertenceASerie } from "@/utils/recorrencia";
 import { PROJETO_STATUS_BADGE_CLASS, PROJETO_STATUS_LABELS } from "@/utils/projetos";
 import { canEditTarefa, canToggleTarefaConclusao } from "@/utils/tarefas";
@@ -81,14 +86,13 @@ function ProjetoDetailPage() {
   );
 
   const pessoasEquipe = useMemo(() => {
+    if (isAdmin(profile)) return pessoasAtivas;
     const memberIds = new Set(membros.map((m) => m.id));
     return pessoasAtivas.filter((p) => memberIds.has(p.id));
-  }, [pessoasAtivas, membros]);
+  }, [pessoasAtivas, membros, profile]);
 
-  const canDeleteTarefa = (tarefa: TarefaWithRelations) => {
-    if (isAdmin(profile)) return true;
-    return tarefa.criado_por === profile?.id;
-  };
+  const canDeleteTarefa = (tarefa: TarefaWithRelations) =>
+    podeExcluirTarefa(profile, tarefa);
 
   const canEdit = (tarefa: TarefaWithRelations) =>
     canEditTarefa(tarefa, profile?.id, isAdmin(profile), isGerente(profile), profile?.setor_id);

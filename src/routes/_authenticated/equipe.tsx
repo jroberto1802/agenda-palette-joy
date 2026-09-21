@@ -50,7 +50,7 @@ import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
 import { cn } from "@/lib/utils";
 import { EQUIPE_SEM_GRUPO_ID } from "@/services/equipe-grupos";
 import type { ProfileWithSetor, TarefaWithRelations } from "@/types";
-import { isAdminOrGerente } from "@/utils/permissions";
+import { canViewAgendaOutraPessoa } from "@/utils/permissions";
 import { getTarefaResponsaveis } from "@/utils/tarefas";
 
 export const Route = createFileRoute("/_authenticated/equipe")({
@@ -310,7 +310,7 @@ function EquipePage() {
   const { data: profile, isLoading: loadingProfile } = useProfile();
   const { data: pessoas, isLoading: loadingPessoas } = usePessoas();
   const { data: grupos, isLoading: loadingGrupos } = useEquipeGrupos();
-  const canManage = isAdminOrGerente(profile);
+  const canManage = canViewAgendaOutraPessoa(profile);
   // Contador e agenda de terceiros: só Admin/Gestor — não buscar tarefas para colaborador.
   const { data: tarefas, isLoading: loadingTarefas } = useTarefas(
     {},

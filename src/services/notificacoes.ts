@@ -88,6 +88,21 @@ export async function notifyUsers(
   usuarioIds: string[],
   params: Omit<Parameters<typeof notifyUser>[0], "usuario_id">,
 ): Promise<void> {
+  // Admin não dispara notificações de tarefa (evita N checks no loop).
+  if (params.referencia_tipo === "tarefa" && params.tipo !== "sistema") {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("papel")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (profile?.papel === "admin") return;
+    }
+  }
+
   const unique = [...new Set(usuarioIds.filter(Boolean))];
   await Promise.all(
     unique.map((usuario_id) =>

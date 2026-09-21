@@ -17,6 +17,30 @@ export function isAdminOrGerente(profile: Profile | null | undefined): boolean {
   return profile?.papel === "admin" || profile?.papel === "gerente";
 }
 
+/**
+ * Agenda de outras pessoas (menu Equipe):
+ * Administrador e Gestor podem abrir a agenda de qualquer pessoa.
+ */
+export function canViewAgendaOutraPessoa(
+  profile: Profile | null | undefined,
+): boolean {
+  return isAdminOrGerente(profile);
+}
+
+/**
+ * Exclusão (soft delete) de tarefa:
+ * - Administrador: qualquer tarefa
+ * - Demais: apenas se for o criador
+ */
+export function canDeleteTarefa(
+  profile: Profile | null | undefined,
+  tarefa: { criado_por: string | null } | null | undefined,
+): boolean {
+  if (!profile || !tarefa) return false;
+  if (isAdmin(profile)) return true;
+  return tarefa.criado_por === profile.id;
+}
+
 /** Nesta fase: Administrador e Gestor podem CRUD de Setores e Pessoas. */
 export function canManageSetores(profile: Profile | null | undefined): boolean {
   return isAdminOrGerente(profile);

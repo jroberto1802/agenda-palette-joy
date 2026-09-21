@@ -30,7 +30,7 @@ import type { SubtarefaAgendaItem, TarefaWithRelations } from "@/types";
 import { localDateAtNoon, startOfTodayLocal } from "@/utils/agenda-datas";
 import { readAgendaClassificarPreference } from "@/utils/agenda-classificar-preference";
 import { readAgendaViewPreference } from "@/utils/agenda-view-preference";
-import { isAdmin, isGerente } from "@/utils/permissions";
+import { canDeleteTarefa as podeExcluirTarefa, isAdmin, isGerente } from "@/utils/permissions";
 import { pertenceASerie } from "@/utils/recorrencia";
 import { canEditTarefa, canToggleTarefaConclusao } from "@/utils/tarefas";
 
@@ -151,10 +151,8 @@ function AgendaPage() {
     [profile?.id],
   );
 
-  const canDeleteTarefa = (tarefa: TarefaWithRelations) => {
-    if (isAdmin(profile)) return true;
-    return tarefa.criado_por === profile?.id;
-  };
+  const canDeleteTarefa = (tarefa: TarefaWithRelations) =>
+    podeExcluirTarefa(profile, tarefa);
 
   const canEdit = (tarefa: TarefaWithRelations) =>
     canEditTarefa(tarefa, profile?.id, isAdmin(profile), isGerente(profile), profile?.setor_id);
@@ -225,9 +223,22 @@ function AgendaPage() {
     }
   };
 
-  /** Escopo fixo: apenas tarefas do usuário logado como responsável. */
+  /** Escopo: usuário comum = só próprias; Admin = todas (RLS já libera). */
   const scopedBoardState = useMemo(() => {
     if (!profile?.id) return boardState;
+    if (isAdmin(profile)) {
+      return {
+        ...boardState,
+        filters: {
+          ...boardState.filters,
+          atribuido_a: boardState.filters.atribuido_a ?? ("all" as const),
+        },
+        debouncedFilters: {
+          ...boardState.debouncedFilters,
+          atribuido_a: boardState.debouncedFilters.atribuido_a ?? ("all" as const),
+        },
+      };
+    }
     return {
       ...boardState,
       filters: {
@@ -241,7 +252,7 @@ function AgendaPage() {
         atribuido_a: "all" as const,
       },
     };
-  }, [boardState, profile?.id]);
+  }, [boardState, profile]);
 
   usePageHeader({ title: "Minha Agenda" });
 
@@ -317,6 +328,10 @@ function AgendaPage() {
           <TarefaAgendaBoard
             state={scopedBoardState}
             onStateChange={(next) => {
+              if (isAdmin(profile)) {
+                setBoardState(next);
+                return;
+              }
               setBoardState({
                 ...next,
                 filters: {
@@ -334,10 +349,14 @@ function AgendaPage() {
             setores={setores ?? []}
             projetos={projetos ?? []}
             pessoas={pessoasAtivas}
-            hideResponsavel
+            hideResponsavel={!isAdmin(profile)}
             preferenceScope="agenda-geral"
             preferenceUserId={profile?.id}
-            emptyMessage="Nenhuma tarefa atribuída a você."
+            emptyMessage={
+              isAdmin(profile)
+                ? "Nenhuma tarefa encontrada com os filtros atuais."
+                : "Nenhuma tarefa atribuída a você."
+            }
             canEdit={canEdit}
             canDeleteTarefa={canDeleteTarefa}
             canToggleConcluida={canToggleConcluida}
