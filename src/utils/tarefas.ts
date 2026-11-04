@@ -206,6 +206,28 @@ export function getSetoresPermitidos(
 /** Janela, em minutos, em que usuário/gestor ainda podem reabrir uma tarefa concluída. Após esse prazo, somente Administrador. */
 export const TAREFA_REABERTURA_JANELA_MINUTOS = 20;
 
+/** Mensagem exibida ao tentar deixar uma Tarefa sem Responsável. */
+export const TAREFA_SEM_RESPONSAVEL_MSG = "A tarefa precisa de pelo menos um responsável.";
+
+/** Usuário é Responsável da tarefa (lista de responsáveis ou campo legado `atribuido_a`). */
+export function isTarefaResponsavel(
+  tarefa: Pick<TarefaWithRelations, "atribuido_a" | "responsaveis">,
+  userId: string | undefined,
+): boolean {
+  if (!userId) return false;
+  if (tarefa.atribuido_a === userId) return true;
+  return !!tarefa.responsaveis?.some((r) => r.usuario_id === userId);
+}
+
+/** Usuário é Visualizador (observador) da tarefa. */
+export function isTarefaVisualizador(
+  tarefa: Pick<TarefaWithRelations, "observadores">,
+  userId: string | undefined,
+): boolean {
+  if (!userId) return false;
+  return !!tarefa.observadores?.some((o) => o.usuario_id === userId);
+}
+
 /** Vínculo básico de edição (criador/responsável/gestor do setor), sem considerar se a tarefa está concluída. */
 function temVinculoDeEdicaoTarefa(
   tarefa: TarefaWithRelations,
@@ -221,6 +243,142 @@ function temVinculoDeEdicaoTarefa(
   if (isGerenteUser && tarefa.setor_id && tarefa.setor_id === userSetorId) return true;
   return false;
 }
+
+/**
+ * Vínculo de participação: quem edita (criador/responsável/gestor/admin) **ou** é
+ * Visualizador. Base das ações liberadas a Responsável e Visualizador: adicionar
+ * pessoas, concluir e alterar Data/Hora.
+ */
+function temVinculoDeParticipacaoTarefa(
+  tarefa: TarefaWithRelations,
+  userId: string | undefined,
+  isAdminUser: boolean,
+  isGerenteUser: boolean,
+  userSetorId: string | null | undefined,
+): boolean {
+  if (temVinculoDeEdicaoTarefa(tarefa, userId, isAdminUser, isGerenteUser, userSetorId)) {
+    return true;
+  }
+  return isTarefaVisualizador(tarefa, userId);
+}
+
+/** Criador, Gestor do setor ou Administrador (quem gerencia título, descrição e remoções). */
+function isGestorDaTarefa(
+  tarefa: Pick<TarefaWithRelations, "criado_por" | "setor_id">,
+  userId: string | undefined,
+  isAdminUser: boolean,
+  isGerenteUser: boolean,
+  userSetorId: string | null | undefined,
+): boolean {
+  if (!userId) return false;
+  if (isAdminUser) return true;
+  if (tarefa.criado_por === userId) return true;
+  return !!(isGerenteUser && tarefa.setor_id && tarefa.setor_id === userSetorId);
+}
+
+/**
+ * Título e Descrição: somente Criador, Gestor (do setor) e Administrador.
+ * Responsável e Visualizador não editam. Tarefa concluída: somente Administrador.
+ */
+export function canEditTarefaTexto(
+  tarefa: TarefaWithRelations,
+  userId: string | undefined,
+  isAdminUser: boolean,
+  isGerenteUser: boolean,
+  userSetorId: string | null | undefined,
+): boolean {
+  if (tarefa.concluida) return isAdminUser;
+  return isGestorDaTarefa(tarefa, userId, isAdminUser, isGerenteUser, userSetorId);
+}
+
+/**
+ * Adicionar Responsáveis/Visualizadores e alterar Data e Hora: qualquer
+ * Responsável ou Visualizador (inclusive perfil Usuário, sem ser o criador),
+ * além de Criador, Gestor e Administrador. Tarefa concluída: somente Administrador.
+ */
+export function canAdicionarPessoasTarefa(
+  tarefa: TarefaWithRelations,
+  userId: string | undefined,
+  isAdminUser: boolean,
+  isGerenteUser: boolean,
+  userSetorId: string | null | undefined,
+): boolean {
+  if (tarefa.concluida) return isAdminUser;
+  return temVinculoDeParticipacaoTarefa(tarefa, userId, isAdminUser, isGerenteUser, userSetorId);
+}
+
+/** Alterar Data e Hora segue as mesmas pessoas de `canAdicionarPessoasTarefa`. */
+export const canAlterarDataTarefa = canAdicionarPessoasTarefa;
+
+/**
+ * Remover Responsáveis/Visualizadores: somente Criador, Gestor (do setor) e
+ * Administrador. Responsável/Visualizador apenas adicionam.
+ */
+export function canRemoverPessoasTarefa(
+  tarefa: TarefaWithRelations,
+  userId: string | undefined,
+  isAdminUser: boolean,
+  isGerenteUser: boolean,
+  userSetorId: string | null | undefined,
+): boolean {
+  if (tarefa.concluida) return isAdminUser;
+  return isGestorDaTarefa(tarefa, userId, isAdminUser, isGerenteUser, userSetorId);
+}
+
+type SubtarefaPermissaoInput = {
+  criado_por?: string | null;
+  responsaveis?: { usuario_id: string }[] | null;
+  observadores?: { usuario_id: string }[] | null;
+};
+
+/** Usuário é Responsável ou Visualizador da própria subtarefa. */
+export function isSubtarefaParticipante(
+  subtarefa: SubtarefaPermissaoInput | null | undefined,
+  userId: string | undefined,
+): boolean {
+  if (!userId || !subtarefa) return false;
+  return (
+    subtarefa.criado_por === userId ||
+    !!subtarefa.responsaveis?.some((r) => r.usuario_id === userId) ||
+    !!subtarefa.observadores?.some((o) => o.usuario_id === userId)
+  );
+}
+
+/**
+ * Adicionar pessoas, concluir e alterar Data/Hora da subtarefa: quem edita a
+ * tarefa pai **ou** é Responsável/Visualizador da própria subtarefa.
+ */
+export function canInteragirSubtarefa(
+  subtarefa: SubtarefaPermissaoInput | null | undefined,
+  parentTarefa: TarefaWithRelations | null | undefined,
+  userId: string | undefined,
+  isAdminUser: boolean,
+  isGerenteUser: boolean,
+  userSetorId: string | null | undefined,
+): boolean {
+  if (!parentTarefa || !userId) return false;
+  if (canEditTarefa(parentTarefa, userId, isAdminUser, isGerenteUser, userSetorId)) return true;
+  if (parentTarefa.concluida) return false;
+  return isSubtarefaParticipante(subtarefa, userId);
+}
+
+/** Título/Descrição da subtarefa: Criador (da subtarefa ou da tarefa), Gestor e Administrador. */
+export function canEditSubtarefaTexto(
+  subtarefa: SubtarefaPermissaoInput | null | undefined,
+  parentTarefa: TarefaWithRelations | null | undefined,
+  userId: string | undefined,
+  isAdminUser: boolean,
+  isGerenteUser: boolean,
+  userSetorId: string | null | undefined,
+): boolean {
+  if (!parentTarefa || !userId) return false;
+  if (parentTarefa.concluida) return isAdminUser;
+  if (subtarefa?.criado_por === userId) return true;
+  return isGestorDaTarefa(parentTarefa, userId, isAdminUser, isGerenteUser, userSetorId);
+}
+
+/** Remover pessoas da subtarefa: Criador (da subtarefa ou da tarefa), Gestor e Administrador. */
+export const canRemoverPessoasSubtarefa = canEditSubtarefaTexto;
 
 /**
  * Edição de campos da tarefa (título, descrição, metadados, subtarefas, status).
@@ -271,7 +429,7 @@ export function canReabrirTarefa(
 ): boolean {
   if (!tarefa.concluida) return false;
   if (isAdminUser) return true;
-  if (!temVinculoDeEdicaoTarefa(tarefa, userId, isAdminUser, isGerenteUser, userSetorId)) {
+  if (!temVinculoDeParticipacaoTarefa(tarefa, userId, isAdminUser, isGerenteUser, userSetorId)) {
     return false;
   }
   if (!tarefa.data_conclusao) return false;
@@ -280,8 +438,9 @@ export function canReabrirTarefa(
 }
 
 /**
- * Permissão para acionar a bolinha de conclusão da tarefa: concluir (se aberta,
- * mesmo vínculo de `canEditTarefa`) ou reabrir (se concluída, ver `canReabrirTarefa`).
+ * Permissão para acionar a bolinha de conclusão da tarefa: concluir (se aberta —
+ * criador/responsável/gestor/admin **ou Visualizador**) ou reabrir (se concluída,
+ * ver `canReabrirTarefa`).
  */
 export function canToggleTarefaConclusao(
   tarefa: TarefaWithRelations,
@@ -293,7 +452,7 @@ export function canToggleTarefaConclusao(
   if (tarefa.concluida) {
     return canReabrirTarefa(tarefa, userId, isAdminUser, isGerenteUser, userSetorId);
   }
-  return temVinculoDeEdicaoTarefa(tarefa, userId, isAdminUser, isGerenteUser, userSetorId);
+  return temVinculoDeParticipacaoTarefa(tarefa, userId, isAdminUser, isGerenteUser, userSetorId);
 }
 
 export function getTarefaResponsaveis(

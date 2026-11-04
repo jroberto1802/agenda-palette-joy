@@ -84,6 +84,7 @@ import {
   useUpdateTarefa,
   useUpdateTarefaConclusao,
   useUpdateTarefaComentario,
+  useUpdateTarefaParticipante,
 } from "@/hooks/use-tarefas";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
 import type {
@@ -107,9 +108,14 @@ import {
 import { isAdmin, isGerente } from "@/utils/permissions";
 import {
   TAREFA_PRIORIDADE_COLORS,
+  TAREFA_SEM_RESPONSAVEL_MSG,
+  canAdicionarPessoasTarefa,
   canCommentOrAttachTarefa,
   canEditTarefa,
-  canEditVisibilidade,
+  canEditTarefaTexto,
+  canInteragirSubtarefa,
+  canRemoverPessoasSubtarefa,
+  canRemoverPessoasTarefa,
   canToggleTarefaConclusao,
   formatAvisoResponsavelForaDoProjeto,
   getSetoresPermitidos,
@@ -176,6 +182,9 @@ function parseTags(input: string): string[] {
 function SortableSubtarefaRow({
   subtarefa,
   canEdit,
+  canInteract,
+  lockedResponsavelIds,
+  lockedVisualizadorIds,
   pessoasDisponiveis,
   onOpen,
   onToggle,
@@ -188,6 +197,10 @@ function SortableSubtarefaRow({
 }: {
   subtarefa: SubtarefaWithAuthors;
   canEdit: boolean;
+  /** Concluir, adicionar pessoas e alterar Data/Hora (inclui Responsável/Visualizador da subtarefa). */
+  canInteract: boolean;
+  lockedResponsavelIds?: string[];
+  lockedVisualizadorIds?: string[];
   pessoasDisponiveis: ProfileWithSetor[];
   onOpen: () => void;
   onToggle: (concluida: boolean) => Promise<void>;
@@ -211,6 +224,9 @@ function SortableSubtarefaRow({
       <SubtarefaRow
         subtarefa={subtarefa}
         canEdit={canEdit}
+        canInteract={canInteract}
+        lockedResponsavelIds={lockedResponsavelIds}
+        lockedVisualizadorIds={lockedVisualizadorIds}
         pessoasDisponiveis={pessoasDisponiveis}
         onOpen={onOpen}
         onToggle={onToggle}
@@ -378,6 +394,7 @@ export function TarefaPanelSheet({
 
   const createTarefa = useCreateTarefa();
   const updateTarefa = useUpdateTarefa();
+  const updateTarefaParticipante = useUpdateTarefaParticipante();
   const updateConclusao = useUpdateTarefaConclusao();
   const createSubtarefa = useCreateSubtarefa();
   const toggleSubtarefa = useToggleSubtarefa();
@@ -494,17 +511,66 @@ export function TarefaPanelSheet({
     [tarefa, profile?.id, readOnly],
   );
 
-  const canEditVisibility = useMemo(() => {
+  /** Título e Descrição: somente Criador, Gestor e Administrador. */
+  const canEditTexto = useMemo(() => {
     if (readOnly) return false;
     if (isCreate) return true;
-    return canEditVisibilidade(
-      tarefa ?? null,
-      profile?.id,
+    if (!tarefa || !profile) return false;
+    return canEditTarefaTexto(
+      tarefa,
+      profile.id,
       isAdmin(profile),
       isGerente(profile),
-      profile?.setor_id,
+      profile.setor_id,
     );
   }, [readOnly, isCreate, tarefa, profile]);
+
+  /**
+   * Adicionar Responsáveis/Visualizadores e alterar Data/Hora: qualquer
+   * Responsável ou Visualizador, além de Criador, Gestor e Administrador.
+   */
+  const canAddPessoas = useMemo(() => {
+    if (readOnly) return false;
+    if (isCreate) return true;
+    if (!tarefa || !profile) return false;
+    return canAdicionarPessoasTarefa(
+      tarefa,
+      profile.id,
+      isAdmin(profile),
+      isGerente(profile),
+      profile.setor_id,
+    );
+  }, [readOnly, isCreate, tarefa, profile]);
+
+  /** Remover pessoas: somente Criador, Gestor e Administrador. */
+  const canRemovePessoas = useMemo(() => {
+    if (readOnly) return false;
+    if (isCreate) return true;
+    if (!tarefa || !profile) return false;
+    return canRemoverPessoasTarefa(
+      tarefa,
+      profile.id,
+      isAdmin(profile),
+      isGerente(profile),
+      profile.setor_id,
+    );
+  }, [readOnly, isCreate, tarefa, profile]);
+
+  // Quem só pode adicionar não consegue desmarcar quem já estava salvo.
+  const lockedResponsavelIds = useMemo(() => {
+    if (canRemovePessoas || !tarefa) return undefined;
+    const ids = (tarefa.responsaveis ?? []).map((r) => r.usuario_id);
+    if (tarefa.atribuido_a) ids.push(tarefa.atribuido_a);
+    return [...new Set(ids)];
+  }, [canRemovePessoas, tarefa]);
+
+  const lockedVisualizadorIds = useMemo(() => {
+    if (canRemovePessoas || !tarefa) return undefined;
+    return (tarefa.observadores ?? []).map((o) => o.usuario_id);
+  }, [canRemovePessoas, tarefa]);
+
+  /** Pode salvar algo: edição completa ou apenas adicionar pessoas / Data e Hora. */
+  const canSave = canEdit || canAddPessoas;
 
   const form = useForm<TarefaPanelSchema>({
     resolver: zodResolver(tarefaPanelSchema),
@@ -723,6 +789,20 @@ export function TarefaPanelSheet({
       return;
     }
     if (!tarefaId) return;
+    if (!canEdit) {
+      // Visualizador: só adiciona pessoas e altera Data/Hora — nada mais é enviado.
+      await updateTarefaParticipante.mutateAsync({
+        id: tarefaId,
+        data: {
+          data_inicio: payload.data_inicio,
+          atribuido_ids: payload.atribuido_ids,
+          observador_ids: payload.observador_ids,
+        },
+      });
+      toast.success("Tarefa atualizada");
+      setEditingField(null);
+      return;
+    }
     await updateTarefa.mutateAsync({ id: tarefaId, data: payload });
     toast.success(ehModeloSerie ? "Série atualizada" : "Tarefa atualizada");
     setEditingField(null);
@@ -815,14 +895,15 @@ export function TarefaPanelSheet({
     }
   };
 
-  const saving = createTarefa.isPending || updateTarefa.isPending;
+  const saving =
+    createTarefa.isPending || updateTarefa.isPending || updateTarefaParticipante.isPending;
   const showInteractions = !isCreate && !!tarefaId;
   const {
     formState: { errors: formErrors },
   } = form;
 
   const startFieldEdit = (field: EditableTarefaField) => {
-    if (!canEdit) return;
+    if (!canEditTexto) return;
     setEditingField(field);
   };
 
@@ -969,7 +1050,7 @@ export function TarefaPanelSheet({
                               </Badge>
                             </>
                           )}
-                          {canEdit && (
+                          {canSave && (
                             <Button
                               type="submit"
                               size="sm"
@@ -998,7 +1079,16 @@ export function TarefaPanelSheet({
                     <TarefaMetaToolbar
                       form={form as never}
                       canEdit={canEdit}
-                      canEditVisibility={canEditVisibility}
+                      canEditVisibility={canAddPessoas}
+                      canAddResponsaveis={canAddPessoas}
+                      canEditData={canAddPessoas}
+                      lockedResponsavelIds={lockedResponsavelIds}
+                      lockedVisualizadorIds={lockedVisualizadorIds}
+                      onSemResponsavelBlocked={() =>
+                        toast.error(TAREFA_SEM_RESPONSAVEL_MSG, {
+                          description: "Adicione outro responsável antes de remover este.",
+                        })
+                      }
                       lockProjeto={lockProjeto}
                       projetos={projetos ?? []}
                       setores={setoresPermitidos}
@@ -1058,7 +1148,7 @@ export function TarefaPanelSheet({
                       render={({ field }) => (
                         <FormItem>
                           <EditableOnDoubleClick
-                            locked={!canEdit}
+                            locked={!canEditTexto}
                             forceEditable={isCreate}
                             editing={editingField === "titulo"}
                             onStartEdit={() => startFieldEdit("titulo")}
@@ -1070,7 +1160,7 @@ export function TarefaPanelSheet({
                                   placeholder="Título da tarefa"
                                   className="rounded-xl border bg-card px-3 py-2 text-lg font-semibold shadow-sm focus-visible:ring-1"
                                   readOnly={!editable}
-                                  disabled={!canEdit}
+                                  disabled={!canEditTexto}
                                   {...field}
                                 />
                               </FormControl>
@@ -1087,7 +1177,7 @@ export function TarefaPanelSheet({
                       render={({ field }) => (
                         <FormItem>
                           <EditableOnDoubleClick
-                            locked={!canEdit}
+                            locked={!canEditTexto}
                             forceEditable={false}
                             editing={editingField === "descricao"}
                             onStartEdit={() => startFieldEdit("descricao")}
@@ -1100,7 +1190,7 @@ export function TarefaPanelSheet({
                                   onChange={field.onChange}
                                   onBlur={field.onBlur}
                                   editable={editable}
-                                  disabled={!canEdit}
+                                  disabled={!canEditTexto}
                                   editorKey={tarefaId ?? "nova-tarefa"}
                                   placeholder="Adicione uma descrição... (duplo clique para editar)"
                                   minHeightClassName="[&_.ProseMirror]:min-h-[6rem]"
@@ -1160,11 +1250,45 @@ export function TarefaPanelSheet({
                               strategy={verticalListSortingStrategy}
                             >
                               <div className="space-y-2.5">
-                                {orderedSubtarefas.map((sub) => (
+                                {orderedSubtarefas.map((sub) => {
+                                  const subCanInteract =
+                                    !readOnly &&
+                                    !!tarefa &&
+                                    canInteragirSubtarefa(
+                                      sub,
+                                      tarefa,
+                                      profile?.id,
+                                      isAdmin(profile),
+                                      isGerente(profile),
+                                      profile?.setor_id,
+                                    );
+                                  const subCanRemover =
+                                    !readOnly &&
+                                    !!tarefa &&
+                                    canRemoverPessoasSubtarefa(
+                                      sub,
+                                      tarefa,
+                                      profile?.id,
+                                      isAdmin(profile),
+                                      isGerente(profile),
+                                      profile?.setor_id,
+                                    );
+                                  return (
                                   <SortableSubtarefaRow
                                     key={sub.id}
                                     subtarefa={sub}
                                     canEdit={canEdit}
+                                    canInteract={subCanInteract}
+                                    lockedResponsavelIds={
+                                      subCanRemover
+                                        ? undefined
+                                        : (sub.responsaveis ?? []).map((r) => r.usuario_id)
+                                    }
+                                    lockedVisualizadorIds={
+                                      subCanRemover
+                                        ? undefined
+                                        : (sub.observadores ?? []).map((o) => o.usuario_id)
+                                    }
                                     pessoasDisponiveis={pessoasEscopoTarefa}
                                     modeloSerieMode={ehModeloSerie}
                                     modeloRecorrencia={parseRecorrencia(
@@ -1226,7 +1350,8 @@ export function TarefaPanelSheet({
                                       }
                                     }}
                                   />
-                                ))}
+                                  );
+                                })}
                               </div>
                             </SortableContext>
                           </DndContext>

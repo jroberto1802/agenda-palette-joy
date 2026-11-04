@@ -72,16 +72,34 @@ export type TarefaMetaFormValues = {
   lembretes: TarefaLembreteOpcao[];
 };
 
+/**
+ * Estado visual do ícone da barra:
+ * - filled: campo preenchido — cor primária do sistema, bem destacado;
+ * - empty: campo vazio — tom neutro/cinza;
+ * - alert: campo obrigatório vazio (Responsável da Tarefa) — vermelho;
+ * - plain: o próprio conteúdo já traz a cor (ex.: bolinha da Prioridade).
+ */
+type MetaIconTone = "filled" | "empty" | "alert" | "plain";
+
+const META_ICON_TONE_CLASS: Record<MetaIconTone, string> = {
+  filled:
+    "bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary disabled:opacity-90",
+  empty: "text-muted-foreground hover:text-foreground",
+  alert:
+    "bg-destructive/10 text-destructive hover:bg-destructive/15 hover:text-destructive disabled:opacity-90",
+  plain: "bg-muted text-foreground",
+};
+
 function MetaIconButton({
   label,
-  active,
+  tone,
   disabled,
   compact = false,
   children,
   className,
 }: {
   label: string;
-  active?: boolean;
+  tone: MetaIconTone;
   disabled?: boolean;
   compact?: boolean;
   children: ReactNode;
@@ -95,10 +113,11 @@ function MetaIconButton({
           variant="ghost"
           size="icon"
           disabled={disabled}
+          data-tone={tone}
           className={cn(
-            "shrink-0 rounded-lg text-muted-foreground hover:text-foreground",
+            "shrink-0 rounded-lg",
             compact ? "h-7 w-7" : "h-9 w-9",
-            active && "bg-muted text-foreground",
+            META_ICON_TONE_CLASS[tone],
             className,
           )}
           aria-label={label}
@@ -117,6 +136,11 @@ export function TarefaMetaToolbar({
   form,
   canEdit,
   canEditVisibility,
+  canAddResponsaveis = canEdit,
+  canEditData = canEdit,
+  lockedResponsavelIds,
+  lockedVisualizadorIds,
+  onSemResponsavelBlocked,
   lockProjeto,
   hideProjetoSetor = false,
   projetos,
@@ -135,8 +159,20 @@ export function TarefaMetaToolbar({
   onVisibilidadeManualChange,
 }: {
   form: UseFormReturn<TarefaMetaFormValues & Record<string, unknown>>;
+  /** Projeto, Setor, Prioridade e Lembretes. */
   canEdit: boolean;
+  /** Adicionar Visualizadores (Responsável/Visualizador também podem adicionar). */
   canEditVisibility: boolean;
+  /** Adicionar Responsáveis. Padrão: igual a `canEdit`. */
+  canAddResponsaveis?: boolean;
+  /** Alterar Data e Hora. Padrão: igual a `canEdit`. */
+  canEditData?: boolean;
+  /** Responsáveis que não podem ser desmarcados (só Criador/Gestor/Admin removem). */
+  lockedResponsavelIds?: string[];
+  /** Visualizadores que não podem ser desmarcados (só Criador/Gestor/Admin removem). */
+  lockedVisualizadorIds?: string[];
+  /** Disparado ao tentar remover o último Responsável de uma Tarefa. */
+  onSemResponsavelBlocked?: () => void;
   lockProjeto?: boolean;
   /** Oculta Projeto e Setor (ex.: drawer da subtarefa, que herda da tarefa pai). */
   hideProjetoSetor?: boolean;
@@ -244,7 +280,7 @@ export function TarefaMetaToolbar({
                   <span>
                     <MetaIconButton
                       label={projetoNome ? `Projeto: ${projetoNome}` : "Projeto"}
-                      active={!!field.value}
+                      tone={field.value ? "filled" : "empty"}
                       disabled={!canEdit || lockProjeto}
                       compact={compact}
                     >
@@ -301,7 +337,7 @@ export function TarefaMetaToolbar({
                   <span>
                     <MetaIconButton
                       label={setorNome ? `Setor: ${setorNome}` : "Setor"}
-                      active={!!field.value}
+                      tone={field.value ? "filled" : "empty"}
                       disabled={!canEdit}
                       compact={compact}
                     >
@@ -355,14 +391,15 @@ export function TarefaMetaToolbar({
                             ? "Responsável (obrigatório)"
                             : "Responsável"
                       }
-                      active={atribuidoIds.length > 0}
-                      disabled={!canEdit}
-                      compact={compact}
-                      className={
-                        requireResponsavel && !atribuidoIds.length
-                          ? "text-destructive"
-                          : undefined
+                      tone={
+                        atribuidoIds.length > 0
+                          ? "filled"
+                          : requireResponsavel
+                            ? "alert"
+                            : "empty"
                       }
+                      disabled={!canAddResponsaveis}
+                      compact={compact}
                     >
                       <UserRound className={iconClass} />
                     </MetaIconButton>
@@ -373,8 +410,26 @@ export function TarefaMetaToolbar({
                   <PessoasMultiSelect
                     pessoas={pessoasParaResponsavel}
                     value={field.value}
-                    onChange={field.onChange}
-                    disabled={!canEdit}
+                    onChange={(ids) => {
+                      field.onChange(ids);
+                      // Todo Responsável é também Visualizador (o inverso não vale).
+                      const novos = ids.filter((id) => !(field.value ?? []).includes(id));
+                      if (novos.length > 0) {
+                        const atuais = form.getValues("observador_ids") ?? [];
+                        form.setValue(
+                          "observador_ids",
+                          [...new Set([...atuais, ...novos])],
+                          { shouldDirty: true },
+                        );
+                        form.setValue("visibilidade", "pessoas_especificas", {
+                          shouldDirty: true,
+                        });
+                      }
+                    }}
+                    disabled={!canAddResponsaveis}
+                    lockedIds={lockedResponsavelIds}
+                    minSelected={requireResponsavel ? 1 : 0}
+                    onMinBlocked={onSemResponsavelBlocked}
                     placeholder={
                       requireResponsavel
                         ? "Selecione responsáveis"
@@ -405,7 +460,7 @@ export function TarefaMetaToolbar({
                           ? `Visibilidade: ${field.value.length}`
                           : "Visibilidade"
                       }
-                      active={(field.value?.length ?? 0) > 0}
+                      tone={(field.value?.length ?? 0) > 0 ? "filled" : "empty"}
                       disabled={!canEditVisibility}
                       compact={compact}
                     >
@@ -429,6 +484,7 @@ export function TarefaMetaToolbar({
                       onVisibilidadeManualChange?.();
                     }}
                     disabled={!canEditVisibility}
+                    lockedIds={lockedVisualizadorIds}
                     placeholder="Selecione pessoas"
                     emptyLabel={emptyVisibilidadeLabel}
                     searchPlaceholder="Buscar por nome..."
@@ -456,12 +512,16 @@ export function TarefaMetaToolbar({
                           ? formatRecorrenciaHoraLabel(recorrenciaAtual, dataInicio)
                           : formatDataHoraLabel(dataInicio)
                       }
-                      active={
-                        dateMode === "recorrencia"
-                          ? !!parseRecorrencia(recorrenciaAtual) || !!dataInicio
-                          : !!dataInicio
+                      tone={
+                        (
+                          dateMode === "recorrencia"
+                            ? !!parseRecorrencia(recorrenciaAtual) || !!dataInicio
+                            : !!dataInicio
+                        )
+                          ? "filled"
+                          : "empty"
                       }
-                      disabled={!canEdit}
+                      disabled={!canEditData}
                       compact={compact}
                     >
                       {dateMode === "recorrencia" ? (
@@ -476,7 +536,7 @@ export function TarefaMetaToolbar({
                   <DataHoraRecorrenciaBody
                     value={field.value}
                     onChange={field.onChange}
-                    canEdit={canEdit}
+                    canEdit={canEditData}
                     dateMode={
                       hideRecorrencia || dateMode === "calendario" ? "calendario" : "recorrencia"
                     }
@@ -503,7 +563,7 @@ export function TarefaMetaToolbar({
                   <span>
                     <MetaIconButton
                       label={`Prioridade: ${field.value}`}
-                      active
+                      tone="plain"
                       disabled={!canEdit}
                       compact={compact}
                     >
@@ -564,7 +624,7 @@ export function TarefaMetaToolbar({
                           ? `Lembretes: ${lembretes.length}`
                           : "Lembretes"
                       }
-                      active={lembretes.length > 0}
+                      tone={lembretes.length > 0 ? "filled" : "empty"}
                       disabled={!canEdit}
                       compact={compact}
                     >

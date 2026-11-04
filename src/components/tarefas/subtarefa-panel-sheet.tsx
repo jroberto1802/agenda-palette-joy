@@ -47,6 +47,7 @@ import {
   useToggleSubtarefaComentarioReacao,
   useUpdateSubtarefa,
   useUpdateSubtarefaComentario,
+  useUpdateSubtarefaMeta,
 } from "@/hooks/use-tarefas";
 import { SUBTAREFA_PANEL_CONTENT_CLASS, ITEM_CONCLUIDO_CLASS } from "@/lib/layout";
 import { getSupabaseErrorMessage } from "@/lib/supabase-errors";
@@ -66,8 +67,10 @@ import {
 import {
   TAREFA_PRIORIDADE_COLORS,
   canCommentOrAttachTarefa,
+  canEditSubtarefaTexto,
   canEditTarefa,
-  canEditVisibilidade,
+  canInteragirSubtarefa,
+  canRemoverPessoasSubtarefa,
   getSetoresPermitidos,
   getTarefaConclusaoColorClass,
   getTarefaConclusaoLabel,
@@ -180,6 +183,7 @@ export function SubtarefaPanelSheet({
   const { data: pessoas } = usePessoas();
   const { data: subtarefa, isLoading } = useSubtarefaDetail(open ? subtarefaId : null);
   const updateSubtarefa = useUpdateSubtarefa();
+  const updateSubtarefaMeta = useUpdateSubtarefaMeta();
   const toggleSubtarefa = useToggleSubtarefa();
   const createComentario = useCreateSubtarefaComentario();
   const deleteComentario = useDeleteSubtarefaComentario();
@@ -228,6 +232,64 @@ export function SubtarefaPanelSheet({
     );
   }, [readOnly, parentTarefa, profile]);
 
+  /** Título e Descrição: Criador (da subtarefa/tarefa), Gestor e Administrador. */
+  const canEditTexto = useMemo(() => {
+    if (readOnly || !profile) return false;
+    return canEditSubtarefaTexto(
+      subtarefa,
+      parentTarefa,
+      profile.id,
+      isAdmin(profile),
+      isGerente(profile),
+      profile.setor_id,
+    );
+  }, [readOnly, subtarefa, parentTarefa, profile]);
+
+  /**
+   * Concluir, adicionar pessoas e alterar Data/Hora: quem edita a tarefa pai ou é
+   * Responsável/Visualizador desta subtarefa.
+   */
+  const canInteract = useMemo(() => {
+    if (readOnly || !profile) return false;
+    return canInteragirSubtarefa(
+      subtarefa,
+      parentTarefa,
+      profile.id,
+      isAdmin(profile),
+      isGerente(profile),
+      profile.setor_id,
+    );
+  }, [readOnly, subtarefa, parentTarefa, profile]);
+
+  /** Remover pessoas: Criador, Gestor e Administrador. */
+  const canRemoverPessoas = useMemo(() => {
+    if (readOnly || !profile) return false;
+    return canRemoverPessoasSubtarefa(
+      subtarefa,
+      parentTarefa,
+      profile.id,
+      isAdmin(profile),
+      isGerente(profile),
+      profile.setor_id,
+    );
+  }, [readOnly, subtarefa, parentTarefa, profile]);
+
+  // Quem só pode adicionar não consegue desmarcar quem já estava salvo.
+  const lockedResponsavelIds = useMemo(
+    () =>
+      canRemoverPessoas
+        ? undefined
+        : (subtarefa?.responsaveis ?? []).map((r) => r.usuario_id),
+    [canRemoverPessoas, subtarefa?.responsaveis],
+  );
+  const lockedVisualizadorIds = useMemo(
+    () =>
+      canRemoverPessoas
+        ? undefined
+        : (subtarefa?.observadores ?? []).map((o) => o.usuario_id),
+    [canRemoverPessoas, subtarefa?.observadores],
+  );
+
   const mostrarBolinhaCabecalho = !!subtarefa && !readOnly;
 
   const handleToggleConclusao = async (concluida: boolean) => {
@@ -248,17 +310,6 @@ export function SubtarefaPanelSheet({
     () => canCommentOrAttachTarefa(parentTarefa, profile?.id, readOnly),
     [parentTarefa, profile?.id, readOnly],
   );
-
-  const canEditVisibility = useMemo(() => {
-    if (readOnly) return false;
-    return canEditVisibilidade(
-      parentTarefa,
-      profile?.id,
-      isAdmin(profile),
-      isGerente(profile),
-      profile?.setor_id,
-    );
-  }, [readOnly, parentTarefa, profile]);
 
   const projetoId = form.watch("projeto_id");
   const setorId = form.watch("setor_id");
@@ -378,7 +429,7 @@ export function SubtarefaPanelSheet({
   ]);
 
   const persistChanges = async (): Promise<boolean> => {
-    if (!subtarefaId || !subtarefa || !canEdit || savingRef.current) return true;
+    if (!subtarefaId || !subtarefa || !(canEdit || canInteract) || savingRef.current) return true;
     const valid = await form.trigger();
     if (!valid) {
       const errors = form.formState.errors;
@@ -397,10 +448,23 @@ export function SubtarefaPanelSheet({
 
     savingRef.current = true;
     try {
-      await updateSubtarefa.mutateAsync({
-        id: subtarefaId,
-        data: toPayload(form.getValues(), parentTarefa),
-      });
+      if (canEdit) {
+        await updateSubtarefa.mutateAsync({
+          id: subtarefaId,
+          data: toPayload(form.getValues(), parentTarefa),
+        });
+      } else {
+        // Responsável/Visualizador da subtarefa: só adiciona pessoas e altera Data/Hora.
+        const values = form.getValues();
+        await updateSubtarefaMeta.mutateAsync({
+          id: subtarefaId,
+          data: {
+            data_inicio: values.data_inicio ? values.data_inicio.toISOString() : null,
+            atribuido_ids: values.atribuido_ids,
+            observador_ids: values.observador_ids,
+          },
+        });
+      }
       return true;
     } catch (error) {
       toast.error("Erro ao salvar subtarefa", {
@@ -535,7 +599,7 @@ export function SubtarefaPanelSheet({
                           concluida={subtarefa.concluida}
                           kind="subtarefa"
                           size="sm"
-                          disabled={!canEdit}
+                          disabled={!canInteract}
                           onToggle={handleToggleConclusao}
                         />
                       )}
@@ -555,7 +619,11 @@ export function SubtarefaPanelSheet({
                   <TarefaMetaToolbar
                     form={form as never}
                     canEdit={canEdit}
-                    canEditVisibility={canEditVisibility}
+                    canEditVisibility={canInteract}
+                    canAddResponsaveis={canInteract}
+                    canEditData={canInteract}
+                    lockedResponsavelIds={lockedResponsavelIds}
+                    lockedVisualizadorIds={lockedVisualizadorIds}
                     hideProjetoSetor
                     hideRecorrencia
                     compact
@@ -604,7 +672,7 @@ export function SubtarefaPanelSheet({
                     render={({ field }) => (
                       <FormItem>
                         <EditableOnDoubleClick
-                          locked={!canEdit}
+                          locked={!canEditTexto}
                           forceEditable={false}
                           editing={editingField === "titulo"}
                           onStartEdit={() => setEditingField("titulo")}
@@ -616,7 +684,7 @@ export function SubtarefaPanelSheet({
                                 placeholder="Título da subtarefa"
                                 className="h-9 rounded-lg border bg-card px-2.5 py-1.5 text-sm font-semibold shadow-sm focus-visible:ring-1"
                                 readOnly={!editable}
-                                disabled={!canEdit}
+                                disabled={!canEditTexto}
                                 {...field}
                               />
                             </FormControl>
@@ -633,7 +701,7 @@ export function SubtarefaPanelSheet({
                     render={({ field }) => (
                       <FormItem>
                         <EditableOnDoubleClick
-                          locked={!canEdit}
+                          locked={!canEditTexto}
                           forceEditable={false}
                           editing={editingField === "descricao"}
                           onStartEdit={() => setEditingField("descricao")}
@@ -646,7 +714,7 @@ export function SubtarefaPanelSheet({
                                 onChange={field.onChange}
                                 onBlur={field.onBlur}
                                 editable={editable}
-                                disabled={!canEdit}
+                                disabled={!canEditTexto}
                                 editorKey={subtarefaId ?? "subtarefa"}
                                 placeholder="Adicione uma descrição... (duplo clique para editar)"
                                 minHeightClassName="[&_.ProseMirror]:min-h-[8rem] text-sm"
@@ -779,9 +847,9 @@ export function SubtarefaPanelSheet({
                 </div>
               </ScrollArea>
 
-              {canEdit && (
+              {(canEdit || canInteract) && (
                 <div className="border-t px-4 py-1.5 text-[10px] text-muted-foreground">
-                  {updateSubtarefa.isPending
+                  {updateSubtarefa.isPending || updateSubtarefaMeta.isPending
                     ? "Salvando alterações..."
                     : "Salvo automaticamente"}
                 </div>

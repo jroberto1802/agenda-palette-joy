@@ -221,8 +221,11 @@ function MetaIconButton({
           size="icon"
           disabled={disabled}
           className={cn(
-            "h-7 w-7 shrink-0 rounded-md text-muted-foreground hover:text-foreground",
-            active && "bg-muted text-foreground",
+            "h-7 w-7 shrink-0 rounded-md",
+            // Preenchido: cor primária do sistema, destacado. Vazio: neutro/cinza.
+            active
+              ? "bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary disabled:opacity-90"
+              : "text-muted-foreground hover:text-foreground",
             className,
           )}
           aria-label={label}
@@ -240,6 +243,9 @@ function MetaIconButton({
 export function SubtarefaRow({
   subtarefa,
   canEdit,
+  canInteract = canEdit,
+  lockedResponsavelIds,
+  lockedVisualizadorIds,
   pessoasDisponiveis,
   onOpen,
   onToggle,
@@ -255,6 +261,15 @@ export function SubtarefaRow({
 }: {
   subtarefa: SubtarefaWithAuthors;
   canEdit: boolean;
+  /**
+   * Concluir, adicionar pessoas e alterar Data/Hora. Inclui Responsável/Visualizador
+   * da subtarefa (que não editam o restante). Padrão: igual a `canEdit`.
+   */
+  canInteract?: boolean;
+  /** Responsáveis que não podem ser desmarcados (só Criador/Gestor/Admin removem). */
+  lockedResponsavelIds?: string[];
+  /** Visualizadores que não podem ser desmarcados (só Criador/Gestor/Admin removem). */
+  lockedVisualizadorIds?: string[];
   pessoasDisponiveis: ProfileWithSetor[];
   onOpen: () => void;
   onToggle: (concluida: boolean) => Promise<void>;
@@ -344,7 +359,7 @@ export function SubtarefaRow({
       <ConclusaoBolinha
         concluida={subtarefa.concluida}
         kind="subtarefa"
-        disabled={!canEdit || saving}
+        disabled={!canInteract || saving}
         className="shrink-0"
         onToggle={async (concluida) => {
           await onToggle(concluida);
@@ -399,7 +414,7 @@ export function SubtarefaRow({
                   <MetaIconButton
                     label={formatDataHoraLabel(dataInicio)}
                     active={!!dataInicio}
-                    disabled={!canEdit || saving}
+                    disabled={!canInteract || saving}
                     className={cn(showHora && "h-7 w-auto min-w-7 gap-0.5 px-1.5")}
                   >
                     {dataInicio ? (
@@ -428,7 +443,7 @@ export function SubtarefaRow({
               <PopoverContent className={cn("w-auto p-0", META_OVERLAY_Z)} align="end">
                 <DataHoraRecorrenciaBody
                   value={dataInicio}
-                  canEdit={canEdit && !saving}
+                  canEdit={canInteract && !saving}
                   dateMode="calendario"
                   onChange={(date) =>
                     void runMeta({
@@ -487,7 +502,7 @@ export function SubtarefaRow({
                       : "Responsáveis"
                   }
                   active={responsaveis.length > 0}
-                  disabled={!canEdit || saving}
+                  disabled={!canInteract || saving}
                 >
                   {responsaveis.length > 0 ? (
                     <span className="flex -space-x-1.5">
@@ -513,7 +528,8 @@ export function SubtarefaRow({
                 pessoas={pessoasDisponiveis}
                 value={responsavelIds}
                 onChange={(ids) => void runMeta({ atribuido_ids: ids })}
-                disabled={!canEdit || saving}
+                disabled={!canInteract || saving}
+                lockedIds={lockedResponsavelIds}
                 placeholder="Nenhum responsável"
                 emptyLabel="Nenhuma pessoa no escopo da tarefa"
                 showSelectAll
@@ -535,7 +551,7 @@ export function SubtarefaRow({
                         : "Visibilidade"
                   }
                   active={observadorIds.length > 0}
-                  disabled={!canEdit || saving}
+                  disabled={!canInteract || saving}
                 >
                   {visualizadores.length > 0 ? (
                     <span className="flex -space-x-1.5">
@@ -569,7 +585,8 @@ export function SubtarefaRow({
                     visibilidade: VISIBILIDADE_PESSOAS,
                   })
                 }
-                disabled={!canEdit || saving}
+                disabled={!canInteract || saving}
+                lockedIds={lockedVisualizadorIds}
                 placeholder="Selecione pessoas"
                 emptyLabel="Nenhuma pessoa no escopo da tarefa"
                 searchPlaceholder="Buscar por nome..."

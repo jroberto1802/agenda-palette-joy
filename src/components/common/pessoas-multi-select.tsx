@@ -28,6 +28,9 @@ function PessoasChecklist({
   showSelectAll,
   search,
   onSearchChange,
+  lockedIds,
+  minSelected,
+  onMinBlocked,
 }: {
   pessoas: PessoaOption[];
   value: string[];
@@ -38,6 +41,9 @@ function PessoasChecklist({
   showSelectAll: boolean;
   search: string;
   onSearchChange: (value: string) => void;
+  lockedIds: Set<string>;
+  minSelected: number;
+  onMinBlocked?: () => void;
 }) {
   const filteredPessoas = useMemo(() => {
     const term = normalizeSearchText(search);
@@ -51,12 +57,23 @@ function PessoasChecklist({
     filteredPessoas.length > 0 &&
     filteredPessoas.every((p) => value.includes(p.id));
 
+  /** Aplica a remoção respeitando pessoas travadas (só adicionar) e o mínimo exigido. */
+  const applyRemoval = (remove: Set<string>) => {
+    const next = value.filter((id) => !remove.has(id) || lockedIds.has(id));
+    if (next.length === value.length) return;
+    if (next.length < minSelected) {
+      onMinBlocked?.();
+      return;
+    }
+    onChange(next);
+  };
+
   const toggle = (id: string, checked: boolean) => {
     if (checked) {
       onChange([...new Set([...value, id])]);
       return;
     }
-    onChange(value.filter((v) => v !== id));
+    applyRemoval(new Set([id]));
   };
 
   const toggleAllFiltered = (checked: boolean) => {
@@ -65,8 +82,7 @@ function PessoasChecklist({
       onChange([...new Set([...value, ...filteredIds])]);
       return;
     }
-    const remove = new Set(filteredIds);
-    onChange(value.filter((id) => !remove.has(id)));
+    applyRemoval(new Set(filteredIds));
   };
 
   if (!pessoas.length) {
@@ -108,15 +124,24 @@ function PessoasChecklist({
             )}
             {filteredPessoas.map((pessoa) => {
               const checked = value.includes(pessoa.id);
+              const locked = checked && lockedIds.has(pessoa.id);
               return (
                 <label
                   key={pessoa.id}
-                  className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60"
+                  title={
+                    locked
+                      ? "Somente o criador, o gestor ou o administrador podem remover esta pessoa."
+                      : undefined
+                  }
+                  className={cn(
+                    "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm",
+                    locked ? "cursor-not-allowed" : "cursor-pointer hover:bg-muted/60",
+                  )}
                 >
                   <Checkbox
                     checked={checked}
                     onCheckedChange={(next) => toggle(pessoa.id, !!next)}
-                    disabled={disabled}
+                    disabled={disabled || locked}
                   />
                   <span className="min-w-0 flex-1 truncate">{pessoa.nome_completo}</span>
                   {checked && <Check className="h-3.5 w-3.5 shrink-0 text-primary" />}
@@ -143,6 +168,15 @@ export function PessoasMultiSelect({
   contentClassName,
   /** Lista embutida (sem segundo popover) — use dentro de Popover/Sheet já aberto. */
   inline = false,
+  /**
+   * Pessoas já selecionadas que NÃO podem ser desmarcadas (modo "somente adicionar":
+   * Responsável/Visualizador só adicionam; remover é do Criador, Gestor e Administrador).
+   */
+  lockedIds,
+  /** Mínimo de pessoas que precisam permanecer selecionadas (ex.: 1 responsável na Tarefa). */
+  minSelected = 0,
+  /** Chamado ao tentar remover abaixo de `minSelected`. */
+  onMinBlocked,
 }: {
   pessoas: PessoaOption[];
   value: string[];
@@ -156,8 +190,12 @@ export function PessoasMultiSelect({
   /** z-index / classes extras do dropdown (precisa ficar acima de Dialog/Sheet). */
   contentClassName?: string;
   inline?: boolean;
+  lockedIds?: string[];
+  minSelected?: number;
+  onMinBlocked?: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const lockedSet = useMemo(() => new Set(lockedIds ?? []), [lockedIds]);
   const [search, setSearch] = useState("");
 
   const selected = useMemo(() => {
@@ -183,6 +221,9 @@ export function PessoasMultiSelect({
       showSelectAll={showSelectAll}
       search={search}
       onSearchChange={setSearch}
+      lockedIds={lockedSet}
+      minSelected={minSelected}
+      onMinBlocked={onMinBlocked}
     />
   );
 

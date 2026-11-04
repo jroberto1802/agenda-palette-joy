@@ -29,7 +29,7 @@ import {
   usuarioNoEscopoSubtarefa,
   VISIBILIDADE_PESSOAS,
 } from "@/utils/escopo-tarefa";
-import { sortSubtarefasList } from "@/utils/tarefas";
+import { sortSubtarefasList, TAREFA_SEM_RESPONSAVEL_MSG } from "@/utils/tarefas";
 import { serializeRecorrencia, isSerieModelo, isSerieOcorrencia } from "@/utils/recorrencia";
 import { atualizarProximaDataModelo, materializarOcorrenciasDevidas } from "@/services/tarefa-recorrencia";
 import type {
@@ -251,47 +251,88 @@ function normalizeSetorForCreate(payload: TarefaFormData, profile: Profile | nul
   };
 }
 
-async function syncObservadores(tarefaId: string, usuarioIds: string[]): Promise<void> {
-  const { error: deleteError } = await supabase
-    .from("tarefa_observadores")
-    .delete()
-    .eq("tarefa_id", tarefaId);
-
-  if (deleteError) throw deleteError;
-
-  if (usuarioIds.length === 0) return;
-
-  const { error: insertError } = await supabase.from("tarefa_observadores").insert(
-    usuarioIds.map((usuario_id) => ({
-      tarefa_id: tarefaId,
-      usuario_id,
-    })),
-  );
-
-  if (insertError) throw insertError;
+/** Diferença entre a lista atual e a desejada (somente o que muda de fato). */
+function diffPessoaIds(atuais: string[], proximos: string[]) {
+  const atualSet = new Set(atuais);
+  const proximoSet = new Set(proximos);
+  return {
+    adicionar: [...proximoSet].filter((id) => !atualSet.has(id)),
+    remover: [...atualSet].filter((id) => !proximoSet.has(id)),
+  };
 }
 
+/**
+ * Todo Responsável é também Visualizador (o inverso não vale).
+ * Une as duas listas sem remover nenhum Visualizador existente.
+ */
+function comResponsaveisComoVisualizadores(
+  observadorIds: string[],
+  responsavelIds: string[],
+): string[] {
+  return [...new Set([...observadorIds, ...responsavelIds].filter(Boolean))];
+}
+
+/**
+ * Sincroniza Visualizadores por diferença: insere só os novos e remove só os
+ * retirados. Quem apenas adiciona pessoas (Responsável/Visualizador) não dispara
+ * nenhum DELETE, que continua restrito a Criador, Gestor e Administrador.
+ */
+async function syncObservadores(tarefaId: string, usuarioIds: string[]): Promise<void> {
+  const unique = [...new Set(usuarioIds.filter(Boolean))];
+  const atuais = await listObservadorIds(tarefaId);
+  const { adicionar, remover } = diffPessoaIds(atuais, unique);
+
+  if (adicionar.length > 0) {
+    const { error: insertError } = await supabase.from("tarefa_observadores").insert(
+      adicionar.map((usuario_id) => ({
+        tarefa_id: tarefaId,
+        usuario_id,
+      })),
+    );
+    if (insertError) throw insertError;
+  }
+
+  if (remover.length > 0) {
+    const { error: deleteError } = await supabase
+      .from("tarefa_observadores")
+      .delete()
+      .eq("tarefa_id", tarefaId)
+      .in("usuario_id", remover);
+    if (deleteError) throw deleteError;
+  }
+}
+
+/**
+ * Sincroniza Responsáveis por diferença. Nunca deixa a tarefa sem responsável:
+ * insere os novos antes de remover os retirados.
+ */
 async function syncResponsaveis(tarefaId: string, usuarioIds: string[]): Promise<void> {
   const unique = [...new Set(usuarioIds.filter(Boolean))];
   if (unique.length === 0) {
-    throw new Error("Selecione ao menos um responsável.");
+    throw new Error(TAREFA_SEM_RESPONSAVEL_MSG);
   }
 
-  const { error: deleteError } = await supabase
-    .from("tarefa_responsaveis")
-    .delete()
-    .eq("tarefa_id", tarefaId);
+  const atuais = await listResponsavelIds(tarefaId);
+  const { adicionar, remover } = diffPessoaIds(atuais, unique);
 
-  if (deleteError) throw deleteError;
+  if (adicionar.length > 0) {
+    const { error: insertError } = await supabase.from("tarefa_responsaveis").insert(
+      adicionar.map((usuario_id) => ({
+        tarefa_id: tarefaId,
+        usuario_id,
+      })),
+    );
+    if (insertError) throw insertError;
+  }
 
-  const { error: insertError } = await supabase.from("tarefa_responsaveis").insert(
-    unique.map((usuario_id) => ({
-      tarefa_id: tarefaId,
-      usuario_id,
-    })),
-  );
-
-  if (insertError) throw insertError;
+  if (remover.length > 0) {
+    const { error: deleteError } = await supabase
+      .from("tarefa_responsaveis")
+      .delete()
+      .eq("tarefa_id", tarefaId)
+      .in("usuario_id", remover);
+    if (deleteError) throw deleteError;
+  }
 }
 
 async function listResponsavelIds(tarefaId: string): Promise<string[]> {
@@ -760,13 +801,16 @@ export async function createTarefa(payload: TarefaFormData): Promise<TarefaWithR
   const tarefaId = crypto.randomUUID();
 
   if (atribuidoIds.length === 0) {
-    throw new Error("Selecione ao menos um responsável.");
+    throw new Error(TAREFA_SEM_RESPONSAVEL_MSG);
   }
 
   // Novo modelo: Visibilidade = lista de pessoas (pessoas_especificas).
-  // Lista vazia = só criador + responsáveis (sempre têm acesso).
+  // Todo responsável é também visualizador.
   const visibilidade: TarefaFormData["visibilidade"] = "pessoas_especificas";
-  const observadorIds = [...new Set(normalized.observador_ids)];
+  const observadorIds = comResponsaveisComoVisualizadores(
+    normalized.observador_ids,
+    atribuidoIds,
+  );
 
   const recorrencia = serializeRecorrencia(normalized.recorrencia);
   const ancoraKey = normalized.data_inicio
@@ -894,11 +938,11 @@ export async function updateTarefa(
 ): Promise<TarefaWithRelations> {
   const atribuidoIds = normalizeAtribuidoIds(payload);
   if (atribuidoIds.length === 0) {
-    throw new Error("Selecione ao menos um responsável.");
+    throw new Error(TAREFA_SEM_RESPONSAVEL_MSG);
   }
 
   const visibilidade: TarefaFormData["visibilidade"] = "pessoas_especificas";
-  const observadorIds = [...new Set(payload.observador_ids)];
+  const observadorIds = comResponsaveisComoVisualizadores(payload.observador_ids, atribuidoIds);
 
   await assertRemocoesEscopoTarefaPermitidas(id, atribuidoIds, observadorIds);
 
@@ -1021,6 +1065,115 @@ export async function updateTarefa(
       .eq("id", id)
       .single();
     if (refreshed) return refreshed as TarefaWithRelations;
+  }
+
+  return tarefa;
+}
+
+/**
+ * Atualização limitada para quem só pode ADICIONAR pessoas e alterar Data/Hora
+ * (Responsável/Visualizador sem poder de edição). Nunca remove ninguém e não
+ * toca em título, descrição, projeto, setor, prioridade, tags nem lembretes.
+ */
+export async function updateTarefaParticipante(
+  id: string,
+  input: {
+    data_inicio?: string | null;
+    atribuido_ids?: string[];
+    observador_ids?: string[];
+  },
+): Promise<TarefaWithRelations> {
+  const [anterioresResp, anterioresObs, { data: anteriorMeta, error: metaError }] =
+    await Promise.all([
+      listResponsavelIds(id),
+      listObservadorIds(id),
+      supabase
+        .from("tarefas")
+        .select("data_inicio, visibilidade, setor_id, projeto_id, titulo, criado_por, atribuido_a")
+        .eq("id", id)
+        .single(),
+    ]);
+  if (metaError) throw metaError;
+
+  // Só adiciona: une o que já existe com o que foi pedido.
+  const responsavelIds = [...new Set([...anterioresResp, ...(input.atribuido_ids ?? [])])];
+  if (responsavelIds.length === 0) {
+    throw new Error(TAREFA_SEM_RESPONSAVEL_MSG);
+  }
+  const observadorIds = comResponsaveisComoVisualizadores(
+    [...anterioresObs, ...(input.observador_ids ?? [])],
+    responsavelIds,
+  );
+
+  const anterioresVisualizadores = await resolveTarefaVisualizadorIds({
+    visibilidade: (anteriorMeta?.visibilidade ?? "pessoas_especificas") as TarefaFormData["visibilidade"],
+    setorId: anteriorMeta?.setor_id,
+    projetoId: anteriorMeta?.projeto_id,
+    observadorIds: anterioresObs,
+  });
+
+  await syncResponsaveis(id, responsavelIds);
+  await syncObservadores(id, observadorIds);
+
+  const patch: TablesUpdate<"tarefas"> = {};
+  if (input.data_inicio !== undefined) patch.data_inicio = input.data_inicio;
+  // Tarefa legada sem responsável principal: espelha o primeiro responsável.
+  if (!anteriorMeta?.atribuido_a) patch.atribuido_a = primaryAtribuido(responsavelIds);
+
+  if (Object.keys(patch).length > 0) {
+    const { error } = await supabase.from("tarefas").update(patch).eq("id", id);
+    if (error) throw error;
+  }
+
+  const { data, error: fetchError } = await supabase
+    .from("tarefas")
+    .select(TAREFA_SELECT)
+    .eq("id", id)
+    .single();
+  if (fetchError) throw fetchError;
+  const tarefa = data as TarefaWithRelations;
+
+  const novosResponsaveis = responsavelIds.filter((uid) => !anterioresResp.includes(uid));
+  if (novosResponsaveis.length > 0) {
+    await notifyUsers(novosResponsaveis, {
+      tipo: "tarefa_atribuida",
+      referencia_tipo: "tarefa",
+      referencia_id: tarefa.id,
+    }).catch(() => undefined);
+  }
+
+  const novosVisualizadores = (
+    await resolveTarefaVisualizadorIds({
+      visibilidade: "pessoas_especificas",
+      setorId: anteriorMeta?.setor_id,
+      projetoId: anteriorMeta?.projeto_id,
+      observadorIds,
+    })
+  ).filter((uid) => !anterioresVisualizadores.includes(uid));
+  await notifyNovosVisualizadores({
+    tarefaId: tarefa.id,
+    titulo: tarefa.titulo,
+    novosVisualizadorIds: novosVisualizadores,
+    responsavelIds,
+    criadoPor: anteriorMeta?.criado_por ?? tarefa.criado_por,
+  });
+
+  if (
+    input.data_inicio !== undefined &&
+    toLocalDateKey(anteriorMeta?.data_inicio) !== toLocalDateKey(input.data_inicio)
+  ) {
+    const ator = await getCurrentActor();
+    const stakeholders = await getTarefaStakeholderIds(id);
+    const alvos = stakeholders.filter((uid) => uid !== ator?.id);
+    if (alvos.length > 0) {
+      await notifyTarefaPrazo({
+        usuarioIds: alvos,
+        tarefaId: id,
+        titulo: tarefa.titulo,
+        atorNome: ator?.nome ?? "Alguém",
+        dataInicio: input.data_inicio,
+      }).catch(() => undefined);
+    }
   }
 
   return tarefa;
@@ -1485,22 +1638,37 @@ async function syncSubtarefaResponsaveis(
   usuarioIds: string[],
 ): Promise<void> {
   const unique = [...new Set(usuarioIds.filter(Boolean))];
+  const atuais = await listSubtarefaResponsavelIds(subtarefaId);
+  const { adicionar, remover } = diffPessoaIds(atuais, unique);
 
-  const { error: deleteError } = await supabase
-    .from("subtarefa_responsaveis")
-    .delete()
+  if (adicionar.length > 0) {
+    const { error: insertError } = await supabase.from("subtarefa_responsaveis").insert(
+      adicionar.map((usuario_id) => ({
+        subtarefa_id: subtarefaId,
+        usuario_id,
+      })),
+    );
+    if (insertError) throw insertError;
+  }
+
+  if (remover.length > 0) {
+    const { error: deleteError } = await supabase
+      .from("subtarefa_responsaveis")
+      .delete()
+      .eq("subtarefa_id", subtarefaId)
+      .in("usuario_id", remover);
+    if (deleteError) throw deleteError;
+  }
+}
+
+async function listSubtarefaObservadorIds(subtarefaId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("subtarefa_observadores")
+    .select("usuario_id")
     .eq("subtarefa_id", subtarefaId);
-  if (deleteError) throw deleteError;
 
-  if (unique.length === 0) return;
-
-  const { error: insertError } = await supabase.from("subtarefa_responsaveis").insert(
-    unique.map((usuario_id) => ({
-      subtarefa_id: subtarefaId,
-      usuario_id,
-    })),
-  );
-  if (insertError) throw insertError;
+  if (error) throw error;
+  return (data ?? []).map((row) => row.usuario_id);
 }
 
 /** Notifica apenas responsáveis recém-atribuídos (RPC já ignora o ator). */
@@ -1532,22 +1700,27 @@ async function syncSubtarefaObservadores(
   usuarioIds: string[],
 ): Promise<void> {
   const unique = [...new Set(usuarioIds.filter(Boolean))];
+  const atuais = await listSubtarefaObservadorIds(subtarefaId);
+  const { adicionar, remover } = diffPessoaIds(atuais, unique);
 
-  const { error: deleteError } = await supabase
-    .from("subtarefa_observadores")
-    .delete()
-    .eq("subtarefa_id", subtarefaId);
-  if (deleteError) throw deleteError;
+  if (adicionar.length > 0) {
+    const { error: insertError } = await supabase.from("subtarefa_observadores").insert(
+      adicionar.map((usuario_id) => ({
+        subtarefa_id: subtarefaId,
+        usuario_id,
+      })),
+    );
+    if (insertError) throw insertError;
+  }
 
-  if (unique.length === 0) return;
-
-  const { error: insertError } = await supabase.from("subtarefa_observadores").insert(
-    unique.map((usuario_id) => ({
-      subtarefa_id: subtarefaId,
-      usuario_id,
-    })),
-  );
-  if (insertError) throw insertError;
+  if (remover.length > 0) {
+    const { error: deleteError } = await supabase
+      .from("subtarefa_observadores")
+      .delete()
+      .eq("subtarefa_id", subtarefaId)
+      .in("usuario_id", remover);
+    if (deleteError) throw deleteError;
+  }
 }
 
 export async function getSubtarefaDetail(id: string): Promise<SubtarefaDetail> {
@@ -1919,6 +2092,13 @@ export async function updateSubtarefaMeta(
   const anterioresResponsaveis =
     meta.atribuido_ids !== undefined ? await listSubtarefaResponsavelIds(id) : [];
 
+  // Todo Responsável é também Visualizador (o inverso não vale).
+  let observadorIdsFinal = meta.observador_ids;
+  if (meta.atribuido_ids !== undefined) {
+    const base = meta.observador_ids ?? (await listSubtarefaObservadorIds(id));
+    observadorIdsFinal = comResponsaveisComoVisualizadores(base, meta.atribuido_ids);
+  }
+
   const patch: {
     data_inicio?: string | null;
     visibilidade?: SubtarefaWithAuthors["visibilidade"];
@@ -1947,7 +2127,7 @@ export async function updateSubtarefaMeta(
       patch.dia_no_mes = null;
     }
   }
-  if (meta.visibilidade !== undefined || meta.observador_ids !== undefined) {
+  if (meta.visibilidade !== undefined || observadorIdsFinal !== undefined) {
     patch.visibilidade = VISIBILIDADE_PESSOAS;
   }
 
@@ -1960,8 +2140,8 @@ export async function updateSubtarefaMeta(
   if (meta.atribuido_ids !== undefined) {
     await syncSubtarefaResponsaveis(id, meta.atribuido_ids);
   }
-  if (meta.observador_ids !== undefined) {
-    await syncSubtarefaObservadores(id, meta.observador_ids);
+  if (observadorIdsFinal !== undefined) {
+    await syncSubtarefaObservadores(id, observadorIdsFinal);
   }
 
   const row = await getSubtarefaRow(id);
@@ -2023,7 +2203,7 @@ export async function updateSubtarefa(
 
   const escopoPai = await getTarefaEscopoIdsFromDb(anterior.tarefa_id);
   const atribuidoIds = [...new Set(payload.atribuido_ids)];
-  const observadorIds = [...new Set(payload.observador_ids)];
+  const observadorIds = comResponsaveisComoVisualizadores(payload.observador_ids, atribuidoIds);
   assertIdsNoEscopo(atribuidoIds, escopoPai);
   assertIdsNoEscopo(observadorIds, escopoPai);
 

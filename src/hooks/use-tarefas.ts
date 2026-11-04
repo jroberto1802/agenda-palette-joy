@@ -32,6 +32,7 @@ import {
   updateTarefaComentario,
   updateTarefaConclusao,
   updateTarefaDataInicio,
+  updateTarefaParticipante,
 } from "@/services/tarefas";
 import {
   softDeleteTarefaComEscopo,
@@ -327,6 +328,21 @@ export function useUpdateTarefa() {
   });
 }
 
+/** Adicionar pessoas e alterar Data/Hora (Visualizador): nunca remove nem edita outros campos. */
+export function useUpdateTarefaParticipante() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: Parameters<typeof updateTarefaParticipante>[1];
+    }) => updateTarefaParticipante(id, data),
+    onSuccess: () => invalidateTarefas(queryClient),
+  });
+}
+
 export function useUpdateTarefaConclusao() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -575,7 +591,10 @@ export function useUpdateSubtarefaMeta() {
       id: string;
       data: import("@/types").SubtarefaMetaUpdate;
     }) => updateSubtarefaMeta(id, data),
-    onSuccess: () => invalidateTarefas(queryClient),
+    onSuccess: (_data, { id }) => {
+      invalidateTarefas(queryClient);
+      queryClient.invalidateQueries({ queryKey: subtarefaKeys.detail(id) });
+    },
   });
 }
 
