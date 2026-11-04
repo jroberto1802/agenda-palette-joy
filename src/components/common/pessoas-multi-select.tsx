@@ -29,6 +29,8 @@ function PessoasChecklist({
   search,
   onSearchChange,
   lockedIds,
+  pinnedIds,
+  pinnedLabel,
   minSelected,
   onMinBlocked,
 }: {
@@ -42,6 +44,8 @@ function PessoasChecklist({
   search: string;
   onSearchChange: (value: string) => void;
   lockedIds: Set<string>;
+  pinnedIds: Set<string>;
+  pinnedLabel: string;
   minSelected: number;
   onMinBlocked?: () => void;
 }) {
@@ -53,24 +57,31 @@ function PessoasChecklist({
     );
   }, [pessoas, search]);
 
-  const allFilteredSelected =
-    filteredPessoas.length > 0 &&
-    filteredPessoas.every((p) => value.includes(p.id));
+  /** Pessoas fixas (ex.: Responsáveis na lista de Visualizadores) sempre contam como marcadas. */
+  const isChecked = (id: string) => pinnedIds.has(id) || value.includes(id);
 
-  /** Aplica a remoção respeitando pessoas travadas (só adicionar) e o mínimo exigido. */
+  const allFilteredSelected =
+    filteredPessoas.length > 0 && filteredPessoas.every((p) => isChecked(p.id));
+
+  /** Seleção final sempre soma as pessoas fixas — sem duplicar. */
+  const withPinned = (ids: string[]) => [...new Set([...ids, ...pinnedIds])];
+
+  /** Aplica a remoção respeitando pessoas fixas/travadas e o mínimo exigido. */
   const applyRemoval = (remove: Set<string>) => {
-    const next = value.filter((id) => !remove.has(id) || lockedIds.has(id));
+    const next = value.filter(
+      (id) => !remove.has(id) || lockedIds.has(id) || pinnedIds.has(id),
+    );
     if (next.length === value.length) return;
     if (next.length < minSelected) {
       onMinBlocked?.();
       return;
     }
-    onChange(next);
+    onChange(withPinned(next));
   };
 
   const toggle = (id: string, checked: boolean) => {
     if (checked) {
-      onChange([...new Set([...value, id])]);
+      onChange(withPinned([...value, id]));
       return;
     }
     applyRemoval(new Set([id]));
@@ -79,7 +90,7 @@ function PessoasChecklist({
   const toggleAllFiltered = (checked: boolean) => {
     const filteredIds = filteredPessoas.map((p) => p.id);
     if (checked) {
-      onChange([...new Set([...value, ...filteredIds])]);
+      onChange(withPinned([...value, ...filteredIds]));
       return;
     }
     applyRemoval(new Set(filteredIds));
@@ -123,15 +134,18 @@ function PessoasChecklist({
               </label>
             )}
             {filteredPessoas.map((pessoa) => {
-              const checked = value.includes(pessoa.id);
-              const locked = checked && lockedIds.has(pessoa.id);
+              const pinned = pinnedIds.has(pessoa.id);
+              const checked = isChecked(pessoa.id);
+              const locked = pinned || (checked && lockedIds.has(pessoa.id));
               return (
                 <label
                   key={pessoa.id}
                   title={
-                    locked
-                      ? "Somente o criador, o gestor ou o administrador podem remover esta pessoa."
-                      : undefined
+                    pinned
+                      ? `${pinnedLabel}: não pode ser removido enquanto continuar como ${pinnedLabel}.`
+                      : locked
+                        ? "Somente o criador, o gestor ou o administrador podem remover esta pessoa."
+                        : undefined
                   }
                   className={cn(
                     "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm",
@@ -144,6 +158,11 @@ function PessoasChecklist({
                     disabled={disabled || locked}
                   />
                   <span className="min-w-0 flex-1 truncate">{pessoa.nome_completo}</span>
+                  {pinned && (
+                    <span className="shrink-0 rounded-full bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 dark:text-blue-400">
+                      {pinnedLabel}
+                    </span>
+                  )}
                   {checked && <Check className="h-3.5 w-3.5 shrink-0 text-primary" />}
                 </label>
               );
@@ -173,6 +192,13 @@ export function PessoasMultiSelect({
    * Responsável/Visualizador só adicionam; remover é do Criador, Gestor e Administrador).
    */
   lockedIds,
+  /**
+   * Pessoas sempre selecionadas e travadas, com etiqueta (ex.: Responsáveis dentro da
+   * lista de Visualizadores). A seleção final sempre soma estas pessoas, sem duplicar.
+   */
+  pinnedIds,
+  /** Etiqueta exibida nas pessoas fixas. */
+  pinnedLabel = "Responsável",
   /** Mínimo de pessoas que precisam permanecer selecionadas (ex.: 1 responsável na Tarefa). */
   minSelected = 0,
   /** Chamado ao tentar remover abaixo de `minSelected`. */
@@ -191,11 +217,14 @@ export function PessoasMultiSelect({
   contentClassName?: string;
   inline?: boolean;
   lockedIds?: string[];
+  pinnedIds?: string[];
+  pinnedLabel?: string;
   minSelected?: number;
   onMinBlocked?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const lockedSet = useMemo(() => new Set(lockedIds ?? []), [lockedIds]);
+  const pinnedSet = useMemo(() => new Set(pinnedIds ?? []), [pinnedIds]);
   const [search, setSearch] = useState("");
 
   const selected = useMemo(() => {
@@ -222,6 +251,8 @@ export function PessoasMultiSelect({
       search={search}
       onSearchChange={setSearch}
       lockedIds={lockedSet}
+      pinnedIds={pinnedSet}
+      pinnedLabel={pinnedLabel}
       minSelected={minSelected}
       onMinBlocked={onMinBlocked}
     />

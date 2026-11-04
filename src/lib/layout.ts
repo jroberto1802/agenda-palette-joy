@@ -34,3 +34,16 @@ export const LARGE_MODAL_CONTENT_CLASS =
  */
 export const SUBTAREFA_PANEL_CONTENT_CLASS =
   "flex !top-[5vh] !bottom-auto !h-[90vh] w-full flex-col gap-0 overflow-hidden rounded-l-xl rounded-r-none border-l p-0 sm:max-w-xl md:max-w-2xl lg:max-w-3xl z-[70] [&>button]:right-3 [&>button]:top-3";
+
+/**
+ * Indicadores da barra de ícones de Tarefa/Subtarefa:
+ * - preenchido: azul aceso com fundo levemente destacado;
+ * - vazio: cinza neutro, sem destaque;
+ * - alerta: campo obrigatório vazio (Responsável da Tarefa), em vermelho.
+ */
+export const META_ICON_FILLED_CLASS =
+  "bg-blue-500/15 text-blue-600 ring-1 ring-inset ring-blue-500/30 hover:bg-blue-500/25 hover:text-blue-600 disabled:opacity-100 dark:text-blue-400";
+export const META_ICON_EMPTY_CLASS =
+  "bg-transparent text-muted-foreground/60 hover:bg-transparent hover:text-muted-foreground";
+export const META_ICON_ALERT_CLASS =
+  "bg-destructive/10 text-destructive ring-1 ring-inset ring-destructive/30 hover:bg-destructive/15 hover:text-destructive disabled:opacity-100";

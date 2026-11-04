@@ -283,9 +283,13 @@ function toFormValues(
         : null,
     tagsInput: tarefa?.tags?.join(", ") ?? "",
     visibilidade: VISIBILIDADE_PESSOAS,
-    observador_ids: tarefa
-      ? (tarefa.observadores?.map((o) => o.usuario_id) ?? [])
-      : [...(atribuidoIds.length ? atribuidoIds : (defaultAtribuidoIds ?? []))],
+    // Visualizadores = já salvos + todos os Responsáveis (sem duplicar).
+    observador_ids: [
+      ...new Set([
+        ...(tarefa?.observadores?.map((o) => o.usuario_id) ?? []),
+        ...(atribuidoIds.length ? atribuidoIds : (defaultAtribuidoIds ?? [])),
+      ]),
+    ],
     lembretes: parseLembretes(tarefa?.lembretes),
     recorrencia_tipo: rec?.tipo ?? "nenhuma",
     recorrencia_dias_semana: rec?.dias_semana ?? [],
@@ -414,8 +418,6 @@ export function TarefaPanelSheet({
   const [sideTab, setSideTab] = useState<"comentarios" | "anexos">(
     initialAba ?? "comentarios",
   );
-  /** Na criação, Visibilidade acompanha Responsáveis até edição manual. */
-  const visibilidadeManualRef = useRef(false);
   const [editingField, setEditingField] = useState<EditableTarefaField | null>(null);
 
   const ehModeloSerie =
@@ -640,7 +642,6 @@ export function TarefaPanelSheet({
 
   useLayoutEffect(() => {
     if (!open) return;
-    visibilidadeManualRef.current = !isCreate;
     // Ocorrências não carregam a regra do modelo no formulário.
     const recorrenciaOverride =
       tarefa && isSerieOcorrencia(tarefa) ? null : undefined;
@@ -665,13 +666,6 @@ export function TarefaPanelSheet({
     form,
     isCreate,
   ]);
-
-  // Criação: Visibilidade = Responsáveis até o usuário editar a Visibilidade.
-  useEffect(() => {
-    if (!open || !isCreate || visibilidadeManualRef.current) return;
-    form.setValue("observador_ids", atribuidoIds ?? [], { shouldDirty: false });
-    form.setValue("visibilidade", VISIBILIDADE_PESSOAS, { shouldDirty: false });
-  }, [open, isCreate, atribuidoIds, form]);
 
   const criadorDisplay = useMemo(() => {
     if (tarefa?.criador) return tarefa.criador;
@@ -1096,9 +1090,6 @@ export function TarefaPanelSheet({
                       pessoasParaVisibilidade={pessoasAtivas}
                       hideRecorrencia={!ehModeloSerie}
                       dateMode={ehModeloSerie ? "recorrencia" : "calendario"}
-                      onVisibilidadeManualChange={() => {
-                        visibilidadeManualRef.current = true;
-                      }}
                       emptyResponsavelLabel={
                         projetoId
                           ? "Defina a equipe do projeto antes de atribuir responsáveis"

@@ -112,13 +112,8 @@ function toFormValues(
 ): SubtarefaPanelSchema {
   const atribuidoIds = subtarefa?.responsaveis?.map((r) => r.usuario_id) ?? [];
   const ownObservadores = subtarefa?.observadores?.map((o) => o.usuario_id) ?? [];
-  const visibilidadeJaConfigurada = subtarefa?.visibilidade === VISIBILIDADE_PESSOAS;
-  // Enquanto não configurada: Visibilidade inicia igual aos Responsáveis.
-  const observadorIds = visibilidadeJaConfigurada
-    ? ownObservadores
-    : ownObservadores.length > 0
-      ? ownObservadores
-      : atribuidoIds;
+  // Visualizadores = já salvos + todos os Responsáveis (sem duplicar).
+  const observadorIds = [...new Set([...ownObservadores, ...atribuidoIds])];
 
   return {
     titulo: subtarefa?.titulo ?? "",
@@ -196,8 +191,6 @@ export function SubtarefaPanelSheet({
   const [editingField, setEditingField] = useState<EditableField | null>(null);
   const savingRef = useRef(false);
   const nestedModalLock = useNestedModalLock();
-  /** Visibilidade acompanha Responsáveis até edição manual (primeira configuração). */
-  const visibilidadeManualRef = useRef(false);
 
   const form = useForm<SubtarefaPanelSchema>({
     resolver: zodResolver(subtarefaPanelSchema),
@@ -343,17 +336,8 @@ export function SubtarefaPanelSheet({
       setEditingField(null);
       return;
     }
-    // Já configurada como lista de pessoas → não sincroniza mais com responsáveis.
-    visibilidadeManualRef.current = subtarefa?.visibilidade === VISIBILIDADE_PESSOAS;
     form.reset(toFormValues(subtarefa ?? null, parentTarefa));
   }, [open, subtarefa, parentTarefa, form]);
-
-  // Enquanto Visibilidade não for editada manualmente, acompanha Responsáveis.
-  useEffect(() => {
-    if (!open || visibilidadeManualRef.current) return;
-    form.setValue("observador_ids", atribuidoIds ?? [], { shouldDirty: false });
-    form.setValue("visibilidade", VISIBILIDADE_PESSOAS, { shouldDirty: false });
-  }, [open, atribuidoIds, form]);
 
   useEffect(() => {
     if (!open) return;
@@ -632,9 +616,6 @@ export function SubtarefaPanelSheet({
                     pessoasParaResponsavel={pessoasParaResponsavel}
                     pessoasParaVisibilidade={pessoasParaVisibilidade}
                     requireResponsavel={false}
-                    onVisibilidadeManualChange={() => {
-                      visibilidadeManualRef.current = true;
-                    }}
                     emptyResponsavelLabel="Nenhuma pessoa no escopo da tarefa"
                     emptyVisibilidadeLabel="Nenhuma pessoa no escopo da tarefa"
                   />

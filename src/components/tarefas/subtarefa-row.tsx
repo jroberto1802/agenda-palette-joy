@@ -32,7 +32,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { ITEM_CONCLUIDO_CLASS } from "@/lib/layout";
+import {
+  ITEM_CONCLUIDO_CLASS,
+  META_ICON_EMPTY_CLASS,
+  META_ICON_FILLED_CLASS,
+} from "@/lib/layout";
 import type {
   ProfileWithSetor,
   SubtarefaMetaUpdate,
@@ -222,10 +226,8 @@ function MetaIconButton({
           disabled={disabled}
           className={cn(
             "h-7 w-7 shrink-0 rounded-md",
-            // Preenchido: cor primária do sistema, destacado. Vazio: neutro/cinza.
-            active
-              ? "bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary disabled:opacity-90"
-              : "text-muted-foreground hover:text-foreground",
+            // Preenchido: azul aceso com fundo destacado. Vazio: cinza neutro.
+            active ? META_ICON_FILLED_CLASS : META_ICON_EMPTY_CLASS,
             className,
           )}
           aria-label={label}
@@ -587,6 +589,8 @@ export function SubtarefaRow({
                 }
                 disabled={!canInteract || saving}
                 lockedIds={lockedVisualizadorIds}
+                pinnedIds={responsavelIds}
+                pinnedLabel="Responsável"
                 placeholder="Selecione pessoas"
                 emptyLabel="Nenhuma pessoa no escopo da tarefa"
                 searchPlaceholder="Buscar por nome..."

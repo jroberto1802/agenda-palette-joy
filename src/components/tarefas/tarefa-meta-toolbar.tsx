@@ -40,6 +40,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  META_ICON_ALERT_CLASS,
+  META_ICON_EMPTY_CLASS,
+  META_ICON_FILLED_CLASS,
+} from "@/lib/layout";
 import { cn } from "@/lib/utils";
 import type {
   ProfileWithSetor,
@@ -82,11 +87,9 @@ export type TarefaMetaFormValues = {
 type MetaIconTone = "filled" | "empty" | "alert" | "plain";
 
 const META_ICON_TONE_CLASS: Record<MetaIconTone, string> = {
-  filled:
-    "bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary disabled:opacity-90",
-  empty: "text-muted-foreground hover:text-foreground",
-  alert:
-    "bg-destructive/10 text-destructive hover:bg-destructive/15 hover:text-destructive disabled:opacity-90",
+  filled: META_ICON_FILLED_CLASS,
+  empty: META_ICON_EMPTY_CLASS,
+  alert: META_ICON_ALERT_CLASS,
   plain: "bg-muted text-foreground",
 };
 
@@ -412,15 +415,13 @@ export function TarefaMetaToolbar({
                     value={field.value}
                     onChange={(ids) => {
                       field.onChange(ids);
-                      // Todo Responsável é também Visualizador (o inverso não vale).
-                      const novos = ids.filter((id) => !(field.value ?? []).includes(id));
-                      if (novos.length > 0) {
-                        const atuais = form.getValues("observador_ids") ?? [];
-                        form.setValue(
-                          "observador_ids",
-                          [...new Set([...atuais, ...novos])],
-                          { shouldDirty: true },
-                        );
+                      // Todo Responsável é também Visualizador. A soma é sempre aditiva:
+                      // Visualizadores já escolhidos permanecem (sem apagar nem duplicar) e
+                      // quem deixa de ser Responsável continua Visualizador.
+                      const atuais = form.getValues("observador_ids") ?? [];
+                      const soma = [...new Set([...atuais, ...ids])];
+                      if (soma.length !== atuais.length) {
+                        form.setValue("observador_ids", soma, { shouldDirty: true });
                         form.setValue("visibilidade", "pessoas_especificas", {
                           shouldDirty: true,
                         });
@@ -477,7 +478,8 @@ export function TarefaMetaToolbar({
                     pessoas={pessoasParaVisibilidade}
                     value={field.value ?? []}
                     onChange={(ids) => {
-                      field.onChange(ids);
+                      // Responsáveis sempre permanecem na lista (sem duplicar).
+                      field.onChange([...new Set([...ids, ...atribuidoIds])]);
                       form.setValue("visibilidade", "pessoas_especificas", {
                         shouldDirty: true,
                       });
@@ -485,6 +487,8 @@ export function TarefaMetaToolbar({
                     }}
                     disabled={!canEditVisibility}
                     lockedIds={lockedVisualizadorIds}
+                    pinnedIds={atribuidoIds}
+                    pinnedLabel="Responsável"
                     placeholder="Selecione pessoas"
                     emptyLabel={emptyVisibilidadeLabel}
                     searchPlaceholder="Buscar por nome..."
