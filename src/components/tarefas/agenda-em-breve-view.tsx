@@ -15,7 +15,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useSubtarefasAgenda, useTarefas } from "@/hooks/use-tarefas";
+import {
+  useSubtarefasAgenda,
+  useSubtarefasConcluidasAgenda,
+  useTarefas,
+} from "@/hooks/use-tarefas";
+import { ITEM_CONCLUIDO_CLASS } from "@/lib/layout";
 import { cn } from "@/lib/utils";
 import type { SubtarefaAgendaItem, TarefaWithRelations } from "@/types";
 import {
@@ -93,6 +98,20 @@ function emBreveRangeKey(start: Date): { de: string; ate: string } {
     ate: toLocalDateKey(days[days.length - 1])!,
   };
 }
+
+/** Filtro de situação da aba: ativas, concluídas ou ambas (padrão). */
+type EmBreveSituacao = "todas" | "ativas" | "concluidas";
+
+const SITUACAO_LABELS: Record<EmBreveSituacao, string> = {
+  todas: "Todas",
+  ativas: "Só ativas",
+  concluidas: "Só concluídas",
+};
+
+/** Atividade concluída no dia (consulta rápida — pertence ao menu Finalizados). */
+type EmBreveConcluida =
+  | { kind: "tarefa"; tarefa: TarefaWithRelations; concluidaEm: string }
+  | { kind: "subtarefa"; subtarefa: SubtarefaAgendaItem; concluidaEm: string };
 
 type EmBreveItem =
   | { kind: "tarefa"; tarefa: TarefaWithRelations }
@@ -207,6 +226,7 @@ export function AgendaEmBreveView({
   const queryClient = useQueryClient();
   const [windowStart, setWindowStart] = useState(() => startOfTodayLocal());
   const [classificar, setClassificar] = useState<TarefaClassificar>("prioridade_hora");
+  const [situacao, setSituacao] = useState<EmBreveSituacao>("todas");
 
   useEffect(() => {
     if (!usuarioId) return;
@@ -247,6 +267,28 @@ export function AgendaEmBreveView({
       lite: true,
     },
     { enabled: !!usuarioId },
+  );
+
+  // Concluídas: só buscadas quando a situação as exibe (Todas / Só concluídas).
+  const mostrarConcluidas = situacao !== "ativas";
+  const { data: tarefasConcluidas } = useTarefas(
+    {
+      atribuido_ids: usuarioId ? [usuarioId] : [],
+      somente_finalizadas: true,
+      conclusao_de: rangeDe,
+      conclusao_ate: rangeAte,
+      lite: true,
+    },
+    { enabled: !!usuarioId && mostrarConcluidas },
+  );
+
+  const { data: subtarefasConcluidas } = useSubtarefasConcluidasAgenda(
+    {
+      usuario_id: usuarioId ?? "",
+      conclusao_de: rangeDe,
+      conclusao_ate: rangeAte,
+    },
+    { enabled: !!usuarioId && mostrarConcluidas },
   );
 
   const {
@@ -348,6 +390,33 @@ export function AgendaEmBreveView({
     return map;
   }, [tarefas, subtarefas, previsoesBundle, days, classificar]);
 
+  // Concluídas de cada dia (pela data de conclusão), mais recentes primeiro.
+  const concluidasByDay = useMemo(() => {
+    const map = new Map<string, EmBreveConcluida[]>();
+    for (const day of days) {
+      map.set(toLocalDateKey(day)!, []);
+    }
+    for (const t of tarefasConcluidas ?? []) {
+      if (!t.concluida || !t.data_conclusao || isSerieModelo(t)) continue;
+      const key = toLocalDateKey(t.data_conclusao);
+      if (!key || !map.has(key)) continue;
+      map.get(key)!.push({ kind: "tarefa", tarefa: t, concluidaEm: t.data_conclusao });
+    }
+    for (const s of subtarefasConcluidas ?? []) {
+      if (!s.concluida || !s.data_conclusao) continue;
+      const key = toLocalDateKey(s.data_conclusao);
+      if (!key || !map.has(key)) continue;
+      map.get(key)!.push({ kind: "subtarefa", subtarefa: s, concluidaEm: s.data_conclusao });
+    }
+    for (const [key, items] of map) {
+      map.set(
+        key,
+        [...items].sort((a, b) => b.concluidaEm.localeCompare(a.concluidaEm)),
+      );
+    }
+    return map;
+  }, [tarefasConcluidas, subtarefasConcluidas, days]);
+
   const selectedMonth = windowStart.getMonth();
   const selectedYear = windowStart.getFullYear();
   const yearOptions = useMemo(() => {
@@ -440,6 +509,22 @@ export function AgendaEmBreveView({
               )}
             </Tooltip>
           </TooltipProvider>
+
+          <Select
+            value={situacao}
+            onValueChange={(value) => setSituacao(value as EmBreveSituacao)}
+          >
+            <SelectTrigger className="h-8 w-[148px]" aria-label="Situação">
+              <SelectValue placeholder="Situação" />
+            </SelectTrigger>
+            <SelectContent>
+              {(Object.keys(SITUACAO_LABELS) as EmBreveSituacao[]).map((option) => (
+                <SelectItem key={option} value={option}>
+                  {SITUACAO_LABELS[option]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="flex items-center gap-1">
@@ -475,6 +560,8 @@ export function AgendaEmBreveView({
         {days.map((day) => {
           const key = toLocalDateKey(day)!;
           const items = byDay.get(key) ?? [];
+          const concluidas = concluidasByDay.get(key) ?? [];
+          const mostrarAtivas = situacao !== "concluidas";
           const isToday = key === todayKey;
 
           return (
@@ -495,7 +582,7 @@ export function AgendaEmBreveView({
                   </p>
                 </div>
                 <span className="text-xs text-muted-foreground tabular-nums">
-                  {items.length}
+                  {mostrarAtivas ? items.length : concluidas.length}
                 </span>
               </header>
 
@@ -506,7 +593,8 @@ export function AgendaEmBreveView({
                     <Skeleton className="h-14 rounded-lg" />
                   </>
                 ) : (
-                  items.map((item) =>
+                  <>
+                  {mostrarAtivas && items.map((item) =>
                     item.kind === "tarefa" ? (
                       <EmBreveTaskCard
                         key={`tarefa-${item.tarefa.id}`}
@@ -531,7 +619,44 @@ export function AgendaEmBreveView({
                         previsao={item.previsao}
                       />
                     ),
-                  )
+                  )}
+
+                  {mostrarConcluidas && concluidas.length > 0 && (
+                    <>
+                      <div
+                        role="separator"
+                        className="flex items-center gap-2 pt-1 text-[11px] font-medium text-muted-foreground"
+                      >
+                        <span className="h-px flex-1 bg-border" />
+                        <span className="tabular-nums">Concluídas ({concluidas.length})</span>
+                        <span className="h-px flex-1 bg-border" />
+                      </div>
+                      {concluidas.map((item) => (
+                        <div
+                          key={
+                            item.kind === "tarefa"
+                              ? `concluida-tarefa-${item.tarefa.id}`
+                              : `concluida-subtarefa-${item.subtarefa.id}`
+                          }
+                          className={ITEM_CONCLUIDO_CLASS}
+                        >
+                          {item.kind === "tarefa" ? (
+                            <EmBreveTaskCard
+                              tarefa={item.tarefa}
+                              onOpen={() => onOpenTarefa(item.tarefa)}
+                            />
+                          ) : (
+                            <SubtarefaAgendaCard
+                              subtarefa={item.subtarefa}
+                              onOpen={() => onOpenSubtarefa(item.subtarefa)}
+                              compact
+                            />
+                          )}
+                        </div>
+                      ))}
+                    </>
+                  )}
+                  </>
                 )}
               </div>
 

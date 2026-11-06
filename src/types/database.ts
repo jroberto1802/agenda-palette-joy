@@ -528,6 +528,7 @@ export type Database = {
         Row: {
           concluida: boolean;
           concluido_por: string | null;
+          data_conclusao: string | null;
           created_at: string;
           criado_por: string | null;
           data_inicio: string | null;
@@ -556,6 +557,7 @@ export type Database = {
         Insert: {
           concluida?: boolean;
           concluido_por?: string | null;
+          data_conclusao?: string | null;
           created_at?: string;
           criado_por?: string | null;
           data_inicio?: string | null;
@@ -584,6 +586,7 @@ export type Database = {
         Update: {
           concluida?: boolean;
           concluido_por?: string | null;
+          data_conclusao?: string | null;
           created_at?: string;
           criado_por?: string | null;
           data_inicio?: string | null;

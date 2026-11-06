@@ -37,6 +37,7 @@ import type {
   Profile,
   SubtarefaAgendaFilters,
   SubtarefaAgendaItem,
+  SubtarefaConcluidasFilters,
   SubtarefaComentario,
   SubtarefaDetail,
   SubtarefaFormData,
@@ -559,6 +560,20 @@ export async function listTarefas(filters: TarefaFilters = {}): Promise<TarefaWi
 
     if (filters.periodo_fim?.trim()) {
       query = query.lte("data_conclusao", `${filters.periodo_fim.trim()}T23:59:59.999Z`);
+    }
+
+    // Intervalo por dia LOCAL da conclusão (periodo_* acima usa UTC).
+    const conclusaoDe = filters.conclusao_de?.trim();
+    const conclusaoAte = filters.conclusao_ate?.trim();
+    if (conclusaoDe || conclusaoAte) {
+      const { startIso, endIso } = localDateRangeToIsoBounds(
+        conclusaoDe || conclusaoAte!,
+        conclusaoAte || conclusaoDe!,
+      );
+      query = query
+        .not("data_conclusao", "is", null)
+        .gte("data_conclusao", startIso)
+        .lte("data_conclusao", endIso);
     }
 
     if (filters.somente_atrasadas) {
@@ -1440,6 +1455,54 @@ export async function listSubtarefasAgenda(
   const rows = await finalizeSubtarefasAgendaQuery(query, filters);
 
   // Só entra na agenda se o usuário estiver no escopo da própria subtarefa.
+  return rows.filter((row) =>
+    usuarioNoEscopoSubtarefa(usuarioId, {
+      criado_por: row.criado_por,
+      responsaveis: row.responsaveis,
+      observadores: row.observadores,
+    }),
+  );
+}
+
+/**
+ * Subtarefas concluídas em um intervalo de dias locais (pela `data_conclusao`),
+ * no mesmo escopo da Agenda: subtarefas em que o usuário é responsável.
+ * Usada pela seção "Concluídas" de cada dia na aba Em breve. A visibilidade
+ * continua garantida pelo RLS.
+ */
+export async function listSubtarefasConcluidasAgenda(
+  filters: SubtarefaConcluidasFilters,
+): Promise<SubtarefaAgendaItem[]> {
+  const usuarioId = filters.usuario_id.trim();
+  if (!usuarioId) return [];
+
+  const { startIso, endIso } = localDateRangeToIsoBounds(
+    filters.conclusao_de,
+    filters.conclusao_ate,
+  );
+
+  const query = supabase
+    .from("subtarefas")
+    .select(
+      asSelect(`
+      ${SUBTAREFA_AGENDA_SELECT},
+      data_conclusao,
+      ${SUB_RESPONSAVEL_FILTER_EMBED},
+      setor:setores(id, nome, cor),
+      projeto:projetos(id, nome),
+      tarefa:tarefas!inner(id, titulo, concluida, deleted_at, setor_id, projeto_id, serie_raiz_id)
+    `),
+    )
+    .eq("filter_resp.usuario_id", usuarioId)
+    .eq("concluida", true)
+    .not("data_conclusao", "is", null)
+    .gte("data_conclusao", startIso)
+    .lte("data_conclusao", endIso)
+    .is("tarefa.deleted_at", null)
+    .order("data_conclusao", { ascending: false });
+
+  const rows = await finalizeSubtarefasAgendaQuery(query, { usuario_id: usuarioId, lite: true });
+
   return rows.filter((row) =>
     usuarioNoEscopoSubtarefa(usuarioId, {
       criado_por: row.criado_por,

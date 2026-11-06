@@ -17,6 +17,7 @@ import {
   listRecentTarefas,
   listSeriesModelos,
   listSubtarefasAgenda,
+  listSubtarefasConcluidasAgenda,
   listTarefas,
   listTarefasCalendario,
   moveSubtarefa,
@@ -42,6 +43,7 @@ import {
 } from "@/services/tarefa-recorrencia";
 import type {
   SubtarefaAgendaFilters,
+  SubtarefaConcluidasFilters,
   SubtarefaAgendaItem,
   SubtarefaDetail,
   SubtarefaFormData,
@@ -227,6 +229,8 @@ export function useTarefas(
     excluir_finalizadas: filters.excluir_finalizadas ? "1" : "0",
     periodo_inicio: filters.periodo_inicio ?? "",
     periodo_fim: filters.periodo_fim ?? "",
+    conclusao_de: filters.conclusao_de ?? "",
+    conclusao_ate: filters.conclusao_ate ?? "",
     data_inicio_de: filters.data_inicio_de ?? "",
     data_inicio_ate: filters.data_inicio_ate ?? "",
     somente_atrasadas: filters.somente_atrasadas ? "1" : "0",
@@ -280,6 +284,25 @@ export function useSubtarefasAgenda(
     enabled: (options?.enabled ?? true) && !!filters.usuario_id,
     placeholderData: keepPreviousData,
     staleTime: options?.staleTime ?? (filters.lite ? AGENDA_STALE_MS : 0),
+  });
+}
+
+/** Subtarefas concluídas em um intervalo de dias (seção "Concluídas" da aba Em breve). */
+export function useSubtarefasConcluidasAgenda(
+  filters: SubtarefaConcluidasFilters,
+  options?: { enabled?: boolean },
+) {
+  return useQuery({
+    queryKey: subtarefaKeys.agenda({
+      tipo: "concluidas",
+      usuario_id: filters.usuario_id,
+      conclusao_de: filters.conclusao_de,
+      conclusao_ate: filters.conclusao_ate,
+    }),
+    queryFn: () => listSubtarefasConcluidasAgenda(filters),
+    enabled: (options?.enabled ?? true) && !!filters.usuario_id,
+    placeholderData: keepPreviousData,
+    staleTime: AGENDA_STALE_MS,
   });
 }
 

@@ -183,6 +183,13 @@ export type TarefaFilters = {
   periodo_inicio?: string;
   /** YYYY-MM-DD — fim do intervalo por data_conclusao */
   periodo_fim?: string;
+  /**
+   * YYYY-MM-DD — início do intervalo (dia LOCAL) por `data_conclusao`.
+   * Usado com `somente_finalizadas` (ex.: "Concluídas" do dia na aba Em breve).
+   */
+  conclusao_de?: string;
+  /** YYYY-MM-DD — fim do intervalo (dia LOCAL) por `data_conclusao`. */
+  conclusao_ate?: string;
   /** YYYY-MM-DD — início do intervalo por campo Data (`data_inicio`) */
   data_inicio_de?: string;
   /** YYYY-MM-DD — fim do intervalo por campo Data (`data_inicio`) */
@@ -241,6 +248,15 @@ export type SubtarefaAgendaItem = SubtarefaWithAuthors & {
   tarefa: Pick<Tarefa, "id" | "titulo"> | null;
   setor: Pick<Setor, "id" | "nome" | "cor"> | null;
   projeto: Pick<Projeto, "id" | "nome"> | null;
+};
+
+/** Subtarefas concluídas em um intervalo de dias LOCAIS (aba Em breve › "Concluídas"). */
+export type SubtarefaConcluidasFilters = {
+  usuario_id: string;
+  /** YYYY-MM-DD — início (dia local) por `data_conclusao`. */
+  conclusao_de: string;
+  /** YYYY-MM-DD — fim (dia local) por `data_conclusao`. */
+  conclusao_ate: string;
 };
 
 export type SubtarefaAgendaFilters = {
