@@ -16,12 +16,16 @@ export type AgendaClassificarScope =
   | "agenda-geral"
   | "agenda-visualizando"
   | "equipe"
+  | "equipe-hoje"
+  | "equipe-em-breve"
   | "projeto-detalhe"
   | "recorrentes-pasta";
 
 const HOJE_EM_BREVE_SCOPES: ReadonlySet<AgendaClassificarScope> = new Set([
   "agenda-hoje",
   "agenda-em-breve",
+  "equipe-hoje",
+  "equipe-em-breve",
 ]);
 
 export function isHojeOuEmBreveScope(scope: AgendaClassificarScope): boolean {

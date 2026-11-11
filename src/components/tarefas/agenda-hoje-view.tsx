@@ -74,6 +74,8 @@ function sortAgendaItems(
 
 export function AgendaHojeView({
   usuarioId,
+  preferenceUserId,
+  preferenceScope = "agenda-hoje",
   setores,
   projetos,
   onOpenTarefa,
@@ -83,7 +85,11 @@ export function AgendaHojeView({
   canDeleteTarefa,
   onDelete,
 }: {
+  /** Dono da agenda (quem tem as tarefas atribuídas). */
   usuarioId: string | undefined;
+  /** Quem consulta: dono das preferências salvas. Padrão: `usuarioId`. */
+  preferenceUserId?: string;
+  preferenceScope?: "agenda-hoje" | "equipe-hoje";
   setores: SetorWithGerente[];
   projetos: Pick<Projeto, "id" | "nome">[];
   onOpenTarefa: (tarefa: TarefaWithRelations) => void;
@@ -105,16 +111,18 @@ export function AgendaHojeView({
   filtersRef.current = filters;
   const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const prefUserId = preferenceUserId ?? usuarioId;
+
   useEffect(() => {
-    if (!usuarioId) return;
-    const classificar = readAgendaClassificarPreference(usuarioId, "agenda-hoje");
+    if (!prefUserId) return;
+    const classificar = readAgendaClassificarPreference(prefUserId, preferenceScope);
     setFilters((prev) =>
       prev.classificar === classificar ? prev : { ...prev, classificar },
     );
     setDebouncedFilters((prev) =>
       prev.classificar === classificar ? prev : { ...prev, classificar },
     );
-  }, [usuarioId]);
+  }, [prefUserId, preferenceScope]);
 
   useEffect(() => {
     return () => {
@@ -125,9 +133,9 @@ export function AgendaHojeView({
   const handleFiltersChange = (next: TarefaFilters) => {
     if (next.classificar && next.classificar !== filtersRef.current.classificar) {
       writeAgendaClassificarPreference(
-        usuarioId,
-        "agenda-hoje",
-        normalizeTarefaClassificar(next.classificar, "agenda-hoje"),
+        prefUserId,
+        preferenceScope,
+        normalizeTarefaClassificar(next.classificar, preferenceScope),
       );
     }
     setFilters(next);
@@ -224,7 +232,7 @@ export function AgendaHojeView({
 
   const classificarMode: TarefaClassificar = normalizeTarefaClassificar(
     debouncedFilters.classificar,
-    "agenda-hoje",
+    preferenceScope,
   );
 
   const itemsHoje = useMemo((): AgendaHojeItem[] => {

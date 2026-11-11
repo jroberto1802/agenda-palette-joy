@@ -214,11 +214,17 @@ function EmBreveTaskCard({
 
 export function AgendaEmBreveView({
   usuarioId,
+  preferenceUserId,
+  preferenceScope = "agenda-em-breve",
   onOpenTarefa,
   onOpenSubtarefa,
   onCreateForDate,
 }: {
+  /** Dono da agenda (quem tem as tarefas atribuídas). */
   usuarioId: string | undefined;
+  /** Quem consulta: dono das preferências salvas. Padrão: `usuarioId`. */
+  preferenceUserId?: string;
+  preferenceScope?: "agenda-em-breve" | "equipe-em-breve";
   onOpenTarefa: (tarefa: TarefaWithRelations) => void;
   onOpenSubtarefa: (subtarefa: SubtarefaAgendaItem) => void;
   onCreateForDate: (date: Date) => void;
@@ -228,15 +234,17 @@ export function AgendaEmBreveView({
   const [classificar, setClassificar] = useState<TarefaClassificar>("prioridade_hora");
   const [situacao, setSituacao] = useState<EmBreveSituacao>("todas");
 
+  const prefUserId = preferenceUserId ?? usuarioId;
+
   useEffect(() => {
-    if (!usuarioId) return;
-    setClassificar(readAgendaClassificarPreference(usuarioId, "agenda-em-breve"));
-  }, [usuarioId]);
+    if (!prefUserId) return;
+    setClassificar(readAgendaClassificarPreference(prefUserId, preferenceScope));
+  }, [prefUserId, preferenceScope]);
 
   const handleClassificarChange = (value: TarefaClassificar) => {
-    const next = normalizeTarefaClassificar(value, "agenda-em-breve");
+    const next = normalizeTarefaClassificar(value, preferenceScope);
     setClassificar(next);
-    writeAgendaClassificarPreference(usuarioId, "agenda-em-breve", next);
+    writeAgendaClassificarPreference(prefUserId, preferenceScope, next);
   };
 
   const days = useMemo(
@@ -297,7 +305,7 @@ export function AgendaEmBreveView({
     isFetching: fetchingPrevisoes,
   } = useQuery({
     queryKey: ["recorrencia-previsoes", usuarioId, rangeDe, rangeAte],
-    queryFn: () => listPrevisoesOcorrencia(rangeDe, rangeAte),
+    queryFn: () => listPrevisoesOcorrencia(rangeDe, rangeAte, usuarioId),
     enabled: !!usuarioId,
     placeholderData: keepPreviousData,
     staleTime: 60_000,
@@ -315,7 +323,7 @@ export function AgendaEmBreveView({
     for (const { de, ate } of neighbors) {
       void queryClient.prefetchQuery({
         queryKey: ["recorrencia-previsoes", usuarioId, de, ate],
-        queryFn: () => listPrevisoesOcorrencia(de, ate),
+        queryFn: () => listPrevisoesOcorrencia(de, ate, usuarioId),
         staleTime: 60_000,
       });
     }

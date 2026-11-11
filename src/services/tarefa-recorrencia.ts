@@ -128,6 +128,12 @@ export type PrevisoesAgenda = {
 export async function listPrevisoesOcorrencia(
   deIsoDate: string,
   ateIsoDate: string,
+  /**
+   * Dono da agenda. Padrão: usuário logado (Minha Agenda). Na Agenda de outra
+   * pessoa (Equipe), previsões das séries em que ELA é responsável — e que o
+   * usuário logado pode ver (a leitura das séries continua sob RLS).
+   */
+  responsavelId?: string,
 ): Promise<PrevisoesAgenda> {
   const de = startOfDay(new Date(deIsoDate + "T12:00:00"));
   const ateSolicitado = endOfDay(new Date(ateIsoDate + "T12:00:00"));
@@ -170,7 +176,7 @@ export async function listPrevisoesOcorrencia(
   const { data: respLinks, error: respError } = await supabase
     .from("tarefa_responsaveis")
     .select("tarefa_id")
-    .eq("usuario_id", user.id)
+    .eq("usuario_id", responsavelId ?? user.id)
     .in("tarefa_id", modeloIdsAll);
   if (respError) throw respError;
 
