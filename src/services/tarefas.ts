@@ -1335,7 +1335,7 @@ const SUBTAREFA_INDICADORES_SELECT = `
 /** Campos base da subtarefa — sem aggregates de comentários/anexos. */
 const SUBTAREFA_BASE_SELECT = `
   id, tarefa_id, titulo, concluida, posicao, created_at, criado_por, concluido_por,
-  data_inicio, descricao, prioridade, lembretes,
+  data_conclusao, data_inicio, descricao, prioridade, lembretes,
   recorrencia, projeto_id, setor_id, visibilidade, updated_at,
   dia_no_mes, offset_dias, origem_subtarefa_id,
   criador:profiles!subtarefas_criado_por_fkey(id, nome_completo, avatar_url, ativo),

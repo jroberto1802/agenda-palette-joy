@@ -32,6 +32,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { formatAutoriaTooltip } from "@/utils/formatters";
 import {
   ITEM_CONCLUIDO_CLASS,
   META_ICON_EMPTY_CLASS,
@@ -174,17 +175,26 @@ function AuthorAvatar({
   name,
   avatarUrl,
   label,
+  quando,
   ativo = true,
 }: {
   name: string;
   avatarUrl?: string | null;
-  label: string;
+  label: "Criado por" | "Concluído por";
+  /** Instante da ação (criação/conclusão) — exibido no tooltip em horário de Brasília. */
+  quando?: string | null;
   ativo?: boolean | null;
 }) {
+  const tooltip = formatAutoriaTooltip({
+    acao: label === "Criado por" ? "Criado" : "Concluído",
+    nome: name,
+    quando,
+    ativo,
+  });
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span className="inline-flex shrink-0" aria-label={`${label}: ${name}`}>
+        <span className="inline-flex shrink-0" aria-label={tooltip}>
           <ProfileAvatar
             name={name}
             avatarUrl={avatarUrl}
@@ -194,10 +204,7 @@ function AuthorAvatar({
         </span>
       </TooltipTrigger>
       <TooltipContent side="top" className={META_OVERLAY_Z}>
-        <p className="text-xs">
-          {label}: {name}
-          {ativo === false ? " (desativada)" : ""}
-        </p>
+        <p className="text-xs">{tooltip}</p>
       </TooltipContent>
     </Tooltip>
   );
@@ -605,6 +612,7 @@ export function SubtarefaRow({
             avatarUrl={subtarefa.criador?.avatar_url}
             ativo={subtarefa.criador?.ativo}
             label="Criado por"
+            quando={subtarefa.created_at}
           />
           {subtarefa.concluida && concluidoNome && (
             <AuthorAvatar
@@ -612,6 +620,7 @@ export function SubtarefaRow({
               avatarUrl={subtarefa.concluido_por_usuario?.avatar_url}
               ativo={subtarefa.concluido_por_usuario?.ativo}
               label="Concluído por"
+              quando={subtarefa.data_conclusao}
             />
           )}
 

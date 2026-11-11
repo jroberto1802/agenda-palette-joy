@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { TarefaVisibilidade } from "@/types";
+import { formatAutoriaTooltip } from "@/utils/formatters";
 
 /** Acima de Dialog/Sheet e do drawer de subtarefa. */
 const OVERLAY_Z = "z-[100]";
@@ -23,9 +24,12 @@ export type TarefaPeopleMini = {
 function PersonAvatar({
   person,
   compact = false,
+  tooltipText,
 }: {
   person: TarefaPeopleMini;
   compact?: boolean;
+  /** Substitui o texto padrão do tooltip (ex.: "Criado por Fulano em ..."). */
+  tooltipText?: string;
 }) {
   return (
     <Tooltip>
@@ -45,8 +49,12 @@ function PersonAvatar({
       </TooltipTrigger>
       <TooltipContent side="top" className={OVERLAY_Z}>
         <p className="text-xs">
-          {person.nome_completo}
-          {person.ativo === false ? " (desativada)" : ""}
+          {tooltipText ?? (
+            <>
+              {person.nome_completo}
+              {person.ativo === false ? " (desativada)" : ""}
+            </>
+          )}
         </p>
       </TooltipContent>
     </Tooltip>
@@ -145,7 +153,16 @@ export function TarefaPeopleStrip({
           <span className={labelClass}>Criado por</span>
           {criador ? (
             <div className="flex items-center gap-1.5">
-              <PersonAvatar person={criador} compact={compact} />
+              <PersonAvatar
+                person={criador}
+                compact={compact}
+                tooltipText={formatAutoriaTooltip({
+                  acao: "Criado",
+                  nome: criador.nome_completo,
+                  quando: createdAt,
+                  ativo: criador.ativo,
+                })}
+              />
               {createdLabel && <span className={mutedClass}>{createdLabel}</span>}
             </div>
           ) : (
